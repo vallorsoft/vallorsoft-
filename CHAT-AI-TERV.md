@@ -37,6 +37,28 @@ kell átállni, ahol a meglévő determinisztikus logika gyors előszűrőként 
 
 ## 2. Célkép — mit tudjon a chat
 
+### 2.0 Hatókör (eldöntve, 2026-10-09)
+
+A chat-irányítás **az Admin és a Manager felületen** él (`/admin`, `/manager` — a meglévő 💬 lebegő
+gomb minden fülön). A **sofőr** (`/sofer`), a **könyvelő**, az **ügyfél-** és az **alvállalkozói
+portál**, valamint a **developer** felület **nem** kap chat-irányítást.
+
+Szerep szerinti különbségek — a chat mindig pontosan azt engedi, amit a felület:
+
+| | Admin | Manager |
+|---|---|---|
+| Fuvar, flotta, sofőr, ügyfél, alvállalkozó, dokumentum, levelezés, kalkulátor | ✅ | ✅ |
+| Pénzügyi számok (bevétel, kintlévőség, árrés, eredmény) | ✅ | csak `stats_finance` joggal |
+| Fuvar törlése | ✅ | csak `orders_delete` joggal |
+| Számla kiállítása / storno | ✅ | csak `invoice_issue` joggal |
+| Felhasználók kezelése, meghívó | ✅ | csak `users_manage` joggal |
+| Integrációk, Jogosultságok, cég-beállítások írása, cél-értékek, időzített riport | ✅ | ❌ (nem is kínálja fel) |
+
+A katalógus minden képessége `roles` + opcionális `perm` (granulált jog, `handlers/permissions.js`
+`hasPerm`) mezőt kap; az AI-hoz CSAK a bejelentkezett felhasználónak elérhető képességek sémái
+mennek, így a Manager nem is kap javaslatot olyanra, amit nem tehet meg. A végső kapu
+változatlanul a meglévő handler.
+
 1. **Bármit megkérdezni** (olvasás): „hány fuvar van úton?", „mikor jár le a B104VLR ITP-je?",
    „mennyivel tartozunk Gondos Imrének?", „mi a kintlévőség Bilkánál?", „mennyi volt a szeptemberi
    átlagfogyasztás?".
@@ -88,6 +110,7 @@ párhuzamos üzleti logika.
   domain: 'fleet',
   kind: 'write',                            // 'read' | 'write' | 'ui' | 'danger'
   roles: ['Admin', 'Manager'],
+  perm: null,                               // pl. 'orders_delete' — Managernél kötelező granulált jog
   feature: 'expiries',                      // feature-catalog kulcs (csomag-kapu)
   desc: { hu: 'Lejárat rögzítése járműhöz / sofőrhöz', ro: 'Adaugă scadență…' },
   examples: { hu: ['a B104VLR ITP-je jövő márciusban jár le'], ro: ['ITP B104VLR expiră în martie'] },
@@ -328,4 +351,4 @@ frissítés (ELSŐ SZABÁLY 6. pont), Fly.io deploy.
 4. **Számla kiállítás / storno chatből**: engedjük (dupla ✅-vel), vagy maradjon csak felületen?
 5. **Csomag**: a teljes chat-irányítás a Pro csomagtól (`ai-szoveges-fuvar`), vagy új kulcs
    (`ai-asszisztens`) külön árazással?
-6. **Sofőr-oldal**: a sofőr is kapjon chat-irányítást (menetlevél, állomás-gomb, határ diktálva)?
+6. ~~Sofőr-oldal~~ — **eldöntve:** csak az Admin és a Manager felület (lásd 2.0).
