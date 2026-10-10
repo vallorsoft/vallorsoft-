@@ -5407,3 +5407,18 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 /* 💬 Chat-levél: saját fájl csatolása (📎) */
 #ochModal .och-up-chip small{ font-weight:500; opacity:.7; margin-left:2px; }
 #ochModal .och-att-add{ border-style:dashed; }
+
+/* 🗓️ AI-chat: diurna-napok naptára (lib/chatDays.js calendarHtml) */
+#ochModal .och-cal-ms { display: flex; flex-wrap: wrap; gap: 14px; margin: 8px 0 4px; }
+#ochModal .och-cal-m { flex: 1 1 220px; min-width: 0; }
+#ochModal .och-cal-mt { font-weight: 700; font-size: 13px; margin-bottom: 6px; text-transform: capitalize; }
+#ochModal .och-cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+#ochModal .och-cal-wd { font-size: 10.5px; text-align: center; color: #64748b; font-weight: 600; }
+#ochModal .och-cal-d { min-height: 30px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #0f172a; font-size: 12.5px; cursor: pointer; padding: 0; }
+#ochModal .och-cal-d.today { border-color: #2563eb; font-weight: 700; }
+#ochModal .och-cal-d.on { background: #16a34a; border-color: #15803d; color: #fff; font-weight: 700; }
+#ochModal .och-cal-cnt { font-weight: 700; margin-right: auto; align-self: center; }
+#ochModal .och-cal-need { align-self: center; font-size: 12px; color: #b45309; margin-right: 8px; }
+#ochModal .och-cal-need.ok { color: #15803d; }
+#ochModal[data-theme="dark"] .och-cal-d { background: rgba(255,255,255,0.05); color: #e2e8f0; border-color: #475569; }
+#ochModal[data-theme="dark"] .och-cal-d.on { background: #16a34a; color: #fff; }

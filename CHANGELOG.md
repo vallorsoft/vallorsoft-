@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-10 — 💬 Chat: diurna-napok naptárral + a maradék törzsadat/beállítás chatből (PR #546)
+
+- **Diurna / napidíj napjai kötelezők a chatben is:** ha a mondatból hiányoznak a napok (pl. „Gondos Imrének 6 nap diurna 70 euró”), a chat egy kattintható zöld mini-naptárt küld (előző + aktuális hónap), „✓ Kész” után a járandóság a kiválasztott napokkal kerül fel — a decont-naptár ezekből készül. Szövegesen is megadható: „okt 1-6”, „október 1-től 6-ig”, „10.01-10.06”, „szept 28-30, okt 1-2”, „de la 1 până la 3 octombrie”. Ha a darabszám és a napok száma eltér, újra kér. Új `lib/chatDays.js` (`parseDays`/`daysFromText`/`calendarHtml`), `OrderChat.dayTog`/`dayGo`.
+- **Új chat-funkciók** (`lib/chatTools/manage.js`, meglévő handlereken át): alvállalkozó módosítása/törlése, csoportjai (lista/létrehozás/átnevezés/törlés/csoportba tétel), jármű követő-linkje (API-kulcs chatből nem adható meg), szállítói számla törlése; ügyfél törlése (csak Admin, közös `deleteClient`); meghívók listája/visszavonása; ügyfél-/alvállalkozói portál-belépők listája és letiltása/visszaengedése; kedvenc helyszínek listája/törlése; árajánlat módosítása; tranzakciós e-mail sablonok listája, szövegük módosítása és küldés sablonból; költség-kalkulátor költségtételei (jármű/sofőr/cég); fuvar-sorozatok; útdíj-ráták; tanult adatok listája és törlése; kiküldött levelek naplója. A ❓ súgó új „🗂️ Törzsadat és beállítás” csoportot kapott.
+- Hiányzó audit pótolva: szállítói számla törlése, portál-belépő letiltása (ügyfél + alvállalkozó), ügyfél törlése. Teszt: `tests/unit/chatTools-manage.test.js` (+17); **1736 Jest zöld**. Cache-bust `?v=20261010chatdays`.
+
 ## 2026-10-10 — 📎 Saját fájl csatolása a levelekhez + 💬 chatből: ügyfél/portál-meghívó, beérkező megrendelés, menetlevél, árajánlat, felhasználó-kezelés (PR #545)
 
 - **📎 Fájl a gépről/telefonról** minden kimenő levélhez: a 💬 chat levél-módjában (fuvar-levél, általános levél, válasz), és a „✉️ Email a fuvarról” ablakban. Kép, PDF, Excel, Word, CSV, ZIP — max. 5 fájl, fájlonként 10 MB, együtt 15 MB. Közös szerver-ellenőrzés: `lib/mailUploads.js` `sanitizeUploads` (kiterjesztés-fehérlista + MIME-egyezés, fájlnév-tisztítás). A fájl csak a levélbe kerül: nem tároljuk, AI-hoz nem jut, a napló csak a nevét őrzi.

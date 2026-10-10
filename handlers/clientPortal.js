@@ -102,6 +102,7 @@ handlers.clientPortalSetActive = async function (req, res, args) {
     const r = await pool.query(
       'UPDATE client_users SET activ = $1 WHERE id = $2 AND company_id = $3', [activ, id, cid]);
     if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
+    try { require('../lib/audit').fromReq(req, 'client_portal.set_active', 'client_user', id, { activ }); } catch (_) {}
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('clientPortalSetActive hiba:', err);

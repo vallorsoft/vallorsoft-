@@ -78,13 +78,22 @@ router.put('/api/clients/:id', requireLogin, requireRole('Admin','Manager'), asy
   } catch (e) { console.error('PUT /api/clients/:id hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
+// Ügyfél törlése — a REST és a chat KÖZÖS útja (company_id-szűrt).
+// A hivatkozó fuvarok client_id-ja NULL lesz (FK ON DELETE SET NULL), a fuvar megmarad.
+async function deleteClient(req, id) {
+  const cid = req.session.user.company_id;
+  const r = await pool.query(`DELETE FROM clients WHERE id=$1 AND company_id=$2`, [id, cid]);
+  if (r.rowCount) { try { await require('../lib/audit').fromReq(req, 'client.delete', 'client', id, null); } catch (_) {} }
+  return r.rowCount > 0;
+}
+
 router.delete('/api/clients/:id', requireLogin, requireRole('Admin'), async (req, res) => {
   try {
-    await pool.query(`DELETE FROM clients WHERE id=$1 AND company_id=$2`,
-      [req.params.id, req.session.user.company_id]);
+    await deleteClient(req, req.params.id);
     res.json({ ok: true });
   } catch (e) { console.error('DELETE /api/clients/:id hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 module.exports = router;
 module.exports.insertClient = insertClient;
+module.exports.deleteClient = deleteClient;
