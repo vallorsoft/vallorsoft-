@@ -143,7 +143,7 @@
   }
   function paintLog() {
     var box = $('trLog'); if (!box) return;
-    if (!S.log.length) { box.innerHTML = '<div class="tr-empty">' + esc(tt('sof.tr.convHint')) + '</div>'; return; }
+    if (!S.log.length) { box.innerHTML = '<div class="tr-empty">' + esc(tt('sof.tr.convEmpty')) + '</div>'; return; }
     box.innerHTML = S.log.map(function (e, i) {
       return '<div class="tr-bub ' + (e.side === 'me' ? 'me' : 'oth') + '">'
         + '<div class="tr-src">' + esc(e.src) + '</div>'
@@ -172,10 +172,11 @@
       repaint();
     });
   }
+  var ICO_MIC = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
   function paintMics() {
     var bm = $('trMicMe'), bo = $('trMicOther'), bt = $('trTxtMic');
-    if (bm) { bm.classList.toggle('on', S.recSide === 'me'); bm.innerHTML = '🎤 ' + esc(tt('sof.tr.meSpeaks')) + '<small>' + esc(lname(S.me)) + '</small>'; }
-    if (bo) { bo.classList.toggle('on', S.recSide === 'other'); bo.innerHTML = '🎤 ' + esc(SPEAK[S.other] || lname(S.other)) + '<small>' + esc(tt('sof.tr.otherSpeaks') + ' · ' + lname(S.other)) + '</small>'; }
+    if (bm) { bm.classList.toggle('on', S.recSide === 'me'); bm.innerHTML = '<span class="tr-mic-l">' + ICO_MIC + esc(tt('sof.tr.meSpeaks')) + '</span><small>' + esc(lname(S.me)) + '</small>'; }
+    if (bo) { bo.classList.toggle('on', S.recSide === 'other'); bo.innerHTML = '<span class="tr-mic-l">' + ICO_MIC + esc(SPEAK[S.other] || lname(S.other)) + '</span><small>' + esc(tt('sof.tr.otherSpeaks') + ' · ' + lname(S.other)) + '</small>'; }
     if (bt) bt.classList.toggle('on', S.recSide === 'text');
   }
 
@@ -196,8 +197,9 @@
     if (!S.me) S.me = uiLang() === 'hu' ? 'hu' : 'ro';
     var conv = S.tab === 'conv';
     m.innerHTML = '<div class="tr-card">'
-      + '<div class="tr-head"><b>🌐 ' + esc(tt('sof.tr.title')) + '</b>'
+      + '<div class="tr-head"><b>🌐 ' + esc(tt('sof.tr.title')) + ' <button type="button" class="tr-help-i" onclick="trHelp()" aria-label="' + esc(tt('sof.tr.helpTip')) + '" title="' + esc(tt('sof.tr.helpTip')) + '">!</button></b>'
       + '<button type="button" class="tr-x" onclick="trClose()" aria-label="✕">✕</button></div>'
+      + '<div class="tr-help" id="trHelp" hidden><button type="button" class="tr-help-x" onclick="trHelp(false)" aria-label="✕">✕</button>' + esc(tt('sof.tr.convHint')) + '</div>'
       + '<div class="tr-tabs"><button type="button" class="' + (conv ? 'act' : '') + '" onclick="trTab(\'conv\')">🗣️ ' + esc(tt('sof.tr.tabConv')) + '</button>'
       + '<button type="button" class="' + (!conv ? 'act' : '') + '" onclick="trTab(\'text\')">✍️ ' + esc(tt('sof.tr.tabText')) + '</button></div>'
       + (conv ? convHtml() : textHtml())
@@ -214,18 +216,18 @@
       + '<div class="tr-log" id="trLog"></div>'
       + '<div class="tr-mics"><button type="button" id="trMicMe" class="tr-mic me" onclick="trListen(\'me\')"></button>'
       + '<button type="button" id="trMicOther" class="tr-mic oth" onclick="trListen(\'other\')"></button></div>'
-      + '<div class="tr-typed"><input id="trConvIn" class="tr-in" maxlength="1500" placeholder="' + esc(tt('sof.tr.typeHere')) + '" onkeydown="if(event.key===\'Enter\'){trSend(\'me\')}">'
-      + '<button type="button" onclick="trSend(\'me\')" title="' + esc(tt('sof.tr.meSpeaks')) + '">' + esc(tt('sof.tr.sendMe')) + '</button>'
-      + '<button type="button" onclick="trSend(\'other\')" title="' + esc(tt('sof.tr.otherSpeaks')) + '">' + esc(tt('sof.tr.sendOther')) + '</button></div>'
+      + '<div class="tr-typed tr-composer"><input id="trConvIn" class="tr-in" maxlength="1500" placeholder="' + esc(tt('sof.tr.typeHere')) + '" onkeydown="if(event.key===\'Enter\'){trSend(\'me\')}">'
+      + '<button type="button" class="tr-send me" onclick="trSend(\'me\')" title="' + esc(tt('sof.tr.meSpeaks')) + '">' + esc(tt('sof.tr.sendMe')) + '</button>'
+      + '<button type="button" class="tr-send oth" onclick="trSend(\'other\')" title="' + esc(tt('sof.tr.otherSpeaks')) + '">' + esc(tt('sof.tr.sendOther')) + '</button></div>'
       + '<div class="tr-foot"><label><input type="checkbox" ' + (S.auto ? 'checked' : '') + ' onchange="trAuto(this.checked)"> 🔊 ' + esc(tt('sof.tr.autoSpeak')) + '</label>'
       + '<button type="button" class="tr-clear" onclick="trClear()">🗑 ' + esc(tt('sof.tr.clear')) + '</button></div>'
       + (SR ? '' : '<div class="tr-warn">' + esc(tt('sof.tr.noSpeech')) + '</div>');
   }
   function textHtml() {
     return '<div class="tr-langs one"><label><span>' + esc(tt('sof.tr.target')) + '</span><select id="trTarget" onchange="trSetLang(\'target\',this.value)">' + opts(S.target) + '</select></label></div>'
-      + '<textarea id="trTxt" class="tr-ta" maxlength="1500" rows="4" placeholder="' + esc(tt('sof.tr.typeHere')) + '"></textarea>'
-      + '<div class="tr-row">' + (SR ? '<button type="button" id="trTxtMic" class="tr-btn ghost" onclick="trDictate()">🎤</button>' : '')
-      + '<button type="button" class="tr-btn" onclick="trDoText()">🌐 ' + esc(tt('sof.tr.translate')) + '</button></div>'
+      + '<div class="tr-composer col"><textarea id="trTxt" class="tr-ta" maxlength="1500" rows="4" placeholder="' + esc(tt('sof.tr.typeHere')) + '"></textarea>'
+      + '<div class="tr-tools">' + (SR ? '<button type="button" id="trTxtMic" class="tr-round" onclick="trDictate()" aria-label="🎤">' + ICO_MIC + '</button>' : '<span></span>')
+      + '<button type="button" class="tr-send me" onclick="trDoText()">🌐 ' + esc(tt('sof.tr.translate')) + '</button></div></div>'
       + '<div class="tr-res" id="trRes" style="display:none"><div id="trResTxt" class="tr-res-txt"></div>'
       + '<div class="tr-row"><button type="button" class="tr-btn ghost" onclick="trSayRes()">🔊 ' + esc(tt('sof.tr.speak')) + '</button>'
       + '<button type="button" class="tr-btn ghost" onclick="trCopyRes()">📋 ' + esc(tt('sof.tr.copy')) + '</button></div>'
@@ -234,6 +236,10 @@
 
   // ── Globális (onclick) belépési pontok ──
   window.trOpen = function () { build(); render(); $('trModal').style.display = 'flex'; };
+  window.trHelp = function (force) {
+    var b = $('trHelp'); if (!b) return;
+    b.hidden = typeof force === 'boolean' ? !force : !b.hidden;
+  };
   window.trClose = function () { stopListen(); stopSpeak(); var m = $('trModal'); if (m) m.style.display = 'none'; };
   window.trTab = function (t) { stopListen(); S.tab = t === 'text' ? 'text' : 'conv'; lsSet('vs_tr_tab', S.tab); render(); };
   window.trSetLang = function (which, v) {

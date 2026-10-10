@@ -14,7 +14,12 @@
 
 ---
 
-## 2026-10-10 — 💬 AI-chat: hosszú leírás helyett ❗ súgó-ikon + modern, szimmetrikus beviteli sáv
+## 2026-10-10 — 🌐 Sofőr-fordító: ❗ súgó-ikon + modern beviteli sáv (a manager a #543-mal már megkapta)
+
+- A sofőr 🌐 fordító-paneljén a hosszú magyarázat a cím melletti halvány **!** ikon mögé került (bezárható panel, `trHelp`); az üres beszélgetésben csak egy rövid sor.
+- A beírós sáv egy lekerekített keretben: mező + kerek „Én ➤” (kék) / „Ő ➤” (narancs) gomb; a Szöveg fülön a textarea alatt kerek 🎤 + „🌐 Fordítás” gomb; a nagy beszéd-gombok SVG mikrofon-ikont kaptak. Csak megjelenés (`public/sofer-translate.js`, `public/sofer.css`, 2 új i18n kulcs RO+HU), cache-bust `?v=20261010trui`.
+
+## 2026-10-10 — 💬 AI-chat: hosszú leírás helyett ❗ súgó-ikon + modern, szimmetrikus beviteli sáv (PR #543)
 
 - **Súgó:** a chat elején megjelenő hosszú leírás (példák, e-mail/sofőr/művelet tippek) eltűnt; helyette a cím mellett egy apró, halvány **!** ikon — kattintásra a leírás egy bezárható (✕) panelben nyílik meg (`OrderChat.help`). Üres chatnél csak egy rövid sor: „Írd le a fuvart, vagy kérdezz bármit.”
 - **Beviteli sáv:** a szövegmező és a gombok egyetlen lekerekített keretben (composer); alul bal oldalt 📷 UIT / 📎 UIT kerek „pill” gombok, jobb oldalt kerek 🎤 mikrofon és kék gradiens ➤ küldés gomb — vonalas SVG ikonokkal, a mező szélességével szimmetrikusan. Mobilon nagyobb érintési felület.
