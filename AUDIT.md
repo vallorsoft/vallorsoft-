@@ -9,6 +9,12 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 52. lépés — Chat: e-CMR, kampány, GDPR, előfizetés, beállítások (2026-10-10) ✅ KÉSZ
+- **Új chat-írások a védett úton** (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler, company_id). `campaign.send`, `gdpr.anonymize`, `subscription.cancel` `danger` → csak beírt IGEN/DA-val. GDPR, előfizetés, PDF-sablon, időzített riport írása csak Admin (mint a felületen); az anonimizálás saját magára tiltva.
+- **Titok nem megy chaten:** az `integrations.status` csak azt mondja meg, be van-e állítva valami; a `credentials`/kulcs-mezőket nem is kérdezi le. Kulcs/jelszó chatből nem állítható.
+- **Felülírás-védelem:** `saveGdprSettings`, `pdfTemplateSave` minden mezőt felülír → a chat a jelenlegi értékekkel egészít ki (visszavonható).
+- **Kampány-címzett** csak a cég saját kontaktjaiból vagy EMAIL_RE-validált címből; a meglévő `ebSend` 200-as korlátja és cég-szűrése érvényes. A fájlos/rajzolós műveletek (CSV-import, PDF-pecsét, rajzolt aláírás, dokumentum-feltöltés) a felületen maradnak — a chat csak megnyitja őket.
+
 ### 51. lépés — Chat: maradék törzsadat-kezelés + diurna-napok (2026-10-10) ✅ KÉSZ
 - **Új chat-írások** a védett úton (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler, company_id). Törlések (`carrier.delete`, `carrier.invoice_delete`, `client.delete`, `learned.forget`) `danger` → csak a beírt IGEN/DA-val; az ügyfél-törlés csak Admin (mint a REST). Fuvar-sorozat írás csak Admin.
 - **Titok nem megy chaten:** az alvállalkozói jármű-GPS-nél csak a megosztott link állítható; az API-kulcs mezőt a chat üresen küldi (a tárolt kulcs megmarad), a kulcsot az AI nem látja.

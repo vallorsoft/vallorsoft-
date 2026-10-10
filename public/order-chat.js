@@ -440,6 +440,12 @@
         if (typeof window.activateTab === 'function') _call(function () { window.activateTab('service-log'); });
         if (id && window.FleetExtra && window.FleetExtra.svOpenDecide) setTimeout(function () { _call(function () { window.FleetExtra.svOpenDecide(id); }); }, 600);
         break;
+      case 'orderImport':
+        if (typeof window.activateTab === 'function') _call(function () { window.activateTab('orders-form'); });
+        if (typeof window.openOrderImport === 'function') setTimeout(function () { _call(function () { window.openOrderImport(); }); }, 400);
+        break;
+      case 'gdprExport': if (typeof window.exportGdpr === 'function') _call(function () { window.exportGdpr(null); }); break;
+      case 'carrierDocs': if (id && /^\d+$/.test(id) && typeof window.carrierApDocs === 'function') _call(function () { window.carrierApDocs(parseInt(id, 10)); }); break;
       default: break;
     }
   }

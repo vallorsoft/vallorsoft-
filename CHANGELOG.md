@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-10-10 — 💬 Chat: e-CMR, e-mail kampány, GDPR, előfizetés, PDF-sablon, időzített riport, integrációk + megnyitók (PR #547)
+
+- **Új chat-funkciók** (`lib/chatTools/settings.js`, meglévő handlereken át):
+  - e-CMR: lista + aláírás név szerint (feladó/fuvarozó/címzett); rajzolt aláíráshoz az e-CMR oldalt nyitja.
+  - E-mail kampány: mentett vizuális sablonok és kontaktok listája, új kontakt, kiküldés a párosított / összes / név szerint megadott kontaktoknak + extra címeknek (max 200, a cég saját feladó-fiókjáról, IGEN-nel).
+  - GDPR: adat-export letöltése, volt munkatárs anonimizálása (IGEN-nel), adatvédelmi beállítások — csak Admin.
+  - Előfizetés: állapot, lemondás (IGEN-nel), lemondás visszavonása — csak Admin.
+  - PDF-sablon (fejléc/lábléc/szín/logó), időzített statisztika-riport (lista/mentés/törlés), integrációk állapota (be van-e állítva, kulcsok nélkül).
+  - Megnyitók: fuvar CSV-import, üzemanyagkártya-import, PDF aláírás/pecsét, alvállalkozó dokumentumai (feltöltés) — ahol fájl kell vagy rajzolni kell, a chat a megfelelő ablakot nyitja meg.
+- Új UI-parancsok: `orderImport`, `gdprExport`, `carrierDocs`. A ❓ súgó új „🛠️ Dokumentum, kampány, GDPR” csoportot kapott.
+- Teszt: `tests/unit/chatTools-settings.test.js` (+15); **1752 Jest zöld**. Cache-bust `order-chat.js?v=20261010chatset`.
+
 ## 2026-10-10 — 💬 Chat: diurna-napok naptárral + a maradék törzsadat/beállítás chatből (PR #546)
 
 - **Diurna / napidíj napjai kötelezők a chatben is:** ha a mondatból hiányoznak a napok (pl. „Gondos Imrének 6 nap diurna 70 euró”), a chat egy kattintható zöld mini-naptárt küld (előző + aktuális hónap), „✓ Kész” után a járandóság a kiválasztott napokkal kerül fel — a decont-naptár ezekből készül. Szövegesen is megadható: „okt 1-6”, „október 1-től 6-ig”, „10.01-10.06”, „szept 28-30, okt 1-2”, „de la 1 până la 3 octombrie”. Ha a darabszám és a napok száma eltér, újra kér. Új `lib/chatDays.js` (`parseDays`/`daysFromText`/`calendarHtml`), `OrderChat.dayTog`/`dayGo`.
