@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 53. lépés — Chat: karbantartó műveletek + titok-tilalom őre (2026-10-10) ✅ KÉSZ
+- **Új chat-írások a védett úton** (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler, company_id). Törlések és a menetlevél-átrendezés `danger` → csak beírt IGEN/DA-val. Adat-törlés (`driver.purge_data`), Manager-jogosultság, EUR/RON, fuvar-sorozat törlés, reggeli összefoglaló, kalkulátor-beállítás csak Admin; saját magát nem törölheti.
+- **Titok-tilalom, teszttel őrizve:** egyetlen chat-eszköz sem hívja a feladó-fiók / számlázó / beérkező-postafiók / postafiók-fiók / developer-integráció / jelszó / 2FA handlereket, és nem hivatkozik `credentials_enc`-re (`tests/unit/chatTools-extra.test.js`). Az AI bon-scan kapcsoló csak a fehérlistás `ai-bon-scan` kulcsot állíthatja.
+- **Felülírás-védelem:** `vcalcSettingsSave`, `saveMorningDigest`, `docRegGroupSave` minden mezőt felülír → a chat a jelenlegi értékekkel egészít ki.
+
 ### 52. lépés — Chat: e-CMR, kampány, GDPR, előfizetés, beállítások (2026-10-10) ✅ KÉSZ
 - **Új chat-írások a védett úton** (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler, company_id). `campaign.send`, `gdpr.anonymize`, `subscription.cancel` `danger` → csak beírt IGEN/DA-val. GDPR, előfizetés, PDF-sablon, időzített riport írása csak Admin (mint a felületen); az anonimizálás saját magára tiltva.
 - **Titok nem megy chaten:** az `integrations.status` csak azt mondja meg, be van-e állítva valami; a `credentials`/kulcs-mezőket nem is kérdezi le. Kulcs/jelszó chatből nem állítható.
