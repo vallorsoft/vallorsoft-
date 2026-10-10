@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-10-10 — 💬 Chat: karbantartó műveletek is chatből — külső sofőrök, menetlevél-átrendezés, jogosultság, nyilvántartás, kapcsolók (PR #548)
+
+- **Új chat-funkciók** (`lib/chatTools/extra.js`, meglévő handlereken át):
+  - Külső sofőrök: lista, felvétel, módosítás (csak a megadott mező), törlés.
+  - Egyéni járandóság-típusok: lista, felvétel, törlés.
+  - Menetlevél: km-hézagok listája, régi sofőr menetleveleinek átrendezése egy aktuális sofőrre, volt sofőr adatainak végleges törlése (csak Admin).
+  - Manager-jogosultság be/ki és belső EUR/RON árfolyam (csak Admin).
+  - Dokumentum-nyilvántartás: mappa létrehozása/átnevezése/törlése, bejegyzés törlése sorszám alapján.
+  - Fuvar-sablon átnevezése/törlése, fuvar-sorozat törlése, fuvar-dokumentum törlése.
+  - Kampány: sablon ↔ kontakt párosítás, vizuális sablon törlése.
+  - Cég WhatsApp-száma, AI bon-kiolvasás kapcsoló, reggeli összefoglaló e-mail, kalkulátor-beállítások, mentett kalkuláció törlése, postafiók frissítése, PDF-munkatér lista/törlés.
+- **Állandó szabály:** kulcs, jelszó, SMTP/IMAP/API-adat chatből nem olvasható és nem állítható — teszt őrzi, hogy egyetlen chat-eszköz se hívjon ilyen handlert. Súgó: új „🧰 Karbantartás” csoport.
+- Teszt: `tests/unit/chatTools-extra.test.js` (+7); **1760 Jest zöld**. Cache-bust `order-chat.js?v=20261010chatext`.
+
 ## 2026-10-10 — 💬 Chat: e-CMR, e-mail kampány, GDPR, előfizetés, PDF-sablon, időzített riport, integrációk + megnyitók (PR #547)
 
 - **Új chat-funkciók** (`lib/chatTools/settings.js`, meglévő handlereken át):
