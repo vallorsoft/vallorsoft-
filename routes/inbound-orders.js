@@ -141,22 +141,28 @@ router.post('/api/inbound-orders/:id/reparse', requireLogin, requireRole('Admin'
 });
 
 // ---- Elvetés ----
+// Közös logika (a REST-végpont ÉS az AI-chat is ezt hívja): { status, body }.
+async function rejectInbound(req, inboundId) {
+  const r = await pool.query(`UPDATE inbound_orders SET status='rejected', updated_at=now()
+                               WHERE id=$1 AND company_id=$2 AND status<>'approved'`, [inboundId, own(req)]);
+  if (!r.rowCount) return { status: 404, body: { error: 'Nu a fost gasit sau a fost deja aprobat.' } };
+  return { status: 200, body: { ok: true } };
+}
 router.post('/api/inbound-orders/:id/reject', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
-    await pool.query(`UPDATE inbound_orders SET status='rejected', updated_at=now() WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]);
-    res.json({ ok: true });
+    const r = await rejectInbound(req, req.params.id);
+    res.status(r.status).json(r.body);
   } catch (e) { console.error('POST /api/inbound-orders/:id/reject hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ---- Jóváhagyás -> valódi orders rekord (Disponibil / Alocat) ----
-router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  try {
-    const r0 = await pool.query(`SELECT * FROM inbound_orders WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]);
-    if (!r0.rows.length) return res.status(404).json({ error: 'Nu a fost gasit.' });
-    if (r0.rows[0].status === 'approved') return res.status(409).json({ error: 'Deja aprobat.' });
+async function approveInbound(req, inboundId, assign) {
+    const r0 = await pool.query(`SELECT * FROM inbound_orders WHERE id=$1 AND company_id=$2`, [inboundId, own(req)]);
+    if (!r0.rows.length) return { status: 404, body: { error: 'Nu a fost gasit.' } };
+    if (r0.rows[0].status === 'approved') return { status: 409, body: { error: 'Deja aprobat.' } };
 
     const ex = r0.rows[0].extracted || {};
-    const a = req.body.assign || {};   // opcionális sofőr/jármű kiosztás
+    const a = assign || {};   // opcionális sofőr/jármű kiosztás
     const company_id = own(req);
     const id = genDocId('CMD');
 
@@ -245,7 +251,7 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
          suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId, fuvar_no,
          firma_incarcare, firma_descarcare]);
       await dbc.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
-        [id, req.params.id, company_id]);
+        [id, inboundId, company_id]);
       await dbc.query('COMMIT');
     } catch (txErr) {
       await dbc.query('ROLLBACK').catch(() => {});
@@ -305,8 +311,16 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
       }
     } catch (e) { /* a dokumentum-csatolás hibája ne buktassa a jóváhagyást */ }
 
-    res.json({ ok: true, order_id: id, status });
+    return { status: 200, body: { ok: true, order_id: id, fuvar_no, status } };
+}
+router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  try {
+    const r = await approveInbound(req, req.params.id, (req.body || {}).assign);
+    res.status(r.status).json(r.body);
   } catch (e) { console.error('POST /api/inbound-orders/:id/approve hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 module.exports = router;
+// Közös logika az AI-chatnek (nem route): ugyanaz, mint a REST-végpontoké.
+module.exports.approveInbound = approveInbound;
+module.exports.rejectInbound = rejectInbound;

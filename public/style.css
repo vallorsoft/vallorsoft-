@@ -5404,3 +5404,6 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   #ochModal .och-tool{ height:38px; }
   #ochModal .och-help{ margin:10px 12px 0; max-height:50%; }
 }
+/* 💬 Chat-levél: saját fájl csatolása (📎) */
+#ochModal .och-up-chip small{ font-weight:500; opacity:.7; margin-left:2px; }
+#ochModal .och-att-add{ border-style:dashed; }

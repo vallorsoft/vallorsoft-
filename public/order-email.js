@@ -73,7 +73,11 @@
           '<input class="input" id="oeBtnLink" type="url" placeholder="https://…">' +
           '<div class="oe-bnote">' + tt('oe.btnLinkNote', 'Ha üres, a sablon link nélküli gombjai nem jelennek meg. A „követés" gomb a követő-linket használja.') + '</div></div>' +
         '<div class="oe-sec"><div class="oe-sec-h">' + tt('oe.fieldsHead', '📋 Fuvar-adatok a levélbe (pipáld, amit küldesz)') + '</div>' + fieldRows + trkRow + '</div>' +
-        '<div class="oe-sec"><div class="oe-sec-h">' + tt('oe.attHead', '📎 Csatolmányok (pipáld, amit küldesz)') + '</div>' + attRows + '</div>' +
+        '<div class="oe-sec"><div class="oe-sec-h">' + tt('oe.attHead', '📎 Csatolmányok (pipáld, amit küldesz)') + '</div>' + attRows +
+          '<div class="oe-row" style="flex-wrap:wrap;gap:6px;"><button type="button" class="btn ghost" id="oeFileBtn" style="padding:4px 10px;">＋ ' + tt('och.fileAdd', 'Fájl a gépről') + '</button>' +
+          '<input type="file" id="oeFile" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.xlsx,.xls,.csv,.docx,.doc,.odt,.ods,.txt,.zip" style="display:none">' +
+          '<span id="oeFiles" style="display:flex;flex-wrap:wrap;gap:6px;"></span></div>' +
+          '<div class="oe-bnote">' + tt('och.fileHint', 'Kép, PDF, Excel, Word, CSV, ZIP — max. 5 fájl, fájlonként 10 MB.') + '</div></div>' +
         '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">' +
           '<button class="btn ghost" id="oeCancel">' + tt('etpl.cancel', 'Anulează') + '</button>' +
           '<button class="btn ghost" id="oeTest">' + tt('oe.test', '✉️ Teszt magamnak') + '</button>' +
@@ -130,6 +134,29 @@
         note.textContent = '📐 ' + tt('oe.tplVisualNote', 'A levél a kiválasztott vizuális sablonnal (HTML) megy ki.'); }
     });
 
+    // 📎 Saját fájlok (csak a levélbe; a szerver lib/mailUploads.js ellenőrzi)
+    var ups = [];
+    function drawUps() {
+      ovl.querySelector('#oeFiles').innerHTML = ups.map(function (u, i) {
+        return '<span class="oe-up">📄 ' + esc(u.name) + ' <a href="#" data-i="' + i + '">✕</a></span>';
+      }).join('');
+    }
+    ovl.querySelector('#oeFileBtn').addEventListener('click', function () { ovl.querySelector('#oeFile').click(); });
+    ovl.querySelector('#oeFiles').addEventListener('click', function (e) {
+      var i = e.target && e.target.getAttribute('data-i');
+      if (i != null) { e.preventDefault(); ups.splice(+i, 1); drawUps(); }
+    });
+    ovl.querySelector('#oeFile').addEventListener('change', function () {
+      var inp = this, files = [].slice.call(inp.files || []);
+      files.forEach(function (f) {
+        if (ups.length >= 5) { toast(tt('och.fileMax', 'Max. 5').replace('{n}', '5'), 'err'); return; }
+        if (f.size > 10 * 1024 * 1024) { toast(tt('och.fileTooBig', 'Túl nagy: {name}').replace('{name}', f.name), 'err'); return; }
+        var r = new FileReader();
+        r.onload = function () { var u = String(r.result || ''), k = u.indexOf(','); ups.push({ name: f.name, mime: f.type || '', b64: k >= 0 ? u.slice(k + 1) : '' }); drawUps(); };
+        r.readAsDataURL(f);
+      });
+      inp.value = '';
+    });
     function doSend(isTest) {
       var to = (ovl.querySelector('#oeTo').value || '').trim();
       if (!isTest && !to) { toast(tt('oe.to', 'Címzett'), 'err'); return; }
@@ -144,6 +171,8 @@
         include_tracking: !!(ovl.querySelector('#oeTrk') && ovl.querySelector('#oeTrk').checked),
         builder_template_id: (ovl.querySelector('#oeBTpl') && ovl.querySelector('#oeBTpl').value) || '',
         button_link: (ovl.querySelector('#oeBtnLink') && ovl.querySelector('#oeBtnLink').value || '').trim(),
+        uploads: ups,
+        lang: lang(),
       };
       var btn = ovl.querySelector(isTest ? '#oeTest' : '#oeSend');
       var old = btn.textContent; btn.disabled = true; btn.textContent = tt('oe.sending', 'Se trimite…');
@@ -171,7 +200,9 @@
       '.oe-row{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:pointer;}' +
       '.oe-row input{margin-top:3px;}' +
       '.oe-empty{font-size:12px;color:var(--muted,#8a7d6e);font-style:italic;}' +
-      '.oe-bnote{margin-top:6px;font-size:12px;color:var(--muted,#8a7d6e);}';
+      '.oe-bnote{margin-top:6px;font-size:12px;color:var(--muted,#8a7d6e);}' +
+      '.oe-up{display:inline-flex;gap:4px;align-items:center;padding:2px 8px;border:1px solid var(--border,#cbd5e1);border-radius:999px;font-size:12px;}' +
+      '.oe-up a{text-decoration:none;color:#dc2626;}';
     document.head.appendChild(s);
   }
 })();

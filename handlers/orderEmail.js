@@ -377,6 +377,15 @@ handlers.sendOrderEmail = async function (req, res, args) {
       attachments.push({ name: name, contentBase64: b64 });
     }
 
+    // A felhasználó saját gépéről csatolt fájljai (chat 📎) — csak a levélbe, nem tároljuk.
+    var up = require('../lib/mailUploads').sanitizeUploads(a.uploads, a.lang);
+    if (!up.ok) return res.json({ result: { ok: false, err: up.err } });
+    for (var u2 = 0; u2 < up.files.length; u2++) {
+      totalB64 += up.files[u2].contentBase64.length;
+      if (totalB64 > MAX_TOTAL_B64) return res.json({ result: { ok: false, err: 'Atașamentele sunt prea mari împreună.' } });
+      attachments.push(up.files[u2]);
+    }
+
     // Cég-arculatos fejléc: a feltöltött céges logó (ha van), különben „vallorSoft".
     // Vizuális sablonnál NEM csomagoljuk be újra (a sablon a saját arculatát hozza,
     // a {{logo}} már behelyettesítve).

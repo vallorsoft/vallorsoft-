@@ -701,6 +701,9 @@ handlers.mailChatSend = async function (req, res, args) {
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
     const d = sanitizeMail(a.draft);
     const isTest = a.test === true;
+    // A felhasználó saját gépéről csatolt fájlok — csak a levélbe mennek, nem tároljuk, AI nem látja.
+    const up = require('../lib/mailUploads').sanitizeUploads(a.uploads, lang);
+    if (!up.ok) return res.json({ result: { ok: false, err: up.err } });
     if (!isTest) {
       if (!d.to_email) return res.json({ result: { ok: false, err: 'E-mail invalid' } });
       const lim = sendLimiter.check(String(req.session.user.id || req.session.user.email));
@@ -719,10 +722,10 @@ handlers.mailChatSend = async function (req, res, args) {
       if (g2) return res.json({ result: { ok: false, err: g2 } });
       // Válasz: a címzettet és a tárgyat a szerver adja (a levél feladója), nem a kliens.
       const r = await require('./mailbox')._sendReply(req, { id: d.reply_mail_id, body: d.body || '', style: d.style, test: isTest,
-        markup: true, cards: d.cards, card_fields: d.card_fields, record_draft: _recordable(d) });
+        markup: true, cards: d.cards, card_fields: d.card_fields, record_draft: _recordable(d), uploads: a.uploads, lang });
       return res.json({ result: r });
     }
-    if (!d.order_id) return res.json({ result: await _sendGeneral(req, cid, d, isTest) });
+    if (!d.order_id) return res.json({ result: await _sendGeneral(req, cid, d, isTest, up.files) });
     const o = await _findOrder(cid, d.order_id);
     if (!o) return res.json({ result: { ok: false, err: 'Comanda nu a fost găsită.' } });
     const r = await _call(require('./orderEmail').sendOrderEmail, req, [{
@@ -730,6 +733,7 @@ handlers.mailChatSend = async function (req, res, args) {
       attachments: d.attachments, include_tracking: d.include_tracking,
       builder_template_id: d.builder_template_id, test: isTest, style: d.style,
       body_markup: true, cards: d.cards, card_fields: d.card_fields, record_draft: _recordable(d), lang: d.lang,
+      uploads: a.uploads,
     }]);
     if (r.ok && !isTest) {
       // Tanulás: az ügyfélnek ténylegesen elküldött cím (ha a fuvarhoz kötött ügyfélnek nincs mentett címe).
@@ -753,7 +757,8 @@ function _recordable(d) {
 }
 
 // Fuvar nélküli levél küldése: valós → a cég SAJÁT feladó-fiókja; teszt → közös cím a saját címre.
-async function _sendGeneral(req, cid, d, isTest) {
+async function _sendGeneral(req, cid, d, isTest, files) {
+  const attachments = Array.isArray(files) ? files : [];
   const u = req.session.user;
   const to = isTest ? String(u.email || '').trim() : d.to_email;
   if (!to || !EMAIL_RE.test(to)) return { ok: false, err: isTest ? 'Adresa dvs. de e-mail lipsește.' : 'E-mail invalid' };
@@ -763,7 +768,7 @@ async function _sendGeneral(req, cid, d, isTest) {
   const subject = d.subject || '(fără subiect)';
   let result;
   if (isTest) {
-    result = await emailSvc.sendClientEmail({ to, subject, html: bodyHtml, senderName, logoUrl, style: d.style, companyId: cid, mailType: 'chat_test' });
+    result = await emailSvc.sendClientEmail({ to, subject, html: bodyHtml, senderName, logoUrl, style: d.style, companyId: cid, mailType: 'chat_test', attachments });
   } else {
     const mailer = await emailSvc.getCompanyMailer(cid);
     if (!mailer || !mailer.ok) {
@@ -771,14 +776,14 @@ async function _sendGeneral(req, cid, d, isTest) {
         ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite către clienți.'
         : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
     }
-    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), mailType: 'chat', sentBy: req.session && req.session.user && req.session.user.email, draft: _recordable(d) });
+    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), attachments, mailType: 'chat', sentBy: req.session && req.session.user && req.session.user.email, draft: _recordable(d) });
   }
   if (!result || !result.ok) return { ok: false, err: (result && result.error) || 'Eroare la trimitere' };
   if (!isTest) {
     try { if (d.recipient === 'named' && d.recipient_name) await memPut(cid, 'mail_pref', 'name:' + _fold(d.recipient_name), { to_email: to, lang: d.lang }); } catch (_) {}
     // Tanulás: a levél tárgya/szövege sablonként (a név / időszak helyőrzővel) → legközelebb AI nélkül.
     try { if (d.intent && (d.cards || []).some((c) => c.query)) await mailIntent.learnTemplate(cid, d, d.intent, d.lang || 'ro'); } catch (_) {}
-    try { await audit.fromReq(req, 'mail.chat_send', 'mail', null, { general: true }); } catch (_) {}
+    try { await audit.fromReq(req, 'mail.chat_send', 'mail', null, { general: true, uploads: attachments.length }); } catch (_) {}
   }
   return { ok: true };
 }
