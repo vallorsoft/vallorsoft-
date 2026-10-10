@@ -43,18 +43,23 @@ router.get('/api/clients/:id', requireLogin, async (req, res) => {
   } catch (e) { console.error('GET /api/clients/:id hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
+// Közös beszúrás (a REST-végpont ÉS az AI-chat is ezt hívja) — company_id-horgonnyal.
+async function insertClient(companyId, b) {
+  const vals = FIELDS.map(f => (b[f] === '' ? null : (b[f] ?? null)));
+  const complet = !!(b.cui_cif && b.adresa);
+  const cols = FIELDS.concat(['complet_facturare','company_id']);
+  const ph = cols.map((_, i) => '$' + (i + 1)).join(',');
+  const { rows } = await pool.query(
+    `INSERT INTO clients (${cols.join(',')}) VALUES (${ph}) RETURNING *`,
+    [...vals, complet, companyId]);
+  return rows[0];
+}
+
 router.post('/api/clients', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
   const b = req.body || {};
   if (!b.denumire || !b.denumire.trim()) return res.status(400).json({ error: 'Denumirea este obligatorie.' });
   try {
-    const vals = FIELDS.map(f => (b[f] === '' ? null : (b[f] ?? null)));
-    const complet = !!(b.cui_cif && b.adresa);
-    const cols = FIELDS.concat(['complet_facturare','company_id']);
-    const ph = cols.map((_, i) => '$' + (i + 1)).join(',');
-    const { rows } = await pool.query(
-      `INSERT INTO clients (${cols.join(',')}) VALUES (${ph}) RETURNING *`,
-      [...vals, complet, req.session.user.company_id]);
-    res.json({ client: rows[0] });
+    res.json({ client: await insertClient(req.session.user.company_id, b) });
   } catch (e) { console.error('POST /api/clients hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
@@ -82,3 +87,4 @@ router.delete('/api/clients/:id', requireLogin, requireRole('Admin'), async (req
 });
 
 module.exports = router;
+module.exports.insertClient = insertClient;

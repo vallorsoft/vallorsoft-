@@ -426,4 +426,33 @@ handlers.settings2faStatus = async function (req, res, args) {
     }
   };
 
+// Munkatárs letiltása / visszaengedése (Admin; Manager csak Sofőrt). A letiltott
+// felhasználó nem tud belépni, és a sessionRevalidate ≤60 mp alatt kilépteti.
+// args: [email, blocked(bool)]
+handlers.userSetBlocked = async function (req, res, args) {
+    try {
+      const me = req.session.user;
+      if (!me || !['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      const email = String((args && args[0]) || '').trim().toLowerCase();
+      const blocked = !!(args && args[1]);
+      if (!email) return res.json({ result: { ok: false, err: 'E-mail obligatoriu.' } });
+      if (email === String(me.email || '').toLowerCase()) return res.json({ result: { ok: false, err: 'Nu te poti bloca pe tine insuti.' } });
+      const t = await pool.query('SELECT id, pozicio, company_id, COALESCE(pozicio_dev,false) AS is_dev FROM users WHERE LOWER(email) = $1', [email]);
+      if (!t.rows.length || t.rows[0].company_id !== me.company_id) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
+      const u = t.rows[0];
+      if (u.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis.' } });
+      if (me.pozicio === 'Manager' && u.pozicio !== 'Sofer') return res.json({ result: { ok: false, err: 'Managerul poate bloca doar utilizatori Sofer.' } });
+      if (blocked && u.pozicio === 'Admin') {
+        const c = await pool.query("SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1 AND COALESCE(blocked,false) = false", [me.company_id]);
+        if (c.rows[0].db <= 1) return res.json({ result: { ok: false, err: 'Ultimul Admin activ nu poate fi blocat.' } });
+      }
+      await pool.query('UPDATE users SET blocked = $1 WHERE id = $2 AND company_id = $3', [blocked, u.id, me.company_id]);
+      try { await require('../lib/audit').fromReq(req, blocked ? 'user.block' : 'user.unblock', 'user', u.id, { email }); } catch (_) {}
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('userSetBlocked hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
 module.exports = handlers;

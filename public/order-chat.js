@@ -97,6 +97,7 @@
       +             '<div class="och-tools-l">'
       +               '<button class="och-tool" type="button" onclick="OrderChat.uit(\'camera\')" title="' + esc(T('och.uitPhotoTip')) + '">' + ICO.cam + '<span>UIT</span></button>'
       +               '<button class="och-tool" type="button" onclick="OrderChat.uit(\'file\')" title="' + esc(T('och.uitFileTip')) + '">' + ICO.clip + '<span>UIT</span></button>'
+      +               '<button class="och-tool" id="ochMailFile" type="button" style="display:none" onclick="OrderChat.mailFile()" title="' + esc(T('och.fileTip')) + '">' + ICO.clip + '<span>' + esc(T('och.fileBtn')) + '</span></button>'
       +             '</div>'
       +             '<div class="och-tools-r">'
       +               (_speechOk() ? '<button class="och-round och-mic" id="ochMic" type="button" onclick="OrderChat.mic()" title="' + esc(T('och.micTip')) + '" aria-label="' + esc(T('och.micTip')) + '">' + ICO.mic + '</button>' : '')
@@ -277,7 +278,14 @@
     box.innerHTML = h;
   }
 
-  function renderAll() { renderMsgs(); renderQs(); renderPrev(); renderTabBadge(); }
+  function renderAll() {
+    renderMsgs(); renderQs(); renderPrev(); renderTabBadge();
+    // E-mail módban a 📎 saját fájl gomb látszik, a 📷/📎 UIT gombok nem (és fordítva).
+    var em = !!(S.draft && S.draft.mode === 'email');
+    var fb = $('ochMailFile'); if (fb) fb.style.display = em ? '' : 'none';
+    var tools = document.querySelectorAll('#ochModal .och-tools-l .och-tool');
+    for (var i = 0; i < tools.length; i++) if (tools[i].id !== 'ochMailFile') tools[i].style.display = em ? 'none' : '';
+  }
 
   // ─── Küldés ───
   // A napi összefoglaló NEM nyílik meg magától — csak kérésre („mai teendők”, „napi összefoglaló”),
@@ -581,6 +589,62 @@
   }
 
 
+  // ─── 📎 Saját fájl csatolása a levélhez (kép, PDF, Excel, Word, CSV, ZIP) ───
+  // A fájl csak a böngészőben él, amíg a levél el nem megy; a szerver nem tárolja,
+  // és az AI sosem látja (csak a levél kapja meg).
+  var UP_MAX = 5, UP_FILE = 10 * 1024 * 1024, UP_TOTAL = 15 * 1024 * 1024;
+  var UP_ACCEPT = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.xlsx,.xls,.csv,.docx,.doc,.odt,.ods,.txt,.zip';
+  function _fmtSize(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; }
+  function _uploadChips() {
+    return (S.uploads || []).map(function (u, i) {
+      return '<span class="och-uit-chip och-up-chip">📄 ' + esc(u.name) + ' <small>' + esc(_fmtSize(u.size)) + '</small>'
+        + ' <button type="button" onclick="OrderChat.mailFileRemove(' + i + ')" title="✕">✕</button></span>';
+    }).join('');
+  }
+  function mailFile() {
+    if (S.busy || S.saved) return;
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.multiple = true; inp.accept = UP_ACCEPT; inp.style.display = 'none';
+    document.body.appendChild(inp);
+    inp.onchange = function () {
+      var files = Array.prototype.slice.call(inp.files || []);
+      inp.remove();
+      if (!files.length) return;
+      S.uploads = S.uploads || [];
+      var total = S.uploads.reduce(function (n, u) { return n + u.size; }, 0);
+      var errs = [], todo = [];
+      files.forEach(function (f) {
+        var ext = (/\.([a-z0-9]{1,5})$/i.exec(f.name) || [])[1];
+        if (!ext || UP_ACCEPT.indexOf('.' + ext.toLowerCase()) === -1) { errs.push(T('och.fileBadType', { name: f.name })); return; }
+        if (f.size > UP_FILE) { errs.push(T('och.fileTooBig', { name: f.name })); return; }
+        if (S.uploads.length + todo.length >= UP_MAX) { errs.push(T('och.fileMax', { n: UP_MAX })); return; }
+        if (total + f.size > UP_TOTAL) { errs.push(T('och.fileTotal')); return; }
+        total += f.size; todo.push(f);
+      });
+      var left = todo.length;
+      var done = function () {
+        if (errs.length) S.messages.push({ role: 'assistant', text: '⚠️ ' + errs.filter(function (x, i, a) { return a.indexOf(x) === i; }).join(' '), err: true, local: true });
+        renderAll(); if (_isMobile()) tab('prev');
+      };
+      if (!left) { done(); return; }
+      todo.forEach(function (f) {
+        var r = new FileReader();
+        r.onload = function () {
+          var url = String(r.result || ''), k = url.indexOf(',');
+          S.uploads.push({ name: f.name, mime: f.type || '', size: f.size, b64: k >= 0 ? url.slice(k + 1) : '' });
+          if (--left === 0) done();
+        };
+        r.onerror = function () { errs.push(T('och.fileBadType', { name: f.name })); if (--left === 0) done(); };
+        r.readAsDataURL(f);
+      });
+    };
+    inp.click();
+  }
+  function mailFileRemove(i) {
+    (S.uploads || []).splice(i, 1);
+    renderAll();
+  }
+
   // ─── ✉️ E-mail mód (ugyanaz a chat — amit a felhasználó ír, abba kezd) ───
   // Szerver: handlers/mailChat.js (a küldés a meglévő sendOrderEmail-en).
   function renderMailPrev(d) {
@@ -619,7 +683,9 @@
     }
     h += '<div class="och-card"><div class="och-sec">' + sec + tpl + '</div>'
       + '<div class="och-sec"><div class="och-sec-h">📝 ' + esc(T('och.mailBody')) + '</div>' + body + lookBtns + '</div>'
-      + (d.order_id ? '<div class="och-sec"><div class="och-sec-h">📎 ' + esc(T('och.attach')) + '</div><div class="och-atts">' + (att || '<span class="och-mut">' + esc(T('och.none')) + '</span>') + '</div></div>' : '')
+      + '<div class="och-sec"><div class="och-sec-h">📎 ' + esc(T('och.attach')) + '</div><div class="och-atts">' + (att || '') + _uploadChips()
+      +   '<button type="button" class="och-att och-att-add" onclick="OrderChat.mailFile()">＋ ' + esc(T('och.fileAdd')) + '</button></div>'
+      +   '<div class="och-mut" style="margin-top:4px;">' + esc(T('och.fileHint')) + '</div></div>'
       + '</div>';
     if (S.missing && S.missing.length && !S.saved) {
       h += '<div class="och-missbox">⚠️ ' + esc(T('och.missing')) + ': ' + S.missing.map(function (k) { return esc(missingLabel(k)); }).join(', ') + '</div>';
@@ -702,7 +768,8 @@
       if (!window.confirm(T('och.mailConfirm', { to: d.to_email }))) return;
     }
     S.busy = true; renderAll();
-    window.gas('mailChatSend', [{ draft: d, test: !!test, lang: lang() }]).then(function (r) {
+    var ups = (S.uploads || []).map(function (u) { return { name: u.name, mime: u.mime, b64: u.b64 }; });
+    window.gas('mailChatSend', [{ draft: d, test: !!test, lang: lang(), uploads: ups }]).then(function (r) {
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -711,6 +778,7 @@
         if (typeof window.toast === 'function') window.toast(T('och.mailTestSent'), 'ok');
       } else {
         S.saved = { mail: true, to: d.to_email };
+        S.uploads = [];
         tab('chat');
         if (typeof window.toast === 'function') window.toast(T('och.mailSent', { to: d.to_email }), 'ok');
       }
@@ -758,5 +826,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

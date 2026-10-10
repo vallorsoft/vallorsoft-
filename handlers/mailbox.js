@@ -288,6 +288,8 @@ async function sendReply(req, a) {
   if (!h || !h.acc.use_inbox) return { ok: false, err: 'E-mailul nu a fost găsit.' };
   if (!h.from_email || !EMAIL_RE.test(h.from_email)) return { ok: false, err: 'Expeditorul nu are adresă validă.' };
   const isTest = a.test === true;
+  const up = require('../lib/mailUploads').sanitizeUploads(a.uploads, a.lang);
+  if (!up.ok) return { ok: false, err: up.err };
   if (!isTest) {
     const lim = sendLimiter.check(String(u.id || u.email));
     if (!lim.ok) return { ok: false, err: 'Prea multe e-mailuri trimise. Încearcă mai târziu.' };
@@ -318,6 +320,7 @@ async function sendReply(req, a) {
         builder_template_id: a.builder_template_id, style: a.style, test: isTest,
         in_reply_to: h.message_id, references: refs, mail_type: 'reply',
         body_markup: a.markup === true, cards: a.cards, card_fields: a.card_fields, record_draft: a.record_draft,
+        uploads: a.uploads,
       }])).catch(() => resolve({ ok: false, err: 'Eroare de server' }));
     });
   } else {
@@ -343,11 +346,11 @@ async function sendReply(req, a) {
     }
     let sent;
     if (isTest) {
-      sent = await emailSvc.sendClientEmail({ to: u.email, subject, html, senderName, logoUrl, style, companyId: cid, mailType: 'reply_test' });
+      sent = await emailSvc.sendClientEmail({ to: u.email, subject, html, senderName, logoUrl, style, companyId: cid, mailType: 'reply_test', attachments: up.files });
     } else {
       const mailer = await emailSvc.getCompanyMailer(cid);
       if (!mailer || !mailer.ok) return { ok: false, err: (mailer && mailer.noConfig) ? 'Configurați contul expeditor (SMTP) în Integrări.' : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
-      sent = await mailer.send({ to: h.from_email, subject, html: emailSvc.wrapBrandedEmail(html, { logoUrl, senderName, style }), mailType: 'reply', inReplyTo: h.message_id, references: refs, sentBy: u.email,
+      sent = await mailer.send({ to: h.from_email, subject, html: emailSvc.wrapBrandedEmail(html, { logoUrl, senderName, style }), attachments: up.files, mailType: 'reply', inReplyTo: h.message_id, references: refs, sentBy: u.email,
         draft: (a.record_draft && typeof a.record_draft === 'object') ? a.record_draft : undefined });
     }
     r = sent && sent.ok ? { ok: true } : { ok: false, err: (sent && sent.error) || 'Eroare la trimitere' };

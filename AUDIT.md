@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 50. lépés — Levél-csatolmány feltöltés + új chat-írások (2026-10-10) ✅ KÉSZ
+- **Feltöltött csatolmány:** minden úton (chat levél, válasz, „Email a fuvarról”) a szerver `sanitizeUploads`-szal ellenőriz: max. 5 fájl / 10 MB / együtt 15 MB, kiterjesztés-fehérlista (futtatható/szkript nem), a megadott MIME-nek egyeznie kell a kiterjesztéssel, base64-ellenőrzés, fájlnév-tisztítás (útvonal- és vezérlőkarakterek). A fájl nem tárolódik, nem kerül AI-hoz és naplóba; a `mail_sent` csak a fájlnevet őrzi. A címzett továbbra is a szerveren oldódik fel.
+- **Új chat-írások** ugyanazon a védett úton (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler): a beérkező megrendelés elfogadása/elvetése és az ügyfél felvétele a REST-útvonal közös függvényét hívja (`approveInbound`/`rejectInbound`/`insertClient`), így a cég-szűrés és validálás egy helyen él. Felhasználó tiltása/törlése `danger` (IGEN-nel), `users_manage` jog; az új `userSetBlocked` cégre szűrt, saját magát és a developert nem tiltja.
+- **AI-katalógus:** a tool-példákban nincs cégadat (a regressziós teszt rendszámra is figyel).
+
 ### 49. lépés — AI-chat 2.0, 2. kör: a maradék konzol-funkciók chatből (2026-10-09) ✅ KÉSZ
 - **Új írások ugyanazon a védett úton** (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler): tömeges dokumentum-nyomkövetés (`setOrderPostDeliveryBulk`, a kijelölés a szerveren cégre szűrve oldódik fel — idegen cég fuvarja kiesik), UIT-kód, fuvar-szakasz, e-CMR, költség-kalkuláció mentése, KPI-cél és cégadatok (**csak Admin**), nyilvántartási bejegyzés módosítása/sztornója.
 - **UIT cross-tenant javítás:** a `POST /api/orders/:id/uit` eddig nem ellenőrizte, hogy a fuvar a hívó cégéé (a sor a hívó cégéhez íródott, de idegen fuvar-azonosítóval). A közös `addUitCode` (`routes/uit.js`) most ellenőrzi → 404; a REST és a chat is ezt használja.
