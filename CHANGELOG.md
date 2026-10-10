@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-10 — 📎 Saját fájl csatolása a levelekhez + 💬 chatből: ügyfél/portál-meghívó, beérkező megrendelés, menetlevél, árajánlat, felhasználó-kezelés
+## 2026-10-10 — 📎 Saját fájl csatolása a levelekhez + 💬 chatből: ügyfél/portál-meghívó, beérkező megrendelés, menetlevél, árajánlat, felhasználó-kezelés (PR #545)
 
 - **📎 Fájl a gépről/telefonról** minden kimenő levélhez: a 💬 chat levél-módjában (fuvar-levél, általános levél, válasz), és a „✉️ Email a fuvarról” ablakban. Kép, PDF, Excel, Word, CSV, ZIP — max. 5 fájl, fájlonként 10 MB, együtt 15 MB. Közös szerver-ellenőrzés: `lib/mailUploads.js` `sanitizeUploads` (kiterjesztés-fehérlista + MIME-egyezés, fájlnév-tisztítás). A fájl csak a levélbe kerül: nem tároljuk, AI-hoz nem jut, a napló csak a nevét őrzi.
 - **Új chat-funkciók** (`lib/chatTools/people.js`, a meglévő handlereken át): ügyfél felvétele (`client.create` — a közös `routes/clients.js` `insertClient`), ügyfél- és alvállalkozói portál-meghívó, beérkező megrendelések listája / elfogadása / elvetése (közös `approveInbound`/`rejectInbound` a `routes/inbound-orders.js`-ből, nem másolat), menetlevél felvétele és módosítása (a módosítás a meglévő értékekkel egészül ki), árajánlat felvétele, felhasználók listája / módosítása / tiltása / feloldása / törlése (új `userSetBlocked` handler), sofőr-járandóság csoportos kifizetése. A felhasználó-meghívó és az alvállalkozó felvétele már korábban is ment chatből.
