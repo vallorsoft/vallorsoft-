@@ -232,6 +232,8 @@
     'och.saveEdit': { hu: "✅ Módosítás mentése", ro: "✅ Salvează modificarea" },
     'och.updated': { hu: "✅ Fuvar módosítva: {no}", ro: "✅ Cursă modificată: {no}" },
     'och.editing': { hu: "Meglévő fuvar módosítása: {no}", ro: "Modificare cursă existentă: {no}" },
+    'och.helpTip': { hu: 'Mit tud a chat? (súgó)', ro: 'Ce știe chatul? (ajutor)' },
+    'och.emptyChat': { hu: 'Írd le a fuvart, vagy kérdezz bármit.', ro: 'Descrie cursa sau întreabă orice.' },
     'och.editHint': { hu: "Meglévő fuvar módosításához írd be a fuvarszámát (pl. CMD-2026-0042).", ro: "Pentru a modifica o cursă existentă, scrie numărul ei (ex. CMD-2026-0042)." },
     'och.learned': { hu: "🧠 tanult", ro: "🧠 învățat" },
     'och.saving': { hu: "Mentés…", ro: "Se salvează…" },

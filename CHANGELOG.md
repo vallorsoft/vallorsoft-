@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-10 — 💬 AI-chat: hosszú leírás helyett ❗ súgó-ikon + modern, szimmetrikus beviteli sáv
+
+- **Súgó:** a chat elején megjelenő hosszú leírás (példák, e-mail/sofőr/művelet tippek) eltűnt; helyette a cím mellett egy apró, halvány **!** ikon — kattintásra a leírás egy bezárható (✕) panelben nyílik meg (`OrderChat.help`). Üres chatnél csak egy rövid sor: „Írd le a fuvart, vagy kérdezz bármit.”
+- **Beviteli sáv:** a szövegmező és a gombok egyetlen lekerekített keretben (composer); alul bal oldalt 📷 UIT / 📎 UIT kerek „pill” gombok, jobb oldalt kerek 🎤 mikrofon és kék gradiens ➤ küldés gomb — vonalas SVG ikonokkal, a mező szélességével szimmetrikusan. Mobilon nagyobb érintési felület.
+- Csak megjelenés (`public/order-chat.js`, `public/style.css`, 2 új i18n kulcs RO+HU); a küldés/mikrofon/UIT-feltöltés logikája változatlan. Cache-bust `?v=20261010chatui`.
+
 ## 2026-10-09 — 💬 AI-chat 2.0, 2. kör: a maradék konzol-funkciók chatből (85 funkció)
 
 - **`lib/chatTools/admin.js`** (+10 funkció): `order.bulk_post_delivery` (a kijelölt vagy felsorolt fuvarokon lezárás / számlaszám / postázás / fizetés / megjegyzés egy ✅-vel, a meglévő `setOrderPostDeliveryBulk`-on), `order.uit_add` + `order.uit_list`, `order.leg_add` (útközbeni átadás másik sofőrnek/járműnek), `ecmr.create` (utána az e-CMR oldal nyílik az aláíráshoz), `vcalc.order_cost` (egy fuvar költsége és várható eredménye a mentett költségtételekből, megadott gázolaj-árral) + `vcalc.order_cost_save`, `stats.goal_set` és `company.settings_update` (csak Admin), `docs.register_update` (bejegyzés módosítása / sztornó).

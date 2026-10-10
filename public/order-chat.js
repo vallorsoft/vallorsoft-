@@ -57,6 +57,14 @@
   }
   function fmtNum(n) { try { return Number(n).toLocaleString('ro-RO'); } catch (_) { return String(n); } }
 
+  // Vonalas SVG ikonok (currentColor) a beviteli sávhoz
+  var ICO = {
+    cam: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    clip: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l9-9a3.7 3.7 0 0 1 5.2 5.2l-9 9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+    send: '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>'
+  };
+
   // ─── Modal váz ───
   function ensureModal() {
     var m = $('ochModal');
@@ -67,7 +75,7 @@
     m.innerHTML = ''
       + '<div class="och-box">'
       +   '<div class="och-head">'
-      +     '<div><div class="och-title">' + esc(T('och.title')) + '</div><div class="och-sub">' + esc(T('och.sub')) + '</div></div>'
+      +     '<div><div class="och-title">' + esc(T('och.title')) + ' <button type="button" class="och-help-i" onclick="OrderChat.help()" title="' + esc(T('och.helpTip')) + '" aria-label="' + esc(T('och.helpTip')) + '">!</button></div><div class="och-sub">' + esc(T('och.sub')) + '</div></div>'
       +     '<div class="och-head-btns">'
       +       '<button class="btn ghost och-reset" type="button" onclick="OrderChat.reset()" title="' + esc(T('och.reset')) + '">🔄<span class="och-reset-l"> ' + esc(T('och.reset').replace(/^🔄\s*/, '')) + '</span></button>'
       +       '<button class="btn ghost och-x" type="button" onclick="OrderChat.close()" aria-label="close">✕</button>'
@@ -79,16 +87,21 @@
       +   '</div>'
       +   '<div class="och-body">'
       +     '<div class="och-chat">'
+      +       '<div class="och-help" id="ochHelp" hidden></div>'
       +       '<div class="och-msgs" id="ochMsgs"></div>'
       +       '<div class="och-qs" id="ochQs"></div>'
       +       '<div class="och-input">'
-      +         '<textarea id="ochInput" rows="3" placeholder="' + esc(T(_isMobile() ? 'och.phMobile' : 'och.ph')) + '" autocomplete="off" data-lpignore="true" data-1p-ignore></textarea>'
-      +         '<div class="och-send-col">'
-      +           '<button class="btn primary" id="ochSend" type="button" onclick="OrderChat.send()">' + esc(T('och.send')) + '</button>'
-      +           (_speechOk() ? '<button class="btn ghost och-mic" id="ochMic" type="button" onclick="OrderChat.mic()" title="' + esc(T('och.micTip')) + '">🎤</button>' : '')
-      +           '<div class="och-uit-btns">'
-      +             '<button class="btn ghost och-uit-btn" type="button" onclick="OrderChat.uit(\'camera\')" title="' + esc(T('och.uitPhotoTip')) + '">📷 UIT</button>'
-      +             '<button class="btn ghost och-uit-btn" type="button" onclick="OrderChat.uit(\'file\')" title="' + esc(T('och.uitFileTip')) + '">📎 UIT</button>'
+      +         '<div class="och-composer">'
+      +           '<textarea id="ochInput" rows="2" placeholder="' + esc(T(_isMobile() ? 'och.phMobile' : 'och.ph')) + '" autocomplete="off" data-lpignore="true" data-1p-ignore></textarea>'
+      +           '<div class="och-tools">'
+      +             '<div class="och-tools-l">'
+      +               '<button class="och-tool" type="button" onclick="OrderChat.uit(\'camera\')" title="' + esc(T('och.uitPhotoTip')) + '">' + ICO.cam + '<span>UIT</span></button>'
+      +               '<button class="och-tool" type="button" onclick="OrderChat.uit(\'file\')" title="' + esc(T('och.uitFileTip')) + '">' + ICO.clip + '<span>UIT</span></button>'
+      +             '</div>'
+      +             '<div class="och-tools-r">'
+      +               (_speechOk() ? '<button class="och-round och-mic" id="ochMic" type="button" onclick="OrderChat.mic()" title="' + esc(T('och.micTip')) + '" aria-label="' + esc(T('och.micTip')) + '">' + ICO.mic + '</button>' : '')
+      +               '<button class="och-round och-send" id="ochSend" type="button" onclick="OrderChat.send()" title="' + esc(T('och.send')) + '" aria-label="' + esc(T('och.send')) + '">' + ICO.send + '</button>'
+      +             '</div>'
       +           '</div>'
       +         '</div>'
       +       '</div>'
@@ -130,7 +143,7 @@
   function renderMsgs() {
     var box = $('ochMsgs');
     if (!box) return;
-    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div><div class="och-mut" style="margin-top:4px;">📍 ' + esc(T('och.infoHint')) + '</div><div class="och-mut" style="margin-top:4px;">⚡ ' + esc(T('och.opsHint')) + '</div><div class="och-mut" style="margin-top:4px;">🧭 ' + esc(T('och.anyHint')) + '</div></div>';
+    var h = S.messages.length ? '' : '<div class="och-empty-chat">' + esc(T('och.emptyChat')) + '</div>';
     S.messages.forEach(function (m) {
       // m.html: a szerver által renderelt (escape-elt) sofőr-információs kártya.
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + (m.sys ? ' sys' : '') + (m.html ? ' info' : '') + '">'
@@ -339,6 +352,20 @@
     if (!txt || !ta) return;
     ta.value = txt; ta.focus();
     if (_isMobile()) tab('chat');
+  }
+
+  // ─── ❗ Súgó: a hosszú leírás csak az ikonra kattintva, bezárható ───
+  function help(force) {
+    var box = $('ochHelp');
+    if (!box) return;
+    var show = typeof force === 'boolean' ? force : box.hidden;
+    if (show) {
+      box.innerHTML = '<button type="button" class="och-help-x" onclick="OrderChat.help(false)" aria-label="close">✕</button>'
+        + '<div class="och-help-t">' + esc(T('och.welcome')) + '</div>'
+        + [['✏️', 'och.editHint'], ['✉️', 'och.mailHint'], ['📍', 'och.infoHint'], ['⚡', 'och.opsHint'], ['🧭', 'och.anyHint']]
+          .map(function (x) { return '<div class="och-help-r"><span>' + x[0] + '</span><span>' + esc(T(x[1])) + '</span></div>'; }).join('');
+    }
+    box.hidden = !show;
   }
 
   // ─── 🎤 Hangbevitel (Web Speech API; ha nincs, a gomb nem jelenik meg) ───
@@ -731,5 +758,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();
