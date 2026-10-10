@@ -267,6 +267,7 @@ handlers.carrierInvoiceDelete = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const id = parseInt(args && args[0], 10);
     const r = await pool.query('DELETE FROM carrier_invoices WHERE id=$1 AND company_id=$2', [id, cid]);
+    if (r.rowCount) audit.fromReq(req, 'carrier_invoice.delete', 'carrier_invoice', id, null);
     return res.json({ result: { ok: !!r.rowCount } });
   } catch (err) { console.error('carrierInvoiceDelete hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
@@ -329,6 +330,7 @@ handlers.carrierPortalSetActive = async function (req, res, args) {
     const activ = !!(args && args[1]);
     if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
     const r = await pool.query('UPDATE carrier_users SET activ=$1 WHERE id=$2 AND company_id=$3', [activ, id, cid]);
+    if (r.rowCount) audit.fromReq(req, 'carrier_portal.set_active', 'carrier_user', id, { activ });
     return res.json({ result: { ok: !!r.rowCount } });
   } catch (err) { console.error('carrierPortalSetActive hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };

@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 51. lépés — Chat: maradék törzsadat-kezelés + diurna-napok (2026-10-10) ✅ KÉSZ
+- **Új chat-írások** a védett úton (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler, company_id). Törlések (`carrier.delete`, `carrier.invoice_delete`, `client.delete`, `learned.forget`) `danger` → csak a beírt IGEN/DA-val; az ügyfél-törlés csak Admin (mint a REST). Fuvar-sorozat írás csak Admin.
+- **Titok nem megy chaten:** az alvállalkozói jármű-GPS-nél csak a megosztott link állítható; az API-kulcs mezőt a chat üresen küldi (a tárolt kulcs megmarad), a kulcsot az AI nem látja.
+- **Audit-pótlás:** `carrierInvoiceDelete`, `carrierPortalSetActive`, `clientPortalSetActive`, ügyfél-törlés (közös `deleteClient`) — eddig napló nélkül futottak.
+- **Felülírás-védelem:** `carrierSave`, `quoteSave`, `emailTemplateSave`, `saveTollRates` minden mezőt felülír → a chat a jelenlegi értékekkel egészít ki; a sablon-szöveg escape-elve kerül HTML-be.
+- **Diurna-napok:** a naptár „Kész” gombja csak szöveget küld vissza („— napok: …”); a szerver újra elemzi és a meglévő `earningCreate` `_normDays` fehérlistáján megy át.
+
 ### 50. lépés — Levél-csatolmány feltöltés + új chat-írások (2026-10-10) ✅ KÉSZ
 - **Feltöltött csatolmány:** minden úton (chat levél, válasz, „Email a fuvarról”) a szerver `sanitizeUploads`-szal ellenőriz: max. 5 fájl / 10 MB / együtt 15 MB, kiterjesztés-fehérlista (futtatható/szkript nem), a megadott MIME-nek egyeznie kell a kiterjesztéssel, base64-ellenőrzés, fájlnév-tisztítás (útvonal- és vezérlőkarakterek). A fájl nem tárolódik, nem kerül AI-hoz és naplóba; a `mail_sent` csak a fájlnevet őrzi. A címzett továbbra is a szerveren oldódik fel.
 - **Új chat-írások** ugyanazon a védett úton (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler): a beérkező megrendelés elfogadása/elvetése és az ügyfél felvétele a REST-útvonal közös függvényét hívja (`approveInbound`/`rejectInbound`/`insertClient`), így a cég-szűrés és validálás egy helyen él. Felhasználó tiltása/törlése `danger` (IGEN-nel), `users_manage` jog; az új `userSetBlocked` cégre szűrt, saját magát és a developert nem tiltja.

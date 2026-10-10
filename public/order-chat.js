@@ -826,5 +826,26 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  // 🗓️ Diurna-napok naptára a chatben: kattintás = jelölés, „Kész" = visszaküldés napokkal.
+  function _calOf(el) { while (el && !(el.classList && el.classList.contains('och-cal'))) el = el.parentNode; return el; }
+  function _calCount(cal) {
+    var n = cal.querySelectorAll('.och-cal-d.on').length;
+    var c = cal.querySelector('.och-cal-cnt'); if (c) c.textContent = n + ' ' + (lang() === 'hu' ? 'nap' : 'zile');
+    var need = cal.querySelector('.och-cal-need');
+    if (need) need.classList.toggle('ok', String(n) === need.getAttribute('data-need'));
+  }
+  function dayTog(el) {
+    if (S.busy || S.saved) return;
+    el.classList.toggle('on');
+    var cal = _calOf(el); if (cal) _calCount(cal);
+  }
+  function dayGo(el) {
+    var cal = _calOf(el); if (!cal || S.busy) return;
+    var days = [].map.call(cal.querySelectorAll('.och-cal-d.on'), function (b) { return b.getAttribute('data-d'); }).sort();
+    if (!days.length) { if (typeof window.toast === 'function') window.toast(lang() === 'hu' ? 'Jelölj be legalább egy napot.' : 'Bifează cel puțin o zi.', 'err'); return; }
+    var base = cal.getAttribute('data-base') || '';
+    send((base ? base + ' — ' : '') + (cal.getAttribute('data-word') || 'zile') + ': ' + days.join(', '));
+  }
+
+  window.OrderChat = { dayTog: dayTog, dayGo: dayGo, open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();
