@@ -4407,6 +4407,8 @@
     'sof.tr.listening': { hu: 'Figyelek…', ro: 'Ascult…' },
     'sof.tr.translating': { hu: 'Fordítás…', ro: 'Se traduce…' },
     'sof.tr.convHint': { hu: 'Nyomd meg a gombot és beszélj: a telefon lefordítja és hangosan felolvassa a másik nyelven. Utána a partner is a saját gombjával válaszolhat.', ro: 'Apasă butonul și vorbește: telefonul traduce și citește cu voce tare în cealaltă limbă. Apoi partenerul răspunde cu butonul său.' },
+    'sof.tr.helpTip': { hu: 'Hogyan működik? (súgó)', ro: 'Cum funcționează? (ajutor)' },
+    'sof.tr.convEmpty': { hu: 'Nyomd meg a gombot és beszélj.', ro: 'Apasă butonul și vorbește.' },
     'sof.tr.typeHere': { hu: 'Írd ide a szöveget…', ro: 'Scrie textul aici…' },
     'sof.tr.autoSpeak': { hu: 'Felolvasás automatikusan', ro: 'Citire automată cu voce' },
     'sof.tr.clear': { hu: 'Törlés', ro: 'Șterge' },
