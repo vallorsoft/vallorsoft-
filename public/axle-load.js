@@ -60,9 +60,10 @@
     trailer0: 5.2,    // üres szerelvény: pótkocsi-tengelycsoport (t)
     wheelbase: 3.8,   // vontató tengelytáv: kormányzott → hajtott (m)
     fifthOffset: 0.6, // nyeregszerkezet a hajtott tengely ELŐTT (m)
-    kingpinFront: 1.6,// pótkocsi homlokfal → királycsap (m)
-    kingpinAxle: 7.7, // királycsap → pótkocsi-tengelycsoport közepe (m)
-    bedLength: 13.6,  // rakfelület hossza (m)
+    kingpinFront: 1.69,// pótkocsi homlokfal → királycsap (m) — Schmitz S.CS: 1690 mm
+    kingpinAxle: 7.7, // királycsap → középső pótkocsi-tengely (tengelytáv, m) — szabvány 7700 mm
+    bedLength: 13.62, // rakfelület hossza (m) — szabvány 13 620 mm
+    tridemSpacing: 1.31, // hármas tengely: tengelyköz (m) — szabvány 1310 / 1310 mm
     limSteer: 8.0,    // kormányzott tengely határ (t)
     limDrive: 11.5,   // hajtott tengely határ (t) — EU 96/53
     limTrailer: 24.0, // pótkocsi hármas tengelycsoport (t)
@@ -139,7 +140,8 @@
     if (cargo > 0 && (moment / cargo - c.kingpinFront) * cosT + shift > leverL) warnings.push({ key: 'behindAxle' });
 
     // ── Hármas tengely: a ferde váz miatt eltolódó tartópont ──
-    var TRI = [-1.31, 0, 1.31];
+    var sp = c.tridemSpacing > 0 ? c.tridemSpacing : 1.31;
+    var TRI = [-sp, 0, sp];
     var fTr = c.trailer0 + trl;
     var triLoads = TRI.map(function () { return fTr / 3; });
     var triShift = 0, kpExtra = 0;
@@ -150,7 +152,7 @@
       });
       var sumF = raw.reduce(function (a, b) { return a + b; }, 0);
       triShift = sumF > 0 ? raw.reduce(function (a, f, i) { return a + f * TRI[i]; }, 0) / sumF : 0;
-      triShift = Math.max(-1.31, Math.min(1.31, triShift));
+      triShift = Math.max(-sp, Math.min(sp, triShift));
       var fTr2 = fTr * leverL / (leverL + triShift);
       kpExtra = fTr - fTr2;
       triLoads = raw.map(function (f) { return sumF > 0 ? f * fTr2 / sumF : fTr2 / 3; });
@@ -282,7 +284,7 @@
 
   var CFG_FIELDS = [
     { grp: 'axl.grpEmpty', keys: [['steer0', 'axl.f.steer0'], ['drive0', 'axl.f.drive0'], ['trailer0', 'axl.f.trailer0']] },
-    { grp: 'axl.grpGeo', keys: [['wheelbase', 'axl.f.wheelbase'], ['fifthOffset', 'axl.f.fifthOffset'], ['kingpinFront', 'axl.f.kingpinFront'], ['kingpinAxle', 'axl.f.kingpinAxle'], ['bedLength', 'axl.f.bedLength']] },
+    { grp: 'axl.grpGeo', keys: [['wheelbase', 'axl.f.wheelbase'], ['fifthOffset', 'axl.f.fifthOffset'], ['kingpinFront', 'axl.f.kingpinFront'], ['kingpinAxle', 'axl.f.kingpinAxle'], ['tridemSpacing', 'axl.f.tridemSpacing'], ['bedLength', 'axl.f.bedLength']] },
     { grp: 'axl.grpLimits', keys: [['limSteer', 'axl.f.limSteer'], ['limDrive', 'axl.f.limDrive'], ['limLift', 'axl.f.limLift'], ['limGroup', 'axl.f.limGroup'], ['limTrailer', 'axl.f.limTrailer'], ['limGross', 'axl.f.limGross'], ['minDrivePct', 'axl.f.minDrivePct']] }
   ];
   // Emelhető tengely + szint kártya mezői (mindig látszik — menet közben is állítják)
@@ -607,7 +609,7 @@
     function axle(m, load, st, triple, raised, row) {
       var out = '';
       var cy = raised ? wheelY - R * 0.9 : wheelY;
-      (triple ? [-1.31, 0, 1.31] : [0]).forEach(function (d) { out += '<circle cx="' + o(X(m + d)) + '" cy="' + o(cy) + '" r="' + o(raised ? R * 0.85 : R) + '" class="axl-wheel' + (raised ? ' axl-raised' : '') + '"/>'; });
+      (triple ? [-c.tridemSpacing, 0, c.tridemSpacing] : [0]).forEach(function (d) { out += '<circle cx="' + o(X(m + d)) + '" cy="' + o(cy) + '" r="' + o(raised ? R * 0.85 : R) + '" class="axl-wheel' + (raised ? ' axl-raised' : '') + '"/>'; });
       var lx = Math.min(Math.max(X(m), PAD + fs * 2), W - PAD - fs * 2);
       var txt = raised ? '⬆ 0 t' : f1(Math.round(load * 100) / 100) + ' t';
       out += '<text x="' + o(lx) + '" y="' + o(wheelY + R + fs + 4 + (row ? fs + 4 : 0)) + '" text-anchor="middle" class="axl-load ' + st + '" font-size="' + (fs + 1) + '">' + txt + '</text>';

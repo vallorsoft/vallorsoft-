@@ -113,11 +113,12 @@ describe('axle-load compute', () => {
     test('pótkocsi dőlés: a karok cosθ / sinθ szerint (tengely a padló alatt)', () => {
       const flat = AL.compute({}, full);
       const r = AL.compute({ frontHeight: 1.25, rearHeight: 1.05, cargoCg: 1.0, refHeight: 1.1, tridemStiff: 0 }, full);
-      const th = Math.atan2(0.2, 13.6);
-      const axleU = 1.6 + 7.7;
-      const depth = (1.25 - 0.2 * axleU / 13.6) - 0.5;
-      const L = 7.7 * Math.cos(th) - depth * Math.sin(th);
-      const d = (6.8 - 1.6) * Math.cos(th) + 1.0 * Math.sin(th);
+      const c = r.cfg, B = c.bedLength, K = c.kingpinFront;
+      const th = Math.atan2(0.2, B);
+      const axleU = K + c.kingpinAxle;
+      const depth = (1.25 - 0.2 * axleU / B) - 0.5;
+      const L = c.kingpinAxle * Math.cos(th) - depth * Math.sin(th);
+      const d = (6.8 - K) * Math.cos(th) + 1.0 * Math.sin(th);
       close(r.trailer, 5.2 + 24 * d / L);
       close(r.gross, flat.gross);
       expect(Math.round(r.tilt.frontDev * 100)).toBe(15);
@@ -158,7 +159,8 @@ describe('axle-load compute', () => {
       expect(up.triLoads[0]).toBeLessThan(up.triLoads[2]);   // első tengely tehermentesül
       close(up.gross, lvl.gross);
       // a pótkocsi nyomatéka a királycsapra megmarad: F·L = F'·(L+e)
-      const L = up.cfg.kingpinAxle * Math.cos(Math.atan2(0.1, 13.6)) - (1.2 - 0.1 * 9.3 / 13.6 - 0.5) * Math.sin(Math.atan2(0.1, 13.6));
+      const c = up.cfg, B = c.bedLength, th = Math.atan2(0.1, B);
+      const L = c.kingpinAxle * Math.cos(th) - (1.2 - 0.1 * (c.kingpinFront + c.kingpinAxle) / B - 0.5) * Math.sin(th);
       close(up.triLoads.reduce((a, b) => a + b, 0), up.trailer);
       expect(up.trailer * (L + up.tilt.triShift)).toBeCloseTo((up.trailer + up.tilt.kpExtra) * L, 6);
     });
