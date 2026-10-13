@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-13 — ⚖️ Tengelyterhelés: a hármas tengely rugózása — nyereg fel → több a vontatón, le → a hármas tengely visz többet
+
+- A pótkocsi hármas tengelye nem egy pontban tartja a vázat: ferde vázban (eleje ≠ vége) az i. tengely (eltolás e_i) `Δh_i = −(h_eleje−h_vége)·e_i/L_rak` magasan van a csoport-átlaghoz képest, terhe `F_i = F/3 − k_t·Δh_i` (k_t t/cm, alap 0,5, állítható). A tartópont `e = ΣF_i·e_i/ΣF_i`-vel eltolódik; a pótkocsi nyomatéka a királycsapra megmarad: `F' = F·L/(L+e)`, a különbség a királycsapra → a hajtottra + kormányzottra kerül.
+- Nyereg fel (eleje a vége fölött) → tartópont hátra → több a királycsapon, hajtotton, kormányzotton; nyereg le → a hármas tengely visz többet. A kártya kiírja az eltolódást, a királycsap-többletet és a három tengely terhét külön.
+- **Szabványos pótkocsi-méretek alapértékként** (Schmitz S.CS 13,62 m curtainsider adatlap): homlokfal → királycsap 1,69 m, királycsap → középső tengely (tengelytáv) 7,70 m, tengelyköz 1,31 / 1,31 m (új, állítható mező), rakfelület 13,62 m.
+- +2 teszt, cache-bust `?v=20261013std`.
+
 ## 2026-10-13 — ⚖️ Tengelyterhelés: a nyereg magasítása a hajtott tengelyre rak (javított képlet)
 
 - **Hiba:** ha a pótkocsi eleje magasabb lett (a hajtott tengely légrugója emeli a nyerget), a kalkulátor kevesebbet tett a hajtottra — a dőlés súlypont-eltolását vette egyetlen hatásnak.
