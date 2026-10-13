@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-13 — ⚖️ Tengelyterhelés: a nyereg magasítása a hajtott tengelyre rak (javított képlet)
+
+- **Hiba:** ha a pótkocsi eleje magasabb lett (a hajtott tengely légrugója emeli a nyerget), a kalkulátor kevesebbet tett a hajtottra — a dőlés súlypont-eltolását vette egyetlen hatásnak.
+- **Új képlet a vontatón:** a nullpont fölötti magasítás (Δ cm) leengedett emelhető tengelynél `k·Δ` terhet ad át az emelhetőről a hajtottra (`emelhető = alap − k·Δ`, `hajtott = (M − emelhető·x_e)/W`, `kormányzott = ΣF − hajtott − emelhető`; k = t/cm, alap 0,2, a jármű-kártyán állítható). Süllyesztésnél fordítva. Két tengelyes vontatón ezt statikailag nem lehet — a felület ki is írja.
+- **Pótkocsi dőlés pontosabban:** a karok `cosθ`/`sinθ` szerint, a tengely a padló alatt (`(d·cosθ + h_sp·sinθ)/(L·cosθ − h_t·sinθ)`) — ez csak pár cm-es hatás.
+- +3 teszt, cache-bust `?v=20261013raise`.
+
 ## 2026-10-13 — ⚖️ Tengelyterhelés: emelhető tengely a vontatón + szint/dőlés (nullpont, pótkocsi eleje/vége magasság)
 
 - **Emelhető tengely** (nincs / hajtott ELŐTT „pusher" / hajtott MÖGÖTT „tag"), ⬇️ leengedve / ⬆️ felemelve kapcsoló. Felemelve 0 t, a vontató kéttámaszú tartó; leengedve a hajtott+emelhető csoport egyenértékű támasz a súlyozott helyen (`x_g = W ± s·e`), a csoport-teher `G = ΣF·x / x_g`, kormányzott = ΣF − G, hajtott = G·(1−s), emelhető = G·s (s = légrugó-megosztás, alap 40 %). Új határok: emelhető 7,5 t, csoport 19 t. Kiírja, mi lenne a másik állásban, és ha az a határon belül marad, javasolja (emeld fel / engedd le).
