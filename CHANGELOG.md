@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-13 — ⚖️ Tengelyterhelés: áttekinthető rakomány-felvitel + a kamion telefonon is egészben látszik
+
+- **Rajz**: a valódi képernyő-szélességre rajzolódik (max. 900 px), nincs vízszintes görgetés; telefonon is olvasható feliratok. A rajzon egy rakományra koppintva az nyílik szerkesztésre.
+- **Új rakomány** külön kártyán: súly + hossz nagy mezőkben, gyors hossz-gombok (1 raklap / 2 sor / fél / teljes), „Hova kerül?" (az előző mögé / legelőre / megadott helyre), szabad hely kijelzése.
+- **Rakomány-lista** kompakt kártyákkal (súly · hossz · hely), ◀ ▶ mozgatás 0,5 m-enként, ✏️ szerkesztés lenyitva, ✕ törlés. ~20 új `axl.*` kulcs (RO+HU), cache-bust `?v=20261013axle2`. **1834 Jest zöld**.
+
 ## 2026-10-13 — FIX: main CI piros → Fly-deploy kimaradt (chat-sablon `orders.valuta`)
 
 - `lib/chatTools/manage.js` (PR #546 óta): a sablonos levél chat-eszköze a nem létező `orders.valuta` oszlopot kérdezte le → a `sql-schema-drift` őr-teszt bukott, a main CI piros lett, így a #548 és #549 nem élesedett Fly-on. Javítva: a fuvar-ár EUR (nincs pénznem-oszlop). **1834 Jest zöld** valós Postgres 16-tal.

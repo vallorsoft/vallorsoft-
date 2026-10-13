@@ -125,10 +125,14 @@
   var t = function (k, fb) { return (root.I18N && root.I18N.t) ? root.I18N.t(k, fb) : (fb || k); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]; }); };
   var f2 = function (n) { return Number.isFinite(n) ? n.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
+  // Rövid szám: felesleges nullák nélkül (3 / 2,4 / 13,6)
+  var f1 = function (n) { return Number.isFinite(n) ? n.toLocaleString('ro-RO', { maximumFractionDigits: 2 }) : '—'; };
+  var r1 = function (n) { return Math.round(n * 100) / 100; };
   var COLORS = ['#f6711e', '#0d9488', '#6366f1', '#e11d48', '#ca8a04', '#2563eb', '#16a34a', '#a855f7'];
   var LS_KEY = 'vs-axle-plan';
+  var STEP = 0.5;   // ◀ ▶ mozgatás lépésköze (m)
 
-  var S = { cfg: Object.assign({}, DEFAULT_CFG), items: DEFAULT_ITEMS.slice(), cfgOpen: false, boxId: null };
+  var S = { cfg: Object.assign({}, DEFAULT_CFG), items: DEFAULT_ITEMS.slice(), cfgOpen: false, boxId: null, editIdx: -1, resizeBound: false };
 
   function load() {
     try {
@@ -144,12 +148,21 @@
   function save() {
     try { root.localStorage.setItem(LS_KEY, JSON.stringify({ cfg: S.cfg, items: S.items })); } catch (e) {}
   }
+  function bedLen() { return num(S.cfg.bedLength, DEFAULT_CFG.bedLength); }
+  function usedEnd() {
+    return S.items.reduce(function (m, it) { return Math.max(m, num(it.start, 0) + num(it.length, 0)); }, 0);
+  }
+  function itemName(i) { var it = S.items[i]; return (it && it.label) ? it.label : t('axl.itemN').replace('{n}', String(i + 1)); }
 
   var CFG_FIELDS = [
     { grp: 'axl.grpEmpty', keys: [['steer0', 'axl.f.steer0'], ['drive0', 'axl.f.drive0'], ['trailer0', 'axl.f.trailer0']] },
     { grp: 'axl.grpGeo', keys: [['wheelbase', 'axl.f.wheelbase'], ['fifthOffset', 'axl.f.fifthOffset'], ['kingpinFront', 'axl.f.kingpinFront'], ['kingpinAxle', 'axl.f.kingpinAxle'], ['bedLength', 'axl.f.bedLength']] },
     { grp: 'axl.grpLimits', keys: [['limSteer', 'axl.f.limSteer'], ['limDrive', 'axl.f.limDrive'], ['limTrailer', 'axl.f.limTrailer'], ['limGross', 'axl.f.limGross'], ['minDrivePct', 'axl.f.minDrivePct']] }
   ];
+
+  function numInput(id, val, step, extra) {
+    return '<input class="input" id="' + id + '" type="number" step="' + step + '" min="0" inputmode="decimal" value="' + esc(val) + '"' + (extra || '') + '>';
+  }
 
   function mount(boxId) {
     S.boxId = boxId;
@@ -167,14 +180,39 @@
       '<div class="axl">' +
         '<div class="h-title">⚖️ ' + esc(t('axl.title')) + '</div>' +
         '<div class="axl-note">' + esc(t('axl.note')) + '</div>' +
-        '<div id="axlResult"></div>' +
-        '<div class="glass axl-card"><div id="axlDrawing" class="axl-drawing"></div></div>' +
+        '<div id="axlBanner"></div>' +
+        '<div class="glass axl-card axl-draw-card"><div id="axlDrawing" class="axl-drawing"></div><div class="axl-legend" id="axlLegend"></div></div>' +
+        '<div id="axlKpis"></div>' +
+        // ── Új rakomány ──
+        '<div class="glass axl-card axl-add">' +
+          '<div class="axl-card-h"><span>➕ ' + esc(t('axl.addTitle')) + '</span><span class="axl-free" id="axlFree"></span></div>' +
+          '<div class="axl-add-grid">' +
+            '<label class="axl-fld axl-big"><span>' + esc(t('axl.f.weight')) + '</span>' + numInput('axlNewW', '', '0.1', ' placeholder="ex. 9"') + '</label>' +
+            '<label class="axl-fld axl-big"><span>' + esc(t('axl.f.length')) + '</span>' + numInput('axlNewL', '', '0.1', ' placeholder="ex. 2,4"') + '</label>' +
+          '</div>' +
+          '<div class="axl-chips" id="axlLenChips">' +
+            [['1.2', 'axl.ch.pallet'], ['2.4', 'axl.ch.pallet2'], ['6.8', 'axl.ch.half'], ['13.6', 'axl.ch.full']].map(function (c) {
+              return '<button type="button" class="axl-chip" data-len="' + c[0] + '">' + esc(t(c[1])) + '</button>';
+            }).join('') +
+          '</div>' +
+          '<div class="axl-fld"><span>' + esc(t('axl.f.place')) + '</span>' +
+            '<div class="axl-seg" id="axlPlaceSeg">' +
+              '<button type="button" class="on" data-place="after">' + esc(t('axl.pl.after')) + '</button>' +
+              '<button type="button" data-place="front">' + esc(t('axl.pl.front')) + '</button>' +
+              '<button type="button" data-place="at">' + esc(t('axl.pl.at')) + '</button>' +
+            '</div>' +
+            '<div id="axlAtWrap" style="display:none;margin-top:8px">' + numInput('axlNewS', '0', '0.1') + '</div>' +
+          '</div>' +
+          '<label class="axl-fld"><span>' + esc(t('axl.f.label')) + ' <i>(' + esc(t('axl.optional')) + ')</i></span><input class="input" id="axlNewN" type="text" maxlength="40"></label>' +
+          '<button class="btn primary axl-add-btn" type="button" onclick="AxleLoadPage.addFromForm()">➕ ' + esc(t('axl.addBtn')) + '</button>' +
+        '</div>' +
+        // ── Lista ──
         '<div class="glass axl-card">' +
-          '<div class="axl-card-h"><span>📦 ' + esc(t('axl.items')) + '</span>' +
-            '<span class="axl-actions"><button class="btn primary" type="button" onclick="AxleLoadPage.addItem()">➕ ' + esc(t('axl.addItem')) + '</button>' +
-            '<button class="btn ghost" type="button" onclick="AxleLoadPage.clearItems()">🗑 ' + esc(t('axl.clear')) + '</button></span></div>' +
+          '<div class="axl-card-h"><span>📦 ' + esc(t('axl.items')) + ' <b id="axlCount"></b></span>' +
+            '<button class="btn ghost" type="button" onclick="AxleLoadPage.clearItems()">🗑 ' + esc(t('axl.clear')) + '</button></div>' +
           '<div id="axlItems"></div>' +
         '</div>' +
+        // ── Jármű ──
         '<div class="glass axl-card">' +
           '<div class="axl-card-h axl-click" onclick="AxleLoadPage.toggleCfg()"><span>🚛 ' + esc(t('axl.vehicle')) + '</span><span id="axlCfgChev">' + (S.cfgOpen ? '▾' : '▸') + '</span></div>' +
           '<div id="axlCfg" style="' + (S.cfgOpen ? '' : 'display:none') + '">' +
@@ -190,53 +228,104 @@
         if (Number.isFinite(v)) { S.cfg[inp.getAttribute('data-axl-cfg')] = v; save(); refresh(); }
       });
     });
+    box.querySelectorAll('#axlLenChips .axl-chip').forEach(function (b) {
+      b.addEventListener('click', function () { var el = document.getElementById('axlNewL'); if (el) el.value = b.getAttribute('data-len'); });
+    });
+    box.querySelectorAll('#axlPlaceSeg button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        box.querySelectorAll('#axlPlaceSeg button').forEach(function (x) { x.classList.toggle('on', x === b); });
+        var w = document.getElementById('axlAtWrap'); if (w) w.style.display = b.getAttribute('data-place') === 'at' ? '' : 'none';
+      });
+    });
+    // A rajzon blokkra koppintva → az a blokk nyílik szerkesztésre
+    var dr = document.getElementById('axlDrawing');
+    if (dr) dr.addEventListener('click', function (e) {
+      var g = e.target && e.target.closest ? e.target.closest('[data-axl-blk]') : null;
+      if (!g) return;
+      S.editIdx = Number(g.getAttribute('data-axl-blk'));
+      renderItems();
+      var card = document.getElementById('axlItem' + S.editIdx);
+      if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    if (!S.resizeBound) {
+      S.resizeBound = true;
+      var tm = null;
+      root.addEventListener('resize', function () { clearTimeout(tm); tm = setTimeout(function () { if (document.getElementById('axlDrawing')) refresh(); }, 150); });
+    }
     renderItems();
     refresh();
   }
 
   function renderItems() {
     var el = document.getElementById('axlItems');
+    var cnt = document.getElementById('axlCount');
+    if (cnt) cnt.textContent = S.items.length ? '(' + S.items.length + ')' : '';
     if (!el) return;
     if (!S.items.length) { el.innerHTML = '<div class="axl-empty">' + esc(t('axl.noItems')) + '</div>'; return; }
     el.innerHTML = S.items.map(function (it, i) {
-      return '<div class="axl-item" style="border-left-color:' + COLORS[i % COLORS.length] + '">' +
-        '<span class="axl-item-n" style="background:' + COLORS[i % COLORS.length] + '">' + (i + 1) + '</span>' +
-        '<label class="axl-fld"><span>' + esc(t('axl.f.label')) + '</span><input class="input" type="text" maxlength="40" data-axl-i="' + i + '" data-k="label" value="' + esc(it.label) + '"></label>' +
-        '<label class="axl-fld"><span>' + esc(t('axl.f.weight')) + '</span><input class="input" type="number" step="0.1" min="0" inputmode="decimal" data-axl-i="' + i + '" data-k="weight" value="' + esc(it.weight) + '"></label>' +
-        '<label class="axl-fld"><span>' + esc(t('axl.f.start')) + '</span><input class="input" type="number" step="0.1" min="0" inputmode="decimal" data-axl-i="' + i + '" data-k="start" value="' + esc(it.start) + '"></label>' +
-        '<label class="axl-fld"><span>' + esc(t('axl.f.length')) + '</span><input class="input" type="number" step="0.1" min="0" inputmode="decimal" data-axl-i="' + i + '" data-k="length" value="' + esc(it.length) + '"></label>' +
-        '<button class="btn ghost axl-del" type="button" title="' + esc(t('axl.del')) + '" onclick="AxleLoadPage.delItem(' + i + ')">✕</button>' +
-      '</div>';
+      var col = COLORS[i % COLORS.length];
+      var w = num(it.weight, 0), s = num(it.start, 0), l = num(it.length, 0);
+      var open = S.editIdx === i;
+      var head =
+        '<div class="axl-ic-top">' +
+          '<span class="axl-item-n" style="background:' + col + '">' + (i + 1) + '</span>' +
+          '<div class="axl-ic-txt"><div class="axl-ic-name">' + esc(itemName(i)) + '</div>' +
+            '<div class="axl-ic-sub"><b>' + f1(w) + ' t</b> · ' + f1(l) + ' m · ' + esc(t('axl.pos')) + ' ' + f1(s) + ' → ' + f1(s + l) + ' m</div></div>' +
+        '</div>' +
+        '<div class="axl-ic-btns">' +
+          '<button type="button" class="axl-ib" title="' + esc(t('axl.moveFwd')) + '" onclick="AxleLoadPage.move(' + i + ',-1)">◀</button>' +
+          '<button type="button" class="axl-ib" title="' + esc(t('axl.moveBack')) + '" onclick="AxleLoadPage.move(' + i + ',1)">▶</button>' +
+          '<button type="button" class="axl-ib' + (open ? ' on' : '') + '" title="' + esc(t('axl.edit')) + '" onclick="AxleLoadPage.edit(' + i + ')">✏️</button>' +
+          '<button type="button" class="axl-ib axl-ib-del" title="' + esc(t('axl.del')) + '" onclick="AxleLoadPage.delItem(' + i + ')">✕</button>' +
+        '</div>';
+      var body = !open ? '' :
+        '<div class="axl-ic-edit">' +
+          '<label class="axl-fld"><span>' + esc(t('axl.f.weight')) + '</span><input class="input" type="number" step="0.1" min="0" inputmode="decimal" data-axl-i="' + i + '" data-k="weight" value="' + esc(w) + '"></label>' +
+          '<label class="axl-fld"><span>' + esc(t('axl.f.length')) + '</span><input class="input" type="number" step="0.1" min="0" inputmode="decimal" data-axl-i="' + i + '" data-k="length" value="' + esc(l) + '"></label>' +
+          '<label class="axl-fld"><span>' + esc(t('axl.f.start')) + '</span><input class="input" type="number" step="0.1" min="0" inputmode="decimal" data-axl-i="' + i + '" data-k="start" value="' + esc(s) + '"></label>' +
+          '<label class="axl-fld"><span>' + esc(t('axl.f.label')) + '</span><input class="input" type="text" maxlength="40" data-axl-i="' + i + '" data-k="label" value="' + esc(it.label) + '"></label>' +
+        '</div>';
+      return '<div class="axl-ic' + (open ? ' open' : '') + '" id="axlItem' + i + '" style="border-left-color:' + col + '"><div class="axl-ic-row">' + head + '</div>' + body + '</div>';
     }).join('');
     el.querySelectorAll('[data-axl-i]').forEach(function (inp) {
       inp.addEventListener('input', function () {
         var i = Number(inp.getAttribute('data-axl-i')), k = inp.getAttribute('data-k');
         if (!S.items[i]) return;
         if (k === 'label') S.items[i].label = inp.value.slice(0, 40);
-        else { var v = num(inp.value, NaN); if (!Number.isFinite(v)) return; S.items[i][k] = v; }
-        save(); refresh();
+        else { var v = num(inp.value, NaN); if (!Number.isFinite(v) || v < 0) return; S.items[i][k] = v; }
+        save(); refresh(); updateItemSub(i);
       });
     });
+  }
+  // Csak a fejléc-szöveget frissíti, hogy a beviteli mező fókusza megmaradjon
+  function updateItemSub(i) {
+    var card = document.getElementById('axlItem' + i), it = S.items[i];
+    if (!card || !it) return;
+    var w = num(it.weight, 0), s = num(it.start, 0), l = num(it.length, 0);
+    var nm = card.querySelector('.axl-ic-name'), sub = card.querySelector('.axl-ic-sub');
+    if (nm) nm.textContent = itemName(i);
+    if (sub) sub.innerHTML = '<b>' + f1(w) + ' t</b> · ' + f1(l) + ' m · ' + esc(t('axl.pos')) + ' ' + f1(s) + ' → ' + f1(s + l) + ' m';
   }
 
   function refresh() {
     var r = compute(S.cfg, S.items);
-    var resEl = document.getElementById('axlResult');
-    var drEl = document.getElementById('axlDrawing');
-    if (!resEl || !drEl) return;
-    if (!r.ok) { resEl.innerHTML = '<div class="axl-banner over">' + esc(t('axl.errGeo')) + '</div>'; drEl.innerHTML = ''; return; }
+    var bEl = document.getElementById('axlBanner'), kEl = document.getElementById('axlKpis'), drEl = document.getElementById('axlDrawing');
+    var free = document.getElementById('axlFree');
+    if (free) { var fr = Math.max(0, bedLen() - usedEnd()); free.textContent = t('axl.freeLen').replace('{m}', f1(r1(fr))); }
+    if (!bEl || !kEl || !drEl) return;
+    if (!r.ok) { bEl.innerHTML = '<div class="axl-banner over">' + esc(t('axl.errGeo')) + '</div>'; kEl.innerHTML = ''; drEl.innerHTML = ''; return; }
 
     var NAMES = { steer: 'axl.r.steer', drive: 'axl.r.drive', trailer: 'axl.r.trailer', gross: 'axl.r.gross', drivePct: 'axl.r.drivePct' };
     var cards = r.checks.map(function (ch) {
       var isPct = ch.key === 'drivePct';
-      var val = isPct ? f2(ch.value) + ' %' : f2(ch.value) + ' t';
-      var lim = isPct ? '≥ ' + f2(ch.limit) + ' %' : '≤ ' + f2(ch.limit) + ' t';
+      var val = isPct ? f1(Math.round(ch.value * 10) / 10) + ' %' : f2(ch.value) + ' t';
+      var lim = isPct ? '≥ ' + f1(ch.limit) + ' %' : '≤ ' + f1(ch.limit) + ' t';
       var bar = isPct ? Math.min(100, ch.value / 50 * 100) : Math.min(100, ch.pct);
       return '<div class="axl-kpi ' + ch.status + '">' +
         '<div class="axl-kpi-l">' + esc(t(NAMES[ch.key])) + '</div>' +
         '<div class="axl-kpi-v">' + val + '</div>' +
         '<div class="axl-kpi-bar"><span style="width:' + bar.toFixed(1) + '%"></span></div>' +
-        '<div class="axl-kpi-s">' + esc(t('axl.r.limit')) + ' ' + lim + (isPct ? '' : ' · ' + f2(ch.pct) + ' %') + '</div>' +
+        '<div class="axl-kpi-s">' + esc(t('axl.r.limit')) + ' ' + lim + '</div>' +
       '</div>';
     }).join('');
 
@@ -250,86 +339,131 @@
       if (w.idx != null) txt = txt.replace('{n}', String(w.idx + 1));
       if (!seen[txt]) { seen[txt] = 1; msgs.push(txt); }
     });
-    var banner = r.status === 'ok' && !r.warnings.length
+    bEl.innerHTML = r.status === 'ok' && !r.warnings.length
       ? '<div class="axl-banner ok">✅ ' + esc(t('axl.allOk')) + '</div>'
-      : '<div class="axl-banner ' + (r.status === 'over' ? 'over' : 'warn') + '">' + msgs.map(function (m) { return '⚠️ ' + esc(m); }).join('<br>') + (msgs.length ? '' : '⚠️ ' + esc(t('axl.nearLimit'))) + '</div>';
+      : '<div class="axl-banner ' + (r.status === 'over' ? 'over' : 'warn') + '">' + (msgs.length ? msgs.map(function (m) { return '⚠️ ' + esc(m); }).join('<br>') : '⚠️ ' + esc(t('axl.nearLimit'))) + '</div>';
 
     var info = '<div class="axl-info">' + esc(t('axl.r.cargo')) + ': <b>' + f2(r.cargo) + ' t</b> · ' + esc(t('axl.r.kingpin')) + ': <b>' + f2(r.kingpin) + ' t</b>' +
       (r.cargoCenter != null ? ' · ' + esc(t('axl.r.center')) + ': <b>' + f2(r.cargoCenter) + ' m</b>' : '') + '</div>';
+    kEl.innerHTML = '<div class="axl-kpis">' + cards + '</div>' + info;
 
-    resEl.innerHTML = banner + '<div class="axl-kpis">' + cards + '</div>' + info;
-    drEl.innerHTML = drawSvg(r);
+    var w = Math.min(900, drEl.clientWidth || 600);
+    drEl.innerHTML = drawSvg(r, w);
+    var lg = document.getElementById('axlLegend');
+    if (lg) lg.innerHTML = S.items.length ? esc(t('axl.tapHint')) : '';
   }
 
-  // Oldalnézet (méretarányos, vízszintesen méterben)
-  function drawSvg(r) {
+  // Oldalnézet — MINDIG kifér a képernyő szélességébe (nincs vízszintes görgetés).
+  // A rajz a valódi pixel-szélességre készül, így a feliratok telefonon is olvashatók.
+  function drawSvg(r, W) {
     var c = r.cfg;
-    var VW = 1000, PAD = 20;
-    // Koordináták méterben: 0 = vontató eleje
+    var small = W < 520;
+    var PAD = small ? 6 : 14;
+    var fs = small ? 11 : 13;              // betűméret px
     var frontAxle = 1.3;
     var driveAxle = frontAxle + c.wheelbase;
     var fifth = driveAxle - c.fifthOffset;
     var trailerFront = fifth - c.kingpinFront;
     var trailerAxle = fifth + c.kingpinAxle;
     var trailerEnd = trailerFront + c.bedLength;
-    var totalM = Math.max(trailerEnd, trailerAxle + 1.5) + 0.3;
-    var sx = (VW - 2 * PAD) / totalM;
-    var X = function (m) { return (PAD + m * sx).toFixed(1); };
+    var startM = Math.min(0, trailerFront - 0.2);
+    var totalM = Math.max(trailerEnd, trailerAxle + 1.5) + 0.3 - startM;
+    var sx = (W - 2 * PAD) / totalM;
+    var X = function (m) { return PAD + (m - startM) * sx; };
     var lanes = assignLanes(r.placed);
-    var bedTop = 40, bedBot = 150, laneH = (bedBot - bedTop) / lanes.count;
-    var wheelY = 178, R = 15;
+    var bedTop = fs + 12;
+    var bedH = Math.max(small ? 46 : 70, Math.min(110, lanes.count * (fs + 14)));
+    var bedBot = bedTop + bedH;
+    var R = Math.max(7, Math.min(15, sx * 0.48));
+    var wheelY = bedBot + 10 + R;
+    var H = wheelY + R + fs + 12;
+    var laneH = bedH / lanes.count;
+    var o = function (n) { return n.toFixed(1); };
     var s = '';
-    // vontató
-    s += '<rect x="' + X(0.2) + '" y="70" width="' + (2.1 * sx).toFixed(1) + '" height="95" rx="10" class="axl-cab"/>';
-    s += '<rect x="' + X(0.2) + '" y="150" width="' + ((driveAxle + 1.0 - 0.2) * sx).toFixed(1) + '" height="14" rx="3" class="axl-chassis"/>';
-    // pótkocsi rakfelület
-    s += '<rect x="' + X(trailerFront) + '" y="' + bedTop + '" width="' + (c.bedLength * sx).toFixed(1) + '" height="' + (bedBot - bedTop) + '" class="axl-bed"/>';
-    s += '<rect x="' + X(trailerFront) + '" y="' + bedBot + '" width="' + (c.bedLength * sx).toFixed(1) + '" height="8" class="axl-chassis"/>';
-    // rakomány-blokkok
+    // vontató (fülke + alváz)
+    var cabTop = bedTop + bedH * 0.25;
+    s += '<rect x="' + o(X(0.2)) + '" y="' + o(cabTop) + '" width="' + o(2.1 * sx) + '" height="' + o(bedBot - cabTop + 6) + '" rx="' + o(Math.min(10, sx * 0.4)) + '" class="axl-cab"/>';
+    s += '<rect x="' + o(X(0.2) + 2.1 * sx * 0.55) + '" y="' + o(cabTop + 6) + '" width="' + o(2.1 * sx * 0.35) + '" height="' + o((bedBot - cabTop) * 0.3) + '" rx="3" class="axl-win"/>';
+    s += '<rect x="' + o(X(0.2)) + '" y="' + o(bedBot) + '" width="' + o((driveAxle + 1.0 - 0.2) * sx) + '" height="' + o(small ? 8 : 12) + '" rx="3" class="axl-chassis"/>';
+    // pótkocsi
+    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedTop) + '" width="' + o(c.bedLength * sx) + '" height="' + o(bedH) + '" class="axl-bed"/>';
+    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedBot) + '" width="' + o(c.bedLength * sx) + '" height="' + o(small ? 5 : 7) + '" class="axl-chassis"/>';
+    // rakomány
     r.placed.forEach(function (p) {
       var col = COLORS[p.idx % COLORS.length];
       var ln = lanes.laneOf[p.idx] || 0;
       var y = bedTop + ln * laneH + 2, h = laneH - 4;
-      var w = Math.max(2, p.length * sx);
-      var lbl = (S.items[p.idx] && S.items[p.idx].label) ? S.items[p.idx].label + ' · ' : '';
-      s += '<g><title>' + esc(lbl + f2(p.weight) + ' t') + '</title><rect x="' + X(trailerFront + p.start) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="4" fill="' + col + '" opacity="0.88"/>';
-      if (w > 34) s += '<text x="' + (Number(X(trailerFront + p.start)) + w / 2).toFixed(1) + '" y="' + (y + h / 2 + 5).toFixed(1) + '" text-anchor="middle" class="axl-blk-t">' + esc(f2(p.weight).replace(/,00$/, '')) + ' t</text>';
+      var bw = Math.max(3, p.length * sx), bx = X(trailerFront + p.start);
+      var sel = S.editIdx === p.idx;
+      s += '<g data-axl-blk="' + p.idx + '" class="axl-blk"><title>' + esc(itemName(p.idx) + ' · ' + f1(p.weight) + ' t') + '</title>' +
+        '<rect x="' + o(bx) + '" y="' + o(y) + '" width="' + o(bw) + '" height="' + o(h) + '" rx="4" fill="' + col + '"' + (sel ? ' stroke="#0f172a" stroke-width="2.5"' : '') + '/>';
+      var lbl = f1(p.weight) + ' t';
+      if (bw > lbl.length * fs * 0.62 + 4) s += '<text x="' + o(bx + bw / 2) + '" y="' + o(y + h / 2 + fs * 0.36) + '" text-anchor="middle" class="axl-blk-t" font-size="' + fs + '">' + esc(lbl) + '</text>';
+      else if (bw > fs) s += '<text x="' + o(bx + bw / 2) + '" y="' + o(y + h / 2 + fs * 0.36) + '" text-anchor="middle" class="axl-blk-t" font-size="' + fs + '">' + (p.idx + 1) + '</text>';
       s += '</g>';
     });
     // királycsap
-    s += '<polygon points="' + X(fifth) + ',' + (bedBot + 8) + ' ' + (Number(X(fifth)) - 7) + ',' + (bedBot + 20) + ' ' + (Number(X(fifth)) + 7) + ',' + (bedBot + 20) + '" class="axl-kp"/>';
-    // tengelyek + terhelések
+    var kx = X(fifth), ky = bedBot + (small ? 5 : 7);
+    s += '<polygon points="' + o(kx) + ',' + o(ky) + ' ' + o(kx - 6) + ',' + o(ky + 9) + ' ' + o(kx + 6) + ',' + o(ky + 9) + '" class="axl-kp"/>';
+    // tengelyek + terhelés
+    var stOf = function (k) { var ch = r.checks.filter(function (x) { return x.key === k; })[0]; return ch ? ch.status : 'ok'; };
     function axle(m, load, st, triple) {
       var out = '';
-      var offs = triple ? [-1.31, 0, 1.31] : [0];
-      offs.forEach(function (o) { out += '<circle cx="' + X(m + o) + '" cy="' + wheelY + '" r="' + R + '" class="axl-wheel"/>'; });
-      out += '<text x="' + X(m) + '" y="' + (wheelY + R + 22) + '" text-anchor="middle" class="axl-load ' + st + '">' + f2(load) + ' t</text>';
+      (triple ? [-1.31, 0, 1.31] : [0]).forEach(function (d) { out += '<circle cx="' + o(X(m + d)) + '" cy="' + o(wheelY) + '" r="' + o(R) + '" class="axl-wheel"/>'; });
+      var lx = Math.min(Math.max(X(m), PAD + fs * 2), W - PAD - fs * 2);
+      out += '<text x="' + o(lx) + '" y="' + o(wheelY + R + fs + 4) + '" text-anchor="middle" class="axl-load ' + st + '" font-size="' + (fs + 1) + '">' + f1(Math.round(load * 100) / 100) + ' t</text>';
       return out;
     }
-    var stOf = function (k) { var ch = r.checks.filter(function (x) { return x.key === k; })[0]; return ch ? ch.status : 'ok'; };
     s += axle(frontAxle, r.steer, stOf('steer'));
     s += axle(driveAxle, r.drive, stOf('drive'));
     s += axle(trailerAxle, r.trailer, stOf('trailer'), true);
-    // méter-skála a rakfelület fölött
+    // méterskála
+    var stepM = sx * 2 < fs * 2.2 ? 4 : 2;
     for (var m = 0; m <= c.bedLength + 1e-9; m += 1) {
-      s += '<line x1="' + X(trailerFront + m) + '" y1="' + (bedTop - 6) + '" x2="' + X(trailerFront + m) + '" y2="' + bedTop + '" class="axl-tick"/>';
-      if (m % 2 === 0) s += '<text x="' + X(trailerFront + m) + '" y="' + (bedTop - 10) + '" text-anchor="middle" class="axl-tick-t">' + m + '</text>';
+      s += '<line x1="' + o(X(trailerFront + m)) + '" y1="' + o(bedTop - 4) + '" x2="' + o(X(trailerFront + m)) + '" y2="' + o(bedTop) + '" class="axl-tick"/>';
+      if (m % stepM === 0) s += '<text x="' + o(X(trailerFront + m)) + '" y="' + o(bedTop - 7) + '" text-anchor="middle" class="axl-tick-t" font-size="' + (fs - 2) + '">' + m + '</text>';
     }
-    return '<svg viewBox="0 0 ' + VW + ' 230" class="axl-svg" role="img" aria-label="' + esc(t('axl.title')) + '">' + s + '</svg>';
+    return '<svg width="' + W + '" height="' + o(H) + '" viewBox="0 0 ' + W + ' ' + o(H) + '" class="axl-svg" role="img" aria-label="' + esc(t('axl.title')) + '">' + s + '</svg>';
+  }
+
+  function place(mode, len, at) {
+    if (mode === 'front') {
+      // a homlokfalhoz kerül, a többit hátrébb tolja
+      S.items.forEach(function (it) { it.start = r1(num(it.start, 0) + len); });
+      return 0;
+    }
+    if (mode === 'at') return Math.max(0, r1(num(at, 0)));
+    return r1(usedEnd());
   }
 
   root.AxleLoadPage = {
     mount: mount,
-    addItem: function () {
-      var last = S.items[S.items.length - 1];
-      var start = last ? Math.round((num(last.start, 0) + num(last.length, 0)) * 10) / 10 : 0;
-      S.items.push({ label: '', weight: 1, start: start, length: 1.2 });
+    addFromForm: function () {
+      var w = num((document.getElementById('axlNewW') || {}).value, NaN);
+      var l = num((document.getElementById('axlNewL') || {}).value, NaN);
+      if (!(w > 0)) { if (root.toast) root.toast(t('axl.needWeight'), 'err'); else root.alert(t('axl.needWeight')); return; }
+      if (!(l > 0)) { if (root.toast) root.toast(t('axl.needLength'), 'err'); else root.alert(t('axl.needLength')); return; }
+      var onBtn = document.querySelector('#axlPlaceSeg button.on');
+      var mode = onBtn ? onBtn.getAttribute('data-place') : 'after';
+      var start = place(mode, l, (document.getElementById('axlNewS') || {}).value);
+      var nm = String((document.getElementById('axlNewN') || {}).value || '').slice(0, 40);
+      var item = { label: nm, weight: w, start: start, length: l };
+      if (mode === 'front') S.items.unshift(item); else S.items.push(item);
+      S.editIdx = -1;
+      ['axlNewW', 'axlNewL', 'axlNewN'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
       save(); renderItems(); refresh();
     },
-    delItem: function (i) { S.items.splice(i, 1); save(); renderItems(); refresh(); },
+    move: function (i, dir) {
+      var it = S.items[i]; if (!it) return;
+      var maxStart = Math.max(0, bedLen() - num(it.length, 0));
+      it.start = Math.min(maxStart, Math.max(0, r1(num(it.start, 0) + dir * STEP)));
+      save(); renderItems(); refresh();
+    },
+    edit: function (i) { S.editIdx = S.editIdx === i ? -1 : i; renderItems(); refresh(); },
+    delItem: function (i) { S.items.splice(i, 1); S.editIdx = -1; save(); renderItems(); refresh(); },
     clearItems: function () {
       if (S.items.length && !root.confirm(t('axl.clearConfirm'))) return;
-      S.items = []; save(); renderItems(); refresh();
+      S.items = []; S.editIdx = -1; save(); renderItems(); refresh();
     },
     toggleCfg: function () {
       S.cfgOpen = !S.cfgOpen;
