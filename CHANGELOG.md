@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-13 — ⚖️ Új menüpont: Tengelyterhelés-kalkulátor (Flotta, PR #549)
+
+- **Flotta → ⚖️ Tengelyterhelés** (`axle-load`, admin + manager): rakomány-blokkok (súly / kezdőpozíció / hossz) + jármű-adatok (üres tengelyterhelések, tengelytáv, nyeregszerkezet, királycsap-távolságok, rakfelület, határértékek) → élő tengelyterhelés-számítás 5 kártyával, oldalnézeti rajzzal és figyelmeztetésekkel. KIZÁRÓLAG kézzel bevitt adatból dolgozik; a beállítások böngészőben maradnak (localStorage). Becslés — a mérlegelést nem helyettesíti.
+- `public/axle-load.js` (motor + felület), `feature-catalog.js` kapcsoló, ~50 `axl.*` i18n kulcs (RO+HU), CSS `#axleLoadBox` scope. Nincs szerver-/DB-változás.
+- Teszt: `tests/unit/axleLoad.test.js` (+10); **1770 Jest zöld**. Cache-bust `?v=20261013axle`.
+
 ## 2026-10-10 — 💬 Chat: karbantartó műveletek is chatből — külső sofőrök, menetlevél-átrendezés, jogosultság, nyilvántartás, kapcsolók (PR #548)
 
 - **Új chat-funkciók** (`lib/chatTools/extra.js`, meglévő handlereken át):
