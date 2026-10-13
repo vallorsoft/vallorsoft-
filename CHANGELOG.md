@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-13 — FIX: main CI piros → Fly-deploy kimaradt (chat-sablon `orders.valuta`)
+
+- `lib/chatTools/manage.js` (PR #546 óta): a sablonos levél chat-eszköze a nem létező `orders.valuta` oszlopot kérdezte le → a `sql-schema-drift` őr-teszt bukott, a main CI piros lett, így a #548 és #549 nem élesedett Fly-on. Javítva: a fuvar-ár EUR (nincs pénznem-oszlop). **1834 Jest zöld** valós Postgres 16-tal.
+
 ## 2026-10-13 — ⚖️ Új menüpont: Tengelyterhelés-kalkulátor (Flotta, PR #549)
 
 - **Flotta → ⚖️ Tengelyterhelés** (`axle-load`, admin + manager): rakomány-blokkok (súly / kezdőpozíció / hossz) + jármű-adatok (üres tengelyterhelések, tengelytáv, nyeregszerkezet, királycsap-távolságok, rakfelület, határértékek) → élő tengelyterhelés-számítás 5 kártyával, oldalnézeti rajzzal és figyelmeztetésekkel. KIZÁRÓLAG kézzel bevitt adatból dolgozik; a beállítások böngészőben maradnak (localStorage). Becslés — a mérlegelést nem helyettesíti.
