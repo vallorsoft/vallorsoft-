@@ -66,4 +66,63 @@ describe('axle-load compute', () => {
     const lanes = AL.assignLanes([{ idx: 0, start: 0, length: 3 }, { idx: 1, start: 1, length: 2 }, { idx: 2, start: 3, length: 1 }]);
     expect(lanes.count).toBe(2); expect(lanes.laneOf[1]).toBe(1); expect(lanes.laneOf[2]).toBe(0);
   });
+
+  describe('emelhető tengely + dőlés', () => {
+    const full = [{ weight: 24, start: 0, length: 13.6 }];
+    const close = (a, b) => expect(a).toBeCloseTo(b, 6);
+
+    test('nincs emelhető / felemelve = a régi kéttámaszú eredmény', () => {
+      const base = AL.compute({}, full);
+      const up = AL.compute({ liftType: 1, liftDown: 0 }, full);
+      close(up.steer, base.steer); close(up.drive, base.drive);
+      expect(up.lift).toBe(0);
+      expect(up.checks.map(c => c.key)).not.toContain('lift');
+    });
+
+    test('leengedve: tömeg- és nyomaték-megmaradás, arány szerinti megosztás', () => {
+      const cfg = { liftType: 2, liftDown: 1, liftOffset: 1.35, liftShare: 40 };
+      const r = AL.compute(cfg, full);
+      const up = AL.compute(Object.assign({}, cfg, { liftDown: 0 }), full);
+      close(r.steer + r.drive + r.lift, up.steer + up.drive);           // vontató össz-teher
+      const W = 3.8;
+      close(r.drive * W + r.lift * (W + 1.35), up.drive * W);           // nyomaték a kormányzottra
+      close(r.lift / (r.drive + r.lift), 0.4);
+      expect(r.checks.map(c => c.key)).toEqual(expect.arrayContaining(['lift', 'group']));
+    });
+
+    test('pusher leengedve: a kormányzott könnyebb, tag leengedve: nehezebb', () => {
+      const up = AL.compute({ liftType: 1, liftDown: 0 }, full);
+      expect(AL.compute({ liftType: 1, liftDown: 1 }, full).steer).toBeLessThan(up.steer);
+      expect(AL.compute({ liftType: 2, liftDown: 1 }, full).steer).toBeGreaterThan(up.steer);
+    });
+
+    test('ha leengedve kevés a hajtott arány, felemelést javasol', () => {
+      const r = AL.compute({ liftType: 1, liftDown: 1 }, full);
+      expect(r.status).toBe('over');
+      expect(r.warnings.map(w => w.key)).toContain('tryLiftUp');
+      expect(r.other.liftDown).toBe(0);
+    });
+
+    test('vízszintes rakfelületnél nincs dőlés-hatás', () => {
+      const r = AL.compute({ refHeight: 1.2, frontHeight: 1.2, rearHeight: 1.2 }, full);
+      close(r.tilt.deg, 0); close(r.tilt.shift, 0);
+      close(r.trailer, AL.compute({}, full).trailer);
+      close(r.tilt.frontDev, 0);
+    });
+
+    test('eleje magasabb → súlypont hátra, több a pótkocsi-tengelyeken', () => {
+      const flat = AL.compute({}, full);
+      const r = AL.compute({ frontHeight: 1.25, rearHeight: 1.05, cargoCg: 1.0, refHeight: 1.1 }, full);
+      close(r.tilt.shift, 0.2 / 13.6);
+      close(r.trailer - flat.trailer, 24 * (0.2 / 13.6) / 7.7);
+      close(r.gross, flat.gross);
+      expect(Math.round(r.tilt.frontDev * 100)).toBe(15);
+      expect(Math.round(r.tilt.rearDev * 100)).toBe(-5);
+    });
+
+    test('nagy dőlés figyelmeztet', () => {
+      const r = AL.compute({ frontHeight: 1.9, rearHeight: 1.0 }, full);
+      expect(r.warnings.map(w => w.key)).toContain('tilt');
+    });
+  });
 });
