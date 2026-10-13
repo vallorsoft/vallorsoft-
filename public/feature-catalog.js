@@ -57,6 +57,7 @@ window.VS_FEATURES = [
   { key: 'expiries',         label: 'Lejáratok & riasztások',      group: 'Flotta & Megfelelés' },
   { key: 'service-log',      label: 'Szerviz & karbantartás',      group: 'Flotta & Megfelelés' },
   { key: 'fuel-import',      label: 'Üzemanyagkártya-import (⛽)',  group: 'Flotta & Megfelelés' },
+  { key: 'axle-load',        label: 'Tengelyterhelés-kalkulátor (⚖️)', group: 'Flotta & Megfelelés' },
   // 'monthly-report': nem menüpont — a havi e-mail összefoglalót kapcsolja (scheduler).
   { key: 'monthly-report',   label: 'Havi e-mail összefoglaló (📧)', group: 'Flotta & Megfelelés' },
   { key: 'users',            label: 'Munkatársak kezelése',        group: 'Adminisztráció' },
