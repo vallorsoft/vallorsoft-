@@ -25,9 +25,18 @@
 //
 //  Szint / dőlés: nullpont (pl. 1,10 m a talajtól), a pótkocsi ELEJÉNEK
 //  és VÉGÉNEK rakfelület-magassága → θ = atan((h_eleje − h_vége)/L_rak).
-//  Ferde rakfelületen a rakomány súlypontja (a padlótól h_sp magasan)
-//  vízszintesen h_sp·tanθ-val vándorol (eleje magasabb → hátrafelé),
-//  ez módosítja a királycsap ↔ pótkocsi-tengelyek közti megoszlást.
+//   – Pótkocsi (merev test a királycsapon és a tengelyeken): a vízszintes
+//     karok a dőléssel változnak. A rakomány súlypontja h_sp-vel a padló
+//     fölött, a tengely közepe h_t-vel alatta van:
+//       pótkocsi-tengelyekre jutó rész = (d·cosθ + h_sp·sinθ) / (L·cosθ − h_t·sinθ)
+//     Ez önmagában kicsi (1°-nál pár cm), és eleje-fel dőlésnél HÁTRA tol.
+//   – Vontató: ha az eleje a nullpont fölött van, a hajtott tengely
+//     légrugója emeli a nyerget (Δ cm). Leengedett emelhető tengelynél a
+//     magasabbra fújt hajtott rugó átveszi a terhet az emelhetőtől:
+//       emelhető = alap − k·Δ,  hajtott = (M − emelhető·x_e) / W,
+//       kormányzott = ΣF − hajtott − emelhető   (k = t/cm, állítható).
+//     Két tengelyes vontatón (nincs második tengely a csoportban) a
+//     magasítás statikailag nem tud terhet átrakni a hajtottra.
 //
 //  Szerver/DB nincs: a beállítások és a blokkok a böngészőben
 //  maradnak (localStorage, csak kényelmi célból). BECSLÉS — a
@@ -60,7 +69,9 @@
     refHeight: 1.1,   // nullpont / szint a talajtól (m)
     frontHeight: 1.1, // pótkocsi ELEJE: rakfelület magassága a talajtól (m)
     rearHeight: 1.1,  // pótkocsi VÉGE: rakfelület magassága a talajtól (m)
-    cargoCg: 1.0      // rakomány súlypontja a rakfelület fölött (m)
+    cargoCg: 1.0,     // rakomány súlypontja a rakfelület fölött (m)
+    liftStiff: 0.2,   // magasítás → teher-átadás emelhető → hajtott (t / cm)
+    wheelR: 0.5       // pótkocsi-kerék sugara (m) — a tengely magassága
   };
   var DEFAULT_ITEMS = [];
 
@@ -85,7 +96,14 @@
     // ── Dőlés a magasságokból ──
     var dh = c.frontHeight - c.rearHeight;
     var theta = Math.atan2(dh, c.bedLength);
-    var shift = c.cargoCg * Math.tan(theta);       // vízszintes súlypont-vándorlás (m, + = hátra)
+    var cosT = Math.cos(theta), sinT = Math.sin(theta);
+    // A tengely közepe a padló alatt (a tengely helyén mért padló-magasságból)
+    var axleU = c.kingpinFront + c.kingpinAxle;
+    var bedAtAxle = c.frontHeight - dh * axleU / c.bedLength;
+    var axleDepth = Math.max(0, bedAtAxle - c.wheelR);
+    var leverL = c.kingpinAxle * cosT - axleDepth * sinT;   // királycsap → tengely vízszintesen
+    if (!(leverL > 0)) leverL = c.kingpinAxle;
+    var shift = c.cargoCg * sinT;                  // a rakomány súlypontjának vízszintes eltolódása (m, + = hátra)
     var tilt = {
       deg: theta * 180 / Math.PI, pct: dh / c.bedLength * 100, shift: shift,
       frontDev: c.frontHeight - c.refHeight, rearDev: c.rearHeight - c.refHeight
@@ -101,15 +119,15 @@
       if (!(w > 0)) return;
       if (l < 0) l = 0;
       var x = s + l / 2;                       // súlypont a homlokfaltól
-      var d = x + shift - c.kingpinFront;      // királycsaptól hátrafelé (dőléssel)
-      var tShare = w * d / c.kingpinAxle;
+      var d = (x - c.kingpinFront) * cosT + shift;   // királycsaptól vízszintesen (dőléssel)
+      var tShare = w * d / leverL;
       var kShare = w - tShare;
       cargo += w; trl += tShare; kp += kShare; moment += w * x;
       if (s < 0 || s + l > c.bedLength + 1e-9) warnings.push({ key: 'outside', idx: idx });
       placed.push({ idx: idx, weight: w, start: s, length: l, center: x });
     });
 
-    if (cargo > 0 && moment / cargo + shift > c.kingpinFront + c.kingpinAxle) warnings.push({ key: 'behindAxle' });
+    if (cargo > 0 && (moment / cargo - c.kingpinFront) * cosT + shift > leverL) warnings.push({ key: 'behindAxle' });
 
     // ── Vontató: nyomaték a kormányzott tengelyre ──
     var W = c.wheelbase;
@@ -123,9 +141,21 @@
     var groupPos = liftActive ? W + (liftPos - W) * sh : W;
     if (!(groupPos > 0)) groupPos = W;
     var group = tractorMoment / groupPos;
-    var steer = tractorLoad - group;
     var drive = liftActive ? group * (1 - sh) : group;
     var lift = liftActive ? group * sh : 0;
+    // A nyereg magasítása (eleje a nullpont fölött) a hajtott légrugóval:
+    // leengedett emelhetőnél terhet ad át az emelhetőről a hajtottra.
+    var raiseCm = (c.frontHeight - c.refHeight) * 100;
+    var transfer = 0;
+    if (liftActive && raiseCm !== 0 && liftPos > 0) {
+      var lift2 = Math.min(Math.max(0, lift - c.liftStiff * raiseCm), tractorMoment / liftPos);
+      transfer = lift - lift2;
+      lift = lift2;
+      drive = (tractorMoment - lift * liftPos) / W;
+    }
+    var steer = tractorLoad - drive - lift;
+    tilt.raiseCm = raiseCm;
+    tilt.transfer = transfer;
     var trailer = c.trailer0 + trl;
     var gross = steer + drive + lift + trailer;
     var drivePct = gross > 0 ? drive / gross * 100 : 0;
@@ -225,7 +255,7 @@
     { grp: 'axl.grpLimits', keys: [['limSteer', 'axl.f.limSteer'], ['limDrive', 'axl.f.limDrive'], ['limLift', 'axl.f.limLift'], ['limGroup', 'axl.f.limGroup'], ['limTrailer', 'axl.f.limTrailer'], ['limGross', 'axl.f.limGross'], ['minDrivePct', 'axl.f.minDrivePct']] }
   ];
   // Emelhető tengely + szint kártya mezői (mindig látszik — menet közben is állítják)
-  var LIFT_FIELDS = [['liftOffset', 'axl.f.liftOffset'], ['liftShare', 'axl.f.liftShare']];
+  var LIFT_FIELDS = [['liftOffset', 'axl.f.liftOffset'], ['liftShare', 'axl.f.liftShare'], ['liftStiff', 'axl.f.liftStiff']];
   var HEIGHT_FIELDS = [['refHeight', 'axl.f.refHeight'], ['frontHeight', 'axl.f.frontHeight'], ['rearHeight', 'axl.f.rearHeight'], ['cargoCg', 'axl.f.cargoCg']];
   function cfgInput(k, lbl) {
     return '<label class="axl-fld"><span>' + esc(t(lbl)) + '</span><input class="input" type="number" step="0.01" inputmode="decimal" data-axl-cfg="' + k + '" value="' + esc(S.cfg[k]) + '"></label>';
@@ -467,7 +497,9 @@
       var dir = Math.abs(tl.deg) < 0.05 ? t('axl.tilt.level') : (tl.deg > 0 ? t('axl.tilt.frontUp') : t('axl.tilt.rearUp'));
       tEl.innerHTML = '<b>' + esc(dir) + '</b> · ' + f2(Math.abs(tl.deg)) + '° (' + f1(Math.round(Math.abs(tl.pct) * 10) / 10) + ' %)' +
         '<br>' + esc(t('axl.tilt.front')) + ' ' + cm(tl.frontDev) + ' · ' + esc(t('axl.tilt.rear')) + ' ' + cm(tl.rearDev) + ' ' + esc(t('axl.tilt.vsRef')) +
-        (Math.abs(tl.shift) >= 0.005 ? '<br>' + esc(t('axl.tilt.shift')).replace('{cm}', String(Math.round(Math.abs(tl.shift) * 100))).replace('{dir}', t(tl.shift > 0 ? 'axl.tilt.back' : 'axl.tilt.fwd')) : '');
+        (Math.abs(tl.shift) >= 0.005 ? '<br>' + esc(t('axl.tilt.shift')).replace('{cm}', String(Math.round(Math.abs(tl.shift) * 100))).replace('{dir}', t(tl.shift > 0 ? 'axl.tilt.back' : 'axl.tilt.fwd')) : '') +
+        (Math.abs(tl.transfer) >= 0.005 ? '<br><b>' + esc(t(tl.transfer > 0 ? 'axl.tilt.toDrive' : 'axl.tilt.toLift').replace('{t}', f2(Math.abs(tl.transfer)))) + '</b>'
+          : (Math.abs(tl.raiseCm) >= 0.5 && !r.liftActive ? '<br>' + esc(t('axl.tilt.noGroup')) : ''));
     }
 
     var w = Math.min(900, drEl.clientWidth || 600);

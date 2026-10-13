@@ -110,14 +110,41 @@ describe('axle-load compute', () => {
       close(r.tilt.frontDev, 0);
     });
 
-    test('eleje magasabb → súlypont hátra, több a pótkocsi-tengelyeken', () => {
+    test('pótkocsi dőlés: a karok cosθ / sinθ szerint (tengely a padló alatt)', () => {
       const flat = AL.compute({}, full);
       const r = AL.compute({ frontHeight: 1.25, rearHeight: 1.05, cargoCg: 1.0, refHeight: 1.1 }, full);
-      close(r.tilt.shift, 0.2 / 13.6);
-      close(r.trailer - flat.trailer, 24 * (0.2 / 13.6) / 7.7);
+      const th = Math.atan2(0.2, 13.6);
+      const axleU = 1.6 + 7.7;
+      const depth = (1.25 - 0.2 * axleU / 13.6) - 0.5;
+      const L = 7.7 * Math.cos(th) - depth * Math.sin(th);
+      const d = (6.8 - 1.6) * Math.cos(th) + 1.0 * Math.sin(th);
+      close(r.trailer, 5.2 + 24 * d / L);
       close(r.gross, flat.gross);
       expect(Math.round(r.tilt.frontDev * 100)).toBe(15);
       expect(Math.round(r.tilt.rearDev * 100)).toBe(-5);
+      expect(r.tilt.transfer).toBe(0);                 // nincs emelhető → nincs átadás
+    });
+
+    test('nyereg magasítása leengedett emelhetőnél: teher az emelhetőről a hajtottra', () => {
+      const base = { liftType: 2, liftDown: 1, liftShare: 40, liftStiff: 0.2 };
+      const lvl = AL.compute(base, full);
+      const up = AL.compute(Object.assign({}, base, { frontHeight: 1.2 }), full);   // +10 cm
+      expect(up.drive).toBeGreaterThan(lvl.drive);
+      expect(up.lift).toBeLessThan(lvl.lift);
+      close(up.tilt.transfer, 2.0);
+      // a vontató össz-terhe és nyomatéka megmarad
+      close(up.steer + up.drive + up.lift, 5.8 + 3.7 + up.kingpin);
+      close(up.drive * 3.8 + up.lift * (3.8 + 1.35), (3.7 * 3.8 + up.kingpin * (3.8 - 0.6)));
+      // süllyesztés fordítva
+      const down = AL.compute(Object.assign({}, base, { frontHeight: 1.0 }), full);
+      expect(down.drive).toBeLessThan(lvl.drive);
+      expect(down.lift).toBeGreaterThan(lvl.lift);
+    });
+
+    test('nagy magasítás: az emelhető 0 alá nem mehet', () => {
+      const r = AL.compute({ liftType: 2, liftDown: 1, liftStiff: 1, frontHeight: 1.6 }, full);
+      expect(r.lift).toBe(0);
+      expect(r.drive).toBeGreaterThan(0);
     });
 
     test('nagy dőlés figyelmeztet', () => {
