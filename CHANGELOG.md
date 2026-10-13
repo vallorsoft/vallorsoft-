@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-13 — ⚖️ Tengelyterhelés: emelhető tengely a vontatón + szint/dőlés (nullpont, pótkocsi eleje/vége magasság)
+
+- **Emelhető tengely** (nincs / hajtott ELŐTT „pusher" / hajtott MÖGÖTT „tag"), ⬇️ leengedve / ⬆️ felemelve kapcsoló. Felemelve 0 t, a vontató kéttámaszú tartó; leengedve a hajtott+emelhető csoport egyenértékű támasz a súlyozott helyen (`x_g = W ± s·e`), a csoport-teher `G = ΣF·x / x_g`, kormányzott = ΣF − G, hajtott = G·(1−s), emelhető = G·s (s = légrugó-megosztás, alap 40 %). Új határok: emelhető 7,5 t, csoport 19 t. Kiírja, mi lenne a másik állásban, és ha az a határon belül marad, javasolja (emeld fel / engedd le).
+- **Szint / dőlés**: állítható nullpont (pl. 1,10 m a talajtól), pótkocsi eleje és vége rakfelület-magasság, rakomány-súlypont magasság → `θ = atan((h_eleje − h_vége)/L_rak)`, a súlypont `h·tanθ`-val vándorol (eleje magasabb → hátra, több a pótkocsi-tengelyeken). Eltérés a nullponthoz cm-ben; 3° fölött figyelmeztet. A rajzon az emelhető tengely (felemelve szaggatott) és a dőlés (felnagyítva, szint-vonallal) is látszik.
+- Alapértékekkel (nincs emelhető, vízszintes) az eredmény változatlan. Csak kliens (`public/axle-load.js`), +7 motor-teszt; cache-bust `?v=20261013lift`. **1841 Jest zöld** valós Postgres 16-tal.
+
 ## 2026-10-13 — ⚖️ Tengelyterhelés: áttekinthető rakomány-felvitel + a kamion telefonon is egészben látszik
 
 - **Rajz**: a valódi képernyő-szélességre rajzolódik (max. 900 px), nincs vízszintes görgetés; telefonon is olvasható feliratok. A rajzon egy rakományra koppintva az nyílik szerkesztésre.

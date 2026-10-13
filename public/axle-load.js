@@ -11,6 +11,24 @@
 //      oszlik → kormányzott: K·c/W, hajtott: K·(W−c)/W
 //  + üres tengelyterhelések; ellenőrzés a (szerkeszthető) határokkal.
 //
+//  Emelhető tengely (6×2 vontató, elöl „pusher” vagy hátul „tag”):
+//   – FELEMELVE: terhelése 0, a vontató kéttámaszú tartó (mint fent).
+//   – LEENGEDVE: a hátsó csoport (hajtott + emelhető) statikailag
+//     határozatlan; a légrugó a nyomás-arány szerint osztja el: az
+//     emelhető tengelyre s, a hajtottra 1−s rész jut. A csoport így egy
+//     egyenértékű támasz a súlyozott helyen: x_g = W ± s·e
+//     (e = tengelyköz, + tag / − pusher). Nyomaték a kormányzott
+//     tengelyre: G = Σ(F_i·x_i) / x_g, kormányzott = ΣF − G,
+//     hajtott = G·(1−s), emelhető = G·s.
+//   – Az üres terhek (kormányzott0 + hajtott0, felemelt állapotban mérve)
+//     egyetlen eredő erőként ugyanígy oszlanak át.
+//
+//  Szint / dőlés: nullpont (pl. 1,10 m a talajtól), a pótkocsi ELEJÉNEK
+//  és VÉGÉNEK rakfelület-magassága → θ = atan((h_eleje − h_vége)/L_rak).
+//  Ferde rakfelületen a rakomány súlypontja (a padlótól h_sp magasan)
+//  vízszintesen h_sp·tanθ-val vándorol (eleje magasabb → hátrafelé),
+//  ez módosítja a királycsap ↔ pótkocsi-tengelyek közti megoszlást.
+//
 //  Szerver/DB nincs: a beállítások és a blokkok a böngészőben
 //  maradnak (localStorage, csak kényelmi célból). BECSLÉS — a
 //  mérlegelést nem helyettesíti.
@@ -32,7 +50,17 @@
     limDrive: 11.5,   // hajtott tengely határ (t) — EU 96/53
     limTrailer: 24.0, // pótkocsi hármas tengelycsoport (t)
     limGross: 40.0,   // össztömeg (t)
-    minDrivePct: 25   // hajtott tengely min. az össztömeg %-ában
+    minDrivePct: 25,  // hajtott tengely min. az össztömeg %-ában
+    liftType: 0,      // emelhető tengely: 0 = nincs, 1 = hajtott ELŐTT (pusher), 2 = hajtott MÖGÖTT (tag)
+    liftDown: 1,      // 1 = leengedve (terhel), 0 = felemelve
+    liftOffset: 1.35, // emelhető ↔ hajtott tengely távolsága (m)
+    liftShare: 40,    // leengedve: a csoport-teher hány %-a jut az emelhetőre
+    limLift: 7.5,     // emelhető tengely határ (t)
+    limGroup: 19.0,   // hajtott + emelhető csoport határ (t) — EU 96/53, 1,3–1,8 m tengelyköz
+    refHeight: 1.1,   // nullpont / szint a talajtól (m)
+    frontHeight: 1.1, // pótkocsi ELEJE: rakfelület magassága a talajtól (m)
+    rearHeight: 1.1,  // pótkocsi VÉGE: rakfelület magassága a talajtól (m)
+    cargoCg: 1.0      // rakomány súlypontja a rakfelület fölött (m)
   };
   var DEFAULT_ITEMS = [];
 
@@ -42,15 +70,27 @@
   }
 
   // ─── Számoló motor (tiszta függvény — Jest is ezt teszteli) ──
-  function compute(cfgIn, itemsIn) {
+  function compute(cfgIn, itemsIn, opts) {
     var c = {};
     Object.keys(DEFAULT_CFG).forEach(function (k) { c[k] = num(cfgIn && cfgIn[k], DEFAULT_CFG[k]); });
+    c.liftType = (c.liftType === 1 || c.liftType === 2) ? c.liftType : 0;
+    c.liftDown = c.liftDown ? 1 : 0;
     var items = Array.isArray(itemsIn) ? itemsIn : [];
     var warnings = [];
-    if (!(c.wheelbase > 0) || !(c.kingpinAxle > 0)) {
+    if (!(c.wheelbase > 0) || !(c.kingpinAxle > 0) || !(c.bedLength > 0)) {
       return { ok: false, err: 'geometry', warnings: warnings };
     }
     if (c.fifthOffset < 0 || c.fifthOffset > c.wheelbase) warnings.push({ key: 'fifth' });
+
+    // ── Dőlés a magasságokból ──
+    var dh = c.frontHeight - c.rearHeight;
+    var theta = Math.atan2(dh, c.bedLength);
+    var shift = c.cargoCg * Math.tan(theta);       // vízszintes súlypont-vándorlás (m, + = hátra)
+    var tilt = {
+      deg: theta * 180 / Math.PI, pct: dh / c.bedLength * 100, shift: shift,
+      frontDev: c.frontHeight - c.refHeight, rearDev: c.rearHeight - c.refHeight
+    };
+    if (Math.abs(tilt.deg) > 3) warnings.push({ key: 'tilt' });
 
     var cargo = 0, kp = 0, trl = 0, moment = 0;
     var placed = [];
@@ -61,7 +101,7 @@
       if (!(w > 0)) return;
       if (l < 0) l = 0;
       var x = s + l / 2;                       // súlypont a homlokfaltól
-      var d = x - c.kingpinFront;              // királycsaptól hátrafelé
+      var d = x + shift - c.kingpinFront;      // királycsaptól hátrafelé (dőléssel)
       var tShare = w * d / c.kingpinAxle;
       var kShare = w - tShare;
       cargo += w; trl += tShare; kp += kShare; moment += w * x;
@@ -69,12 +109,25 @@
       placed.push({ idx: idx, weight: w, start: s, length: l, center: x });
     });
 
-    if (cargo > 0 && moment / cargo > c.kingpinFront + c.kingpinAxle) warnings.push({ key: 'behindAxle' });
+    if (cargo > 0 && moment / cargo + shift > c.kingpinFront + c.kingpinAxle) warnings.push({ key: 'behindAxle' });
 
-    var steer = c.steer0 + kp * c.fifthOffset / c.wheelbase;
-    var drive = c.drive0 + kp * (c.wheelbase - c.fifthOffset) / c.wheelbase;
+    // ── Vontató: nyomaték a kormányzott tengelyre ──
+    var W = c.wheelbase;
+    var tractorLoad = c.steer0 + c.drive0 + kp;
+    var tractorMoment = c.drive0 * W + kp * (W - c.fifthOffset);
+    var hasLift = c.liftType > 0;
+    var liftActive = hasLift && c.liftDown === 1;
+    var sh = Math.min(1, Math.max(0, c.liftShare / 100));
+    var liftPos = hasLift ? W + (c.liftType === 2 ? 1 : -1) * c.liftOffset : null;
+    if (hasLift && !(liftPos > 0)) warnings.push({ key: 'liftGeo' });
+    var groupPos = liftActive ? W + (liftPos - W) * sh : W;
+    if (!(groupPos > 0)) groupPos = W;
+    var group = tractorMoment / groupPos;
+    var steer = tractorLoad - group;
+    var drive = liftActive ? group * (1 - sh) : group;
+    var lift = liftActive ? group * sh : 0;
     var trailer = c.trailer0 + trl;
-    var gross = steer + drive + trailer;
+    var gross = steer + drive + lift + trailer;
     var drivePct = gross > 0 ? drive / gross * 100 : 0;
     if (steer < 0 || drive < 0 || trailer < 0) warnings.push({ key: 'negative' });
 
@@ -84,20 +137,32 @@
       else status = value > limit + 1e-9 ? 'over' : (value >= limit * 0.95 ? 'warn' : 'ok');
       return { key: key, value: value, limit: limit, pct: limit > 0 ? value / limit * 100 : 0, status: status, isMin: !!isMin };
     }
-    var checks = [
-      chk('steer', steer, c.limSteer),
-      chk('drive', drive, c.limDrive),
-      chk('trailer', trailer, c.limTrailer),
-      chk('gross', gross, c.limGross),
-      chk('drivePct', drivePct, c.minDrivePct, true)
-    ];
+    var checks = [chk('steer', steer, c.limSteer), chk('drive', drive, c.limDrive)];
+    if (liftActive) {
+      checks.push(chk('lift', lift, c.limLift));
+      checks.push(chk('group', drive + lift, c.limGroup));
+    }
+    checks.push(chk('trailer', trailer, c.limTrailer));
+    checks.push(chk('gross', gross, c.limGross));
+    checks.push(chk('drivePct', drivePct, c.minDrivePct, true));
     var worst = checks.some(function (x) { return x.status === 'over'; }) ? 'over'
       : (checks.some(function (x) { return x.status === 'warn'; }) ? 'warn' : 'ok');
 
+    // Mi lenne a másik emelő-állásban? (tanács a sofőrnek)
+    var other = null;
+    if (hasLift && !(opts && opts.noOther)) {
+      var oc = Object.assign({}, c, { liftDown: liftActive ? 0 : 1 });
+      var o2 = compute(oc, items, { noOther: true });
+      if (o2.ok) {
+        other = { liftDown: oc.liftDown, steer: o2.steer, drive: o2.drive, lift: o2.lift, drivePct: o2.drivePct, status: o2.status };
+        if (worst === 'over' && o2.status !== 'over') warnings.push({ key: liftActive ? 'tryLiftUp' : 'tryLiftDown' });
+      }
+    }
+
     return {
-      ok: true, cfg: c, steer: steer, drive: drive, trailer: trailer, gross: gross,
-      cargo: cargo, kingpin: kp, drivePct: drivePct,
-      cargoCenter: cargo > 0 ? moment / cargo : null,
+      ok: true, cfg: c, steer: steer, drive: drive, lift: lift, trailer: trailer, gross: gross,
+      cargo: cargo, kingpin: kp, drivePct: drivePct, hasLift: hasLift, liftActive: liftActive, liftPos: liftPos,
+      cargoCenter: cargo > 0 ? moment / cargo : null, tilt: tilt, other: other,
       checks: checks, status: worst, warnings: warnings, placed: placed
     };
   }
@@ -157,8 +222,14 @@
   var CFG_FIELDS = [
     { grp: 'axl.grpEmpty', keys: [['steer0', 'axl.f.steer0'], ['drive0', 'axl.f.drive0'], ['trailer0', 'axl.f.trailer0']] },
     { grp: 'axl.grpGeo', keys: [['wheelbase', 'axl.f.wheelbase'], ['fifthOffset', 'axl.f.fifthOffset'], ['kingpinFront', 'axl.f.kingpinFront'], ['kingpinAxle', 'axl.f.kingpinAxle'], ['bedLength', 'axl.f.bedLength']] },
-    { grp: 'axl.grpLimits', keys: [['limSteer', 'axl.f.limSteer'], ['limDrive', 'axl.f.limDrive'], ['limTrailer', 'axl.f.limTrailer'], ['limGross', 'axl.f.limGross'], ['minDrivePct', 'axl.f.minDrivePct']] }
+    { grp: 'axl.grpLimits', keys: [['limSteer', 'axl.f.limSteer'], ['limDrive', 'axl.f.limDrive'], ['limLift', 'axl.f.limLift'], ['limGroup', 'axl.f.limGroup'], ['limTrailer', 'axl.f.limTrailer'], ['limGross', 'axl.f.limGross'], ['minDrivePct', 'axl.f.minDrivePct']] }
   ];
+  // Emelhető tengely + szint kártya mezői (mindig látszik — menet közben is állítják)
+  var LIFT_FIELDS = [['liftOffset', 'axl.f.liftOffset'], ['liftShare', 'axl.f.liftShare']];
+  var HEIGHT_FIELDS = [['refHeight', 'axl.f.refHeight'], ['frontHeight', 'axl.f.frontHeight'], ['rearHeight', 'axl.f.rearHeight'], ['cargoCg', 'axl.f.cargoCg']];
+  function cfgInput(k, lbl) {
+    return '<label class="axl-fld"><span>' + esc(t(lbl)) + '</span><input class="input" type="number" step="0.01" inputmode="decimal" data-axl-cfg="' + k + '" value="' + esc(S.cfg[k]) + '"></label>';
+  }
 
   function numInput(id, val, step, extra) {
     return '<input class="input" id="' + id + '" type="number" step="' + step + '" min="0" inputmode="decimal" value="' + esc(val) + '"' + (extra || '') + '>';
@@ -183,6 +254,29 @@
         '<div id="axlBanner"></div>' +
         '<div class="glass axl-card axl-draw-card"><div id="axlDrawing" class="axl-drawing"></div><div class="axl-legend" id="axlLegend"></div></div>' +
         '<div id="axlKpis"></div>' +
+        // ── Emelhető tengely + szint ──
+        '<div class="glass axl-card">' +
+          '<div class="axl-card-h"><span>🛞 ' + esc(t('axl.liftTitle')) + '</span></div>' +
+          '<div class="axl-fld"><span>' + esc(t('axl.f.liftType')) + '</span>' +
+            '<div class="axl-seg" id="axlLiftType">' +
+              [['0', 'axl.lt.none'], ['1', 'axl.lt.pusher'], ['2', 'axl.lt.tag']].map(function (o) {
+                return '<button type="button" data-lt="' + o[0] + '"' + (String(S.cfg.liftType) === o[0] ? ' class="on"' : '') + '>' + esc(t(o[1])) + '</button>';
+              }).join('') +
+            '</div></div>' +
+          '<div id="axlLiftBox" style="' + (S.cfg.liftType ? '' : 'display:none') + '">' +
+            '<div class="axl-fld"><span>' + esc(t('axl.f.liftState')) + '</span>' +
+              '<div class="axl-seg" id="axlLiftDown">' +
+                '<button type="button" data-ld="1"' + (S.cfg.liftDown ? ' class="on"' : '') + '>⬇️ ' + esc(t('axl.ld.down')) + '</button>' +
+                '<button type="button" data-ld="0"' + (S.cfg.liftDown ? '' : ' class="on"') + '>⬆️ ' + esc(t('axl.ld.up')) + '</button>' +
+              '</div></div>' +
+            '<div class="axl-cfg-grid">' + LIFT_FIELDS.map(function (kv) { return cfgInput(kv[0], kv[1]); }).join('') + '</div>' +
+            '<div class="axl-hint">' + esc(t('axl.liftHint')) + '</div>' +
+          '</div>' +
+          '<div class="axl-cfg-h" style="margin-top:12px">📐 ' + esc(t('axl.heightTitle')) + '</div>' +
+          '<div class="axl-cfg-grid">' + HEIGHT_FIELDS.map(function (kv) { return cfgInput(kv[0], kv[1]); }).join('') + '</div>' +
+          '<div class="axl-tilt" id="axlTilt"></div>' +
+          '<div class="axl-hint">' + esc(t('axl.heightHint')) + '</div>' +
+        '</div>' +
         // ── Új rakomány ──
         '<div class="glass axl-card axl-add">' +
           '<div class="axl-card-h"><span>➕ ' + esc(t('axl.addTitle')) + '</span><span class="axl-free" id="axlFree"></span></div>' +
@@ -226,6 +320,21 @@
       inp.addEventListener('input', function () {
         var v = num(inp.value, NaN);
         if (Number.isFinite(v)) { S.cfg[inp.getAttribute('data-axl-cfg')] = v; save(); refresh(); }
+      });
+    });
+    box.querySelectorAll('#axlLiftType button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        S.cfg.liftType = Number(b.getAttribute('data-lt'));
+        box.querySelectorAll('#axlLiftType button').forEach(function (x) { x.classList.toggle('on', x === b); });
+        var lb = document.getElementById('axlLiftBox'); if (lb) lb.style.display = S.cfg.liftType ? '' : 'none';
+        save(); refresh();
+      });
+    });
+    box.querySelectorAll('#axlLiftDown button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        S.cfg.liftDown = Number(b.getAttribute('data-ld'));
+        box.querySelectorAll('#axlLiftDown button').forEach(function (x) { x.classList.toggle('on', x === b); });
+        save(); refresh();
       });
     });
     box.querySelectorAll('#axlLenChips .axl-chip').forEach(function (b) {
@@ -315,7 +424,7 @@
     if (!bEl || !kEl || !drEl) return;
     if (!r.ok) { bEl.innerHTML = '<div class="axl-banner over">' + esc(t('axl.errGeo')) + '</div>'; kEl.innerHTML = ''; drEl.innerHTML = ''; return; }
 
-    var NAMES = { steer: 'axl.r.steer', drive: 'axl.r.drive', trailer: 'axl.r.trailer', gross: 'axl.r.gross', drivePct: 'axl.r.drivePct' };
+    var NAMES = { steer: 'axl.r.steer', drive: 'axl.r.drive', lift: 'axl.r.lift', group: 'axl.r.group', trailer: 'axl.r.trailer', gross: 'axl.r.gross', drivePct: 'axl.r.drivePct' };
     var cards = r.checks.map(function (ch) {
       var isPct = ch.key === 'drivePct';
       var val = isPct ? f1(Math.round(ch.value * 10) / 10) + ' %' : f2(ch.value) + ' t';
@@ -345,7 +454,21 @@
 
     var info = '<div class="axl-info">' + esc(t('axl.r.cargo')) + ': <b>' + f2(r.cargo) + ' t</b> · ' + esc(t('axl.r.kingpin')) + ': <b>' + f2(r.kingpin) + ' t</b>' +
       (r.cargoCenter != null ? ' · ' + esc(t('axl.r.center')) + ': <b>' + f2(r.cargoCenter) + ' m</b>' : '') + '</div>';
+    if (r.other) {
+      info += '<div class="axl-info">' + esc(t(r.other.liftDown ? 'axl.r.ifDown' : 'axl.r.ifUp')) + ': ' +
+        esc(t('axl.r.steer')) + ' <b>' + f2(r.other.steer) + ' t</b> · ' + esc(t('axl.r.drive')) + ' <b>' + f2(r.other.drive) + ' t</b>' +
+        (r.other.liftDown ? ' · ' + esc(t('axl.r.lift')) + ' <b>' + f2(r.other.lift) + ' t</b>' : '') +
+        ' · ' + esc(t('axl.r.drivePct')) + ' <b>' + f1(Math.round(r.other.drivePct * 10) / 10) + ' %</b></div>';
+    }
     kEl.innerHTML = '<div class="axl-kpis">' + cards + '</div>' + info;
+    var tEl = document.getElementById('axlTilt');
+    if (tEl) {
+      var tl = r.tilt, cm = function (m) { var v = Math.round(m * 100); return (v > 0 ? '+' : '') + v + ' cm'; };
+      var dir = Math.abs(tl.deg) < 0.05 ? t('axl.tilt.level') : (tl.deg > 0 ? t('axl.tilt.frontUp') : t('axl.tilt.rearUp'));
+      tEl.innerHTML = '<b>' + esc(dir) + '</b> · ' + f2(Math.abs(tl.deg)) + '° (' + f1(Math.round(Math.abs(tl.pct) * 10) / 10) + ' %)' +
+        '<br>' + esc(t('axl.tilt.front')) + ' ' + cm(tl.frontDev) + ' · ' + esc(t('axl.tilt.rear')) + ' ' + cm(tl.rearDev) + ' ' + esc(t('axl.tilt.vsRef')) +
+        (Math.abs(tl.shift) >= 0.005 ? '<br>' + esc(t('axl.tilt.shift')).replace('{cm}', String(Math.round(Math.abs(tl.shift) * 100))).replace('{dir}', t(tl.shift > 0 ? 'axl.tilt.back' : 'axl.tilt.fwd')) : '');
+    }
 
     var w = Math.min(900, drEl.clientWidth || 600);
     drEl.innerHTML = drawSvg(r, w);
@@ -367,6 +490,7 @@
     var trailerAxle = fifth + c.kingpinAxle;
     var trailerEnd = trailerFront + c.bedLength;
     var startM = Math.min(0, trailerFront - 0.2);
+    var liftM = r.hasLift ? frontAxle + r.liftPos : null;
     var totalM = Math.max(trailerEnd, trailerAxle + 1.5) + 0.3 - startM;
     var sx = (W - 2 * PAD) / totalM;
     var X = function (m) { return PAD + (m - startM) * sx; };
@@ -376,7 +500,7 @@
     var bedBot = bedTop + bedH;
     var R = Math.max(7, Math.min(15, sx * 0.48));
     var wheelY = bedBot + 10 + R;
-    var H = wheelY + R + fs + 12;
+    var H = wheelY + R + fs + 12 + (r.hasLift ? fs + 4 : 0);
     var laneH = bedH / lanes.count;
     var o = function (n) { return n.toFixed(1); };
     var s = '';
@@ -384,8 +508,10 @@
     var cabTop = bedTop + bedH * 0.25;
     s += '<rect x="' + o(X(0.2)) + '" y="' + o(cabTop) + '" width="' + o(2.1 * sx) + '" height="' + o(bedBot - cabTop + 6) + '" rx="' + o(Math.min(10, sx * 0.4)) + '" class="axl-cab"/>';
     s += '<rect x="' + o(X(0.2) + 2.1 * sx * 0.55) + '" y="' + o(cabTop + 6) + '" width="' + o(2.1 * sx * 0.35) + '" height="' + o((bedBot - cabTop) * 0.3) + '" rx="3" class="axl-win"/>';
-    s += '<rect x="' + o(X(0.2)) + '" y="' + o(bedBot) + '" width="' + o((driveAxle + 1.0 - 0.2) * sx) + '" height="' + o(small ? 8 : 12) + '" rx="3" class="axl-chassis"/>';
-    // pótkocsi
+    s += '<rect x="' + o(X(0.2)) + '" y="' + o(bedBot) + '" width="' + o((Math.max(driveAxle, liftM || 0) + 1.0 - 0.2) * sx) + '" height="' + o(small ? 8 : 12) + '" rx="3" class="axl-chassis"/>';
+    // pótkocsi (a dőlést felnagyítva, a királycsap körül forgatva mutatjuk)
+    var visDeg = Math.max(-6, Math.min(6, r.tilt.deg * 3));
+    s += '<g transform="rotate(' + visDeg.toFixed(2) + ' ' + o(X(fifth)) + ' ' + o(bedBot) + ')">';
     s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedTop) + '" width="' + o(c.bedLength * sx) + '" height="' + o(bedH) + '" class="axl-bed"/>';
     s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedBot) + '" width="' + o(c.bedLength * sx) + '" height="' + o(small ? 5 : 7) + '" class="axl-chassis"/>';
     // rakomány
@@ -402,20 +528,28 @@
       else if (bw > fs) s += '<text x="' + o(bx + bw / 2) + '" y="' + o(y + h / 2 + fs * 0.36) + '" text-anchor="middle" class="axl-blk-t" font-size="' + fs + '">' + (p.idx + 1) + '</text>';
       s += '</g>';
     });
+    s += '</g>';
+    if (Math.abs(r.tilt.deg) >= 0.05) {
+      s += '<line x1="' + o(X(trailerFront)) + '" y1="' + o(bedBot) + '" x2="' + o(X(trailerEnd)) + '" y2="' + o(bedBot) + '" class="axl-level"/>';
+      s += '<text x="' + o(X(trailerEnd) - 2) + '" y="' + o(bedTop + fs) + '" text-anchor="end" class="axl-tick-t" font-size="' + (fs - 1) + '">∠ ' + f1(Math.round(r.tilt.deg * 100) / 100) + '°</text>';
+    }
     // királycsap
     var kx = X(fifth), ky = bedBot + (small ? 5 : 7);
     s += '<polygon points="' + o(kx) + ',' + o(ky) + ' ' + o(kx - 6) + ',' + o(ky + 9) + ' ' + o(kx + 6) + ',' + o(ky + 9) + '" class="axl-kp"/>';
     // tengelyek + terhelés
     var stOf = function (k) { var ch = r.checks.filter(function (x) { return x.key === k; })[0]; return ch ? ch.status : 'ok'; };
-    function axle(m, load, st, triple) {
+    function axle(m, load, st, triple, raised, row) {
       var out = '';
-      (triple ? [-1.31, 0, 1.31] : [0]).forEach(function (d) { out += '<circle cx="' + o(X(m + d)) + '" cy="' + o(wheelY) + '" r="' + o(R) + '" class="axl-wheel"/>'; });
+      var cy = raised ? wheelY - R * 0.9 : wheelY;
+      (triple ? [-1.31, 0, 1.31] : [0]).forEach(function (d) { out += '<circle cx="' + o(X(m + d)) + '" cy="' + o(cy) + '" r="' + o(raised ? R * 0.85 : R) + '" class="axl-wheel' + (raised ? ' axl-raised' : '') + '"/>'; });
       var lx = Math.min(Math.max(X(m), PAD + fs * 2), W - PAD - fs * 2);
-      out += '<text x="' + o(lx) + '" y="' + o(wheelY + R + fs + 4) + '" text-anchor="middle" class="axl-load ' + st + '" font-size="' + (fs + 1) + '">' + f1(Math.round(load * 100) / 100) + ' t</text>';
+      var txt = raised ? '⬆ 0 t' : f1(Math.round(load * 100) / 100) + ' t';
+      out += '<text x="' + o(lx) + '" y="' + o(wheelY + R + fs + 4 + (row ? fs + 4 : 0)) + '" text-anchor="middle" class="axl-load ' + st + '" font-size="' + (fs + 1) + '">' + txt + '</text>';
       return out;
     }
     s += axle(frontAxle, r.steer, stOf('steer'));
     s += axle(driveAxle, r.drive, stOf('drive'));
+    if (r.hasLift) s += axle(liftM, r.lift, r.liftActive ? stOf('lift') : 'ok', false, !r.liftActive, true);
     s += axle(trailerAxle, r.trailer, stOf('trailer'), true);
     // méterskála
     var stepM = sx * 2 < fs * 2.2 ? 4 : 2;

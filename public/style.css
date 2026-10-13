@@ -5465,6 +5465,10 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #axleLoadBox .axl-blk-t { font-weight: 800; fill: #fff; pointer-events: none; }
 #axleLoadBox .axl-tick { stroke: #94a3b8; stroke-width: 1; }
 #axleLoadBox .axl-tick-t { fill: #64748b; }
+#axleLoadBox .axl-raised { fill: transparent; stroke-dasharray: 4 3; }
+#axleLoadBox .axl-level { stroke: #0d9488; stroke-width: 1.5; stroke-dasharray: 6 4; }
+#axleLoadBox .axl-tilt { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(13,148,136,0.08); border: 1px solid rgba(13,148,136,0.3); font-size: 13.5px; line-height: 1.55; }
+#axleLoadBox #axlLiftDown { grid-template-columns: repeat(2, 1fr); }
 /* új rakomány űrlap */
 #axleLoadBox .axl-add { border: 2px solid rgba(246,113,30,0.35); }
 #axleLoadBox .axl-free { font-size: 13px; font-weight: 700; color: #0d9488; }
