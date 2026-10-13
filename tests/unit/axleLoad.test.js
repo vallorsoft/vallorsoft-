@@ -112,7 +112,7 @@ describe('axle-load compute', () => {
 
     test('pótkocsi dőlés: a karok cosθ / sinθ szerint (tengely a padló alatt)', () => {
       const flat = AL.compute({}, full);
-      const r = AL.compute({ frontHeight: 1.25, rearHeight: 1.05, cargoCg: 1.0, refHeight: 1.1 }, full);
+      const r = AL.compute({ frontHeight: 1.25, rearHeight: 1.05, cargoCg: 1.0, refHeight: 1.1, tridemStiff: 0 }, full);
       const th = Math.atan2(0.2, 13.6);
       const axleU = 1.6 + 7.7;
       const depth = (1.25 - 0.2 * axleU / 13.6) - 0.5;
@@ -145,6 +145,31 @@ describe('axle-load compute', () => {
       const r = AL.compute({ liftType: 2, liftDown: 1, liftStiff: 1, frontHeight: 1.6 }, full);
       expect(r.lift).toBe(0);
       expect(r.drive).toBeGreaterThan(0);
+    });
+
+    test('hármas tengely: nyereg fel → több a királycsapon, hajtotton, kormányzotton', () => {
+      const lvl = AL.compute({}, full);
+      const up = AL.compute({ frontHeight: 1.2 }, full);      // +10 cm, vége a nullponton
+      expect(up.kingpin).toBeGreaterThan(lvl.kingpin);
+      expect(up.drive).toBeGreaterThan(lvl.drive);
+      expect(up.steer).toBeGreaterThan(lvl.steer);
+      expect(up.trailer).toBeLessThan(lvl.trailer);
+      expect(up.tilt.triShift).toBeGreaterThan(0);
+      expect(up.triLoads[0]).toBeLessThan(up.triLoads[2]);   // első tengely tehermentesül
+      close(up.gross, lvl.gross);
+      // a pótkocsi nyomatéka a királycsapra megmarad: F·L = F'·(L+e)
+      const L = up.cfg.kingpinAxle * Math.cos(Math.atan2(0.1, 13.6)) - (1.2 - 0.1 * 9.3 / 13.6 - 0.5) * Math.sin(Math.atan2(0.1, 13.6));
+      close(up.triLoads.reduce((a, b) => a + b, 0), up.trailer);
+      expect(up.trailer * (L + up.tilt.triShift)).toBeCloseTo((up.trailer + up.tilt.kpExtra) * L, 6);
+    });
+
+    test('hármas tengely: nyereg le → a hármas tengely visz többet', () => {
+      const lvl = AL.compute({}, full);
+      const down = AL.compute({ frontHeight: 1.0 }, full);
+      expect(down.trailer).toBeGreaterThan(lvl.trailer);
+      expect(down.kingpin).toBeLessThan(lvl.kingpin);
+      expect(down.drive).toBeLessThan(lvl.drive);
+      expect(down.triLoads[0]).toBeGreaterThan(down.triLoads[2]);
     });
 
     test('nagy dőlés figyelmeztet', () => {
