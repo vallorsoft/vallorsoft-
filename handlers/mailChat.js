@@ -29,6 +29,7 @@ const emailSvc = require('../services/email');
 const { appBaseUrl } = require('../lib/appUrl');
 const mailBody = require('../lib/mailBody');
 const mailIntent = require('../lib/mailIntent');
+const chatHistory = require('../lib/chatHistory');
 const mailData = require('../lib/mailData');
 
 const handlers = {};
@@ -212,14 +213,16 @@ function buildMailPrompt(o, ctx) {
   ].join('\n');
 }
 
-// A helyben (AI nélkül) megválaszolt üzenetek helyén álló, TARTALOM NÉLKÜLI jelölő.
-const HIDDEN_NOTE = 'NOTE: (some side messages here were answered by the system itself; their content is intentionally hidden — ignore them, do not change the draft because of them)';
+// A beszélgetés-kivonat sorai (lib/chatHistory): a mellékszál jelölve, a dokumentumhoz
+// kötődő válasz helyén TARTALOM NÉLKÜLI jelölő (m.hidden ? HIDDEN_NOTE …).
 function _conversation(messages, prev) {
   const v = { style: prev.style, recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
     subject: prev.subject, body: prev.body, cards: prev.cards, card_fields: prev.card_fields, include_tracking: prev.include_tracking,
     builder_template_id: prev.builder_template_id };
-  const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
-  messages.forEach((m) => lines.push(m.hidden ? HIDDEN_NOTE : (m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
+  const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), ''];
+  if (messages.mem) lines.push(messages.mem, '');
+  lines.push('CONVERSATION:');
+  messages.forEach((m) => lines.push(chatHistory.transcriptLine(m)));
   lines.push('', 'Today: ' + new Date().toISOString().slice(0, 10) + '. Update the e-mail draft with the LAST dispatcher message and answer.');
   return lines.join('\n');
 }
@@ -523,7 +526,7 @@ async function applyStyleTurn(req, d, prev, out) {
 
 async function generalTurn(req, res, messages, prev, lang) {
   const cid = req.session.user.company_id;
-  const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).join('\n');
+  const userText = messages.filter((m) => m.role === 'user' && !m.side).map((m) => m.text).join('\n');
   const lastText = messages[messages.length - 1].text;
   // 1) Determinisztikus felismerés (sofőr / jármű / státusz / időszak) — AI nélkül.
   let it = null;
@@ -619,8 +622,10 @@ async function replyTurn(req, res, messages, prev, lang) {
   const cid = req.session.user.company_id;
   try {
     const v = { style: prev.style, lang: prev.lang, body: prev.body, cards: prev.cards, card_fields: prev.card_fields };
-    const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
-    messages.forEach((m) => lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
+    const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), ''];
+    if (messages.mem) lines.push(messages.mem, '');
+    lines.push('CONVERSATION:');
+    messages.forEach((m) => lines.push(chatHistory.transcriptLine(m)));
     lines.push('', 'Today: ' + new Date().toISOString().slice(0, 10) + '.');
     ai = await _runAi(cid, buildReplyPrompt(), lines.join('\n'));
   } catch (e) { return _aiErr(res, e); }
@@ -645,7 +650,7 @@ async function replyTurn(req, res, messages, prev, lang) {
 async function mailTurn(req, res, a, messages, lang) {
   const cid = req.session.user.company_id;
   let prev = sanitizeMail(a.draft);
-  const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).join('\n');
+  const userText = messages.filter((m) => m.role === 'user' && !m.side).map((m) => m.text).join('\n');
   const last = messages[messages.length - 1].text;
   const refM = ORDER_REF_RE.exec(last) || (!prev.order_id ? ORDER_REF_RE.exec(userText) : null);
   const ref = refM ? refM[1] : prev.order_id;
@@ -701,6 +706,15 @@ handlers.mailChatSend = async function (req, res, args) {
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
     const d = sanitizeMail(a.draft);
     const isTest = a.test === true;
+    // 💬 Beszélgetés-adatbázis: a küldés eredménye a saját beszélgetésbe (csak cím + tárgy; csatolmány soha).
+    if (a.conversation_id && !isTest) {
+      const out = res;
+      res = { json: (p) => {
+        const r = p && p.result;
+        if (r) chatHistory.note(req, a.conversation_id, r.ok ? '✉️ ' + [d.to_email, d.subject].filter(Boolean).join(' · ') : '⚠️ ' + (r.err || ''), 'mail_sent');
+        return out.json(p);
+      } };
+    }
     // A felhasználó saját gépéről csatolt fájlok — csak a levélbe mennek, nem tároljuk, AI nem látja.
     const up = require('../lib/mailUploads').sanitizeUploads(a.uploads, lang);
     if (!up.ok) return res.json({ result: { ok: false, err: up.err } });

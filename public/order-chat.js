@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {} };
+  var S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {}, conv: null };
 
   function T(k, v) { return (window.t ? window.t(k, v) : k); }
   function lang() { try { return (window.I18N && window.I18N.get()) || 'ro'; } catch (_) { return 'ro'; } }
@@ -22,6 +22,8 @@
     });
   }
   function $(id) { return document.getElementById(id); }
+  // 💬 Beszélgetés-adatbázis (`chat-history` kapcsoló; hiányzó = BE).
+  function _histOn() { return !!window.ChatHistory && !(window._vsFeatures && window._vsFeatures['chat-history'] === false); }
   function _isMobile() { try { return window.matchMedia('(max-width: 860px)').matches; } catch (_) { return false; } }
   var _tab = 'chat';
   // Telefonon egyszerre egy panel látszik (chat VAGY előnézet) — asztalon mindkettő.
@@ -77,6 +79,7 @@
       +   '<div class="och-head">'
       +     '<div><div class="och-title">' + esc(T('och.title')) + ' <button type="button" class="och-help-i" onclick="OrderChat.help()" title="' + esc(T('och.helpTip')) + '" aria-label="' + esc(T('och.helpTip')) + '">!</button></div><div class="och-sub">' + esc(T('och.sub')) + '</div></div>'
       +     '<div class="och-head-btns">'
+      +       (_histOn() ? '<button class="btn ghost och-hist" type="button" onclick="OrderChat.history()" title="' + esc(T('och.history')) + '" aria-label="' + esc(T('och.history')) + '">🕘</button>' : '')
       +       '<button class="btn ghost och-reset" type="button" onclick="OrderChat.reset()" title="' + esc(T('och.reset')) + '">🔄<span class="och-reset-l"> ' + esc(T('och.reset').replace(/^🔄\s*/, '')) + '</span></button>'
       +       '<button class="btn ghost och-x" type="button" onclick="OrderChat.close()" aria-label="close">✕</button>'
       +     '</div>'
@@ -133,7 +136,7 @@
   }
   function reset(force) {
     if (!force && S.messages.length && !S.saved && !window.confirm(T('och.resetAsk'))) return;
-    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {} };
+    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {}, conv: null };
     var m = $('ochModal');
     if (m) { m.remove(); }
     _tab = 'chat';
@@ -144,7 +147,9 @@
   function renderMsgs() {
     var box = $('ochMsgs');
     if (!box) return;
-    var h = S.messages.length ? '' : '<div class="och-empty-chat">' + esc(T('och.emptyChat')) + '</div>';
+    // Átláthatóság: a beszélgetés mentődik, a cég adminja megtekintheti (ha a funkció be van kapcsolva).
+    var h = S.messages.length ? '' : '<div class="och-empty-chat">' + esc(T('och.emptyChat'))
+      + (_histOn() ? '<div class="och-hist-note">🕘 ' + esc(T('och.histNotice')) + '</div>' : '') + '</div>';
     S.messages.forEach(function (m) {
       // m.html: a szerver által renderelt (escape-elt) sofőr-információs kártya.
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + (m.sys ? ' sys' : '') + (m.html ? ' info' : '') + '">'
@@ -304,7 +309,7 @@
   function act(btn) {
     var tok = btn && btn.getAttribute('data-tok');
     if (!tok || S.busy || (S.acted || {})[tok]) return;
-    var args = { token: tok, lang: lang() };
+    var args = { token: tok, lang: lang(), conversation_id: S.conv };
     var inpId = btn.getAttribute('data-input');
     if (inpId) {
       var inp = $(inpId);
@@ -338,7 +343,7 @@
   function undo() {
     if (S.busy) return;
     S.busy = true; renderMsgs();
-    window.gas('orderChatUndo', [{ lang: lang() }]).then(function (r) {
+    window.gas('orderChatUndo', [{ lang: lang(), conversation_id: S.conv }]).then(function (r) {
       S.busy = false;
       if (r && r.ok) S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
       else S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -461,16 +466,19 @@
     if (S._draftQs) { S.questions = S._draftQs; S._draftQs = null; }
     var _keepQs = S.questions; S.questions = [];
     renderAll();
-    var hist = S.messages.filter(function (m) { return !m.err; }).map(function (m) { return { role: m.role, text: m.text, local: !!m.local }; });
-    window.gas('orderChatTurn', [{ messages: hist, draft: S.draft, lang: lang(), ui: _uiCtx() }]).then(function (r) {
+    var hist = S.messages.filter(function (m) { return !m.err; }).map(function (m) { return { role: m.role, text: m.text, local: !!m.local, noai: !!m.noai }; });
+    window.gas('orderChatTurn', [{ messages: hist, draft: S.draft, lang: lang(), ui: _uiCtx(), conversation_id: S.conv }]).then(function (r) {
       S.busy = false;
+      // A beszélgetés azonosítója (a szerver tárolja; a chat ebből emlékszik).
+      if (r && r.conversation_id) S.conv = r.conversation_id;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
       } else if (r.info) {
         // Sofőr-kérdés válasza: a fuvar-vázlat / előnézet érintetlen marad.
         // AI nélkül megválaszolt kérdés: a kérdés és a válasz sem megy később az AI-hoz.
         for (var li = S.messages.length - 1; li >= 0; li--) { if (S.messages[li].role === 'user') { S.messages[li].local = true; break; } }
-        S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
+        // noai: dokumentumhoz kötődő válasz — a szerver később sem adja tovább az AI-nak.
+        S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true, noai: !!r.noai });
         if (r.ui) setTimeout(function () { runUi(r.ui); }, 30);
         if (r.questions && r.questions.length) { S._draftQs = _keepQs; S.questions = r.questions; }
         // Egy MEGLÉVŐ fuvarról szóló válasznál a vázlat kérdései („Ki a megrendelő?") nem
@@ -514,7 +522,7 @@
     if (btn) { btn.disabled = true; btn.textContent = T('och.saving'); }
     S.busy = true;
     var series = document.getElementById('oSeria');
-    window.gas('orderChatCreate', [{ draft: S.draft, series_id: series && series.value ? series.value : null, uit_docs: _uitDocsFor(S.draft.uit_codes) }]).then(function (r) {
+    window.gas('orderChatCreate', [{ draft: S.draft, series_id: series && series.value ? series.value : null, uit_docs: _uitDocsFor(S.draft.uit_codes), conversation_id: S.conv }]).then(function (r) {
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -545,7 +553,7 @@
   function openList() {
     close();
     if (typeof window.activateTab === 'function') window.activateTab('orders-list');
-    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {} };
+    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {}, conv: null };
     var m = $('ochModal'); if (m) m.remove();
     _tab = 'chat';
   }
@@ -775,7 +783,7 @@
     }
     S.busy = true; renderAll();
     var ups = (S.uploads || []).map(function (u) { return { name: u.name, mime: u.mime, b64: u.b64 }; });
-    window.gas('mailChatSend', [{ draft: d, test: !!test, lang: lang(), uploads: ups }]).then(function (r) {
+    window.gas('mailChatSend', [{ draft: d, test: !!test, lang: lang(), uploads: ups, conversation_id: S.conv }]).then(function (r) {
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -800,7 +808,7 @@
   //     nem kapja meg — csak azt, amit a felhasználó a chatbe ír. ───
   function openReply(ctx) {
     if (!ctx || !ctx.id) return;
-    S = { messages: [], draft: {}, questions: [], notes: [], missing: ['body'], ready: false, busy: false, saved: null, uitDocs: {} };
+    S = { messages: [], draft: {}, questions: [], notes: [], missing: ['body'], ready: false, busy: false, saved: null, uitDocs: {}, conv: null };
     var m = $('ochModal'); if (m) m.remove();
     _tab = 'chat';
     var s0 = String(ctx.subject || '');
@@ -853,5 +861,8 @@
     send((base ? base + ' — ' : '') + (cal.getAttribute('data-word') || 'zile') + ': ' + days.join(', '));
   }
 
-  window.OrderChat = { dayTog: dayTog, dayGo: dayGo, open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  // 🕘 A saját korábbi beszélgetések (csak olvasható) — public/chat-history.js.
+  function history() { if (window.ChatHistory && window.ChatHistory.openOwn) window.ChatHistory.openOwn(); }
+
+  window.OrderChat = { history: history, dayTog: dayTog, dayGo: dayGo, open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

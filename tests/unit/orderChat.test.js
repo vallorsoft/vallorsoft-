@@ -164,8 +164,8 @@ describe('orderChatTurn — a példa-fuvar', () => {
   });
 });
 
-describe('adat-minimalizálás', () => {
-  test('az AI nélkül megválaszolt (local) üzenetek nem kerülnek az AI-hoz', async () => {
+describe('teljes beszélgetés az AI-nak — dokumentum soha', () => {
+  test('az AI nélkül megválaszolt (local) üzenetek mellékszálként jelölve mennek', async () => {
     mockExtract.mockResolvedValue({ json: { client: null, stops: [] }, model: 'm' });
     await call('orderChatTurn', ADMIN, [{ messages: [
       { role: 'user', text: 'Ki tartozik nekünk?', local: true },
@@ -174,9 +174,26 @@ describe('adat-minimalizálás', () => {
     ] }]);
     const conv = mockExtract.mock.calls[0][0].parts[0].text;
     expect(conv).toMatch(/Bicskére/);
-    expect(conv).not.toMatch(/tartozik|Kintlévőség|Bilka 1500/);
+    expect(conv).toMatch(/SIDE TOPIC[^\n]*Ki tartozik nekünk/);
+    expect(conv).toMatch(/SIDE TOPIC[^\n]*Bilka 1500/);
+    // Az utolsó (vázlat-)üzenet NEM mellékszál.
+    expect(conv).toMatch(/\nDISPATCHER: Holnap Brassóból/);
+  });
+
+  test('a dokumentumhoz kötődő (noai) válasz tartalma és a fájlnév sosem kerül az AI-hoz', async () => {
+    mockExtract.mockResolvedValue({ json: { client: null, stops: [] }, model: 'm' });
+    await call('orderChatTurn', ADMIN, [{ messages: [
+      { role: 'user', text: 'mutasd a 0042 dokumentumait, a cmr_bilka.pdf kell', local: true },
+      { role: 'assistant', text: '📎 CMR · szamla_titkos.pdf · 2026-10-01', local: true, noai: true },
+      { role: 'user', text: 'Holnap Brassóból Bicskére FTL' },
+    ] }]);
+    const conv = mockExtract.mock.calls[0][0].parts[0].text;
+    expect(conv).not.toMatch(/szamla_titkos|cmr_bilka\.pdf/);
+    expect(conv).toMatch(/documents — its content is intentionally hidden/);
+    expect(conv).toMatch(/Bicskére/);
   });
 });
+
 
 describe('orderChatCreate', () => {
   const READY = Object.assign({}, AI_DRAFT, { client: 'VALLOR TEAM SRL', client_id: 55, driver_name: null, pret: 1500 });

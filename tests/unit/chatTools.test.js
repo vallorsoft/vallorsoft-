@@ -251,6 +251,33 @@ describe('router', () => {
     expect(r.miss).toBe(true);
     expect(r.questions[0].options).toEqual(['Mutasd a mai fuvarokat']);
   });
+  test('csevegés / a beszélgetésből megválaszolható kérdés → természetes válasz, nem „nem értettem"', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { steps: [], chat: true, reply: 'Szívesen! A 0042-t az előbb zártuk le.' } });
+    const r = await router.route(req(ADMIN), 'köszi, és melyiket is zártuk le?', { lang: 'hu', now: NOW,
+      aiHistory: [{ role: 'user', text: 'zárd le a 0042-t' }, { role: 'assistant', text: '✅ CMD-2026-0042 lezárva' }, { role: 'system', hidden: true, text: '' }],
+      memory: 'MEMORY — facts:\n- Peti = Pető Imre' });
+    expect(r.chat).toBe(true);
+    expect(r.miss).toBeFalsy();
+    expect(r.reply).toMatch(/0042/);
+    const sent = mockExtract.mock.calls[0][0];
+    // A teljes beszélgetés (a válasz is) + az emlékek mennek; a dokumentum-rész csak jelölő.
+    expect(sent.parts[0].text).toMatch(/ASSISTANT \(earlier\): ✅ CMD-2026-0042 lezárva/);
+    expect(sent.parts[0].text).toMatch(/about documents — content hidden/);
+    expect(sent.systemPrompt).toMatch(/Peti = Pető Imre/);
+  });
+  test('„jegyezd meg" → emlék a saját felhasználóhoz (titok soha)', async () => {
+    const ins = [];
+    mockRules.push({ match: /INSERT INTO chat_memories/, fn: (sql, p) => { ins.push(p); return { rows: [], rowCount: 1 }; } });
+    mockExtract.mockResolvedValue({ model: 'm', json: { steps: [], chat: true, reply: 'Rendben, megjegyeztem.',
+      remember: [{ text: 'Peti = Pető Imre sofőr', scope: 'user' }, { text: 'a jelszó: abc123', scope: 'company' }] } });
+    const r = await router.route(req(ADMIN), 'jegyezd meg: Peti = Pető Imre', { lang: 'hu', now: NOW });
+    expect(r.reply).toMatch(/megjegyeztem/);
+    expect(ins.length).toBe(1);
+    expect(ins[0][0]).toBe(7);       // company_id
+    expect(ins[0][1]).toBe(3);       // a saját felhasználó
+    expect(ins[0][2]).toMatch(/Pető Imre/);
+    expect(ins[0][4]).toBe('explicit');
+  });
   test('új fuvar → delegálás a vázlatra', async () => {
     mockExtract.mockResolvedValue({ model: 'm', json: { steps: [{ tool: 'order.create_chat', args: {} }], confidence: 0.9 } });
     const r = await router.route(req(ADMIN), 'holnap Arad Győr', { lang: 'hu', now: NOW });

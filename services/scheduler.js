@@ -1211,6 +1211,28 @@ function startPdfWorkspaceCleanup() {
 }
 
 // ================================================================
+//  💬 AI-chat beszélgetés-adatbázis — megőrzési idő utáni törlés.
+//  CHAT_HISTORY_RETENTION_DAYS (alap 365 nap) után a beszélgetés és az
+//  üzenetei törlődnek (az emlékek a 🧠 Tanult adatok fülön kezelhetők).
+//  Naponta egyszer; migráció-hiánynál csendes skip.
+// ================================================================
+function startChatHistoryCleanup() {
+  const tick = async () => {
+    try {
+      const n = await require('../lib/chatHistory').purgeOld();
+      if (n > 0) console.log(`[ChatHistory] Törölve ${n} lejárt beszélgetés.`);
+    } catch (err) {
+      if (err && err.code === '42P01') return;
+      console.error('[ChatHistory] takarítás hiba:', err.message);
+    }
+  };
+  setTimeout(tick, 2 * 60 * 1000);
+  const interval = setInterval(tick, 24 * 60 * 60 * 1000);
+  console.log('[ChatHistory] Megőrzési takarító elindítva.');
+  return interval;
+}
+
+// ================================================================
 //  REGGELI ÖSSZEFOGLALÓ (napi digest) — cégenkénti kapcsoló + időpont.
 //  Percenként ellenőrzi, hogy egy cég `digest_time`-ja Europe/Bucharest
 //  szerint MOST van-e (±1 perc ablak), és ha ma még nem küldött ki
@@ -1515,4 +1537,4 @@ function startGpsDailyTrackScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler };
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup };
