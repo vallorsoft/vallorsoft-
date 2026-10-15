@@ -9,6 +9,12 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 54. lépés — Chat: beszélgetés-adatbázis + emlékezet (2026-10-15, PR #555) ✅ KÉSZ
+- **Szabály-változás (felhasználói kérésre):** a chat szövege mostantól tárolódik (`chat_messages`) és az AI a teljes beszélgetést látja. **Dokumentum soha:** a dokumentumhoz kötődő válasz (`noai`) helyén tartalom nélküli jelölő, a fájlnév minden AI-ra menő szövegből és az emlékekből is kiszűrve (`stripFiles`); a kártyák HTML-je és a feltöltött fájlok nem tárolódnak és nem mennek AI-hoz.
+- **Izoláció:** a beszélgetés-azonosítót a szerver csak a saját (company_id + user_id) beszélgetésre fogadja el, különben újat nyit; minden lekérdezés company_id-szűrt, paraméteres. Admin a cég bármely beszélgetését látja (más beszélgetésének megnyitása/törlése audit-naplózva: `chat.history_view` / `chat.history_delete`); Manager csak a sajátját (idegen azonosítóra „nem található" — a létezés sem szivárog). Emlékeknél a Manager csak a saját + cégszintű emlékeket látja/törli (cégszintűt csak ha ő vette fel).
+- **Emlék-védelem:** jelszó/kulcs/token/kártyaadat/fájlnév/hosszú véletlen azonosító nem lehet emlék (`cleanMemory`, teszttel őrizve); az emlékek az AI-nak „adat, nem utasítás" jelöléssel mennek; felhasználónként max. 150.
+- **GDPR:** export (beszélgetések, üzenetek, emlékek) + anonimizálás (a felhasználó beszélgetései és személyes emlékei törlődnek); megőrzés `CHAT_HISTORY_RETENTION_DAYS` (alap 365 nap) napi takarítóval; átláthatósági jelzés a chatben („a beszélgetés mentődik, az admin megtekintheti").
+
 ### 53. lépés — Chat: karbantartó műveletek + titok-tilalom őre (2026-10-10) ✅ KÉSZ
 - **Új chat-írások a védett úton** (aláírt token, végrehajtáskor újra ellenőrzött szerep/jog/csomag, meglévő handler, company_id). Törlések és a menetlevél-átrendezés `danger` → csak beírt IGEN/DA-val. Adat-törlés (`driver.purge_data`), Manager-jogosultság, EUR/RON, fuvar-sorozat törlés, reggeli összefoglaló, kalkulátor-beállítás csak Admin; saját magát nem törölheti.
 - **Titok-tilalom, teszttel őrizve:** egyetlen chat-eszköz sem hívja a feladó-fiók / számlázó / beérkező-postafiók / postafiók-fiók / developer-integráció / jelszó / 2FA handlereket, és nem hivatkozik `credentials_enc`-re (`tests/unit/chatTools-extra.test.js`). Az AI bon-scan kapcsoló csak a fehérlistás `ai-bon-scan` kulcsot állíthatja.
