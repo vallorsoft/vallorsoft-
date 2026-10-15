@@ -50,6 +50,7 @@ const handlers = Object.assign(
   require('../handlers/paymentSchedule'),
   require('../handlers/companySettings'),
   require('../handlers/learnedData'),
+  require('../handlers/chatHistory'),
   require('../handlers/orderSeries'),
   require('../handlers/emailTemplates'),
   require('../handlers/pdfTemplates'),

@@ -91,3 +91,23 @@ describe('AI-chat tanulás (chat_miss / chat_intent)', () => {
     pool.query = orig;
   });
 });
+
+describe('💬 chat-emlékek (chat_memories)', () => {
+  test('lista: Manager csak a sajátját + a cégszintűt látja, Admin mindet', async () => {
+    const calls = [];
+    pool.query.mockImplementation(async (sql, p) => { calls.push([sql, p]); return { rows: [], rowCount: 0 }; });
+    await call(H.learnedDataList, MANAGER);
+    const m = calls.find((c) => /FROM chat_memories/.test(c[0]));
+    expect(m[1].slice(0, 3)).toEqual([7, false, 2]);
+    calls.length = 0;
+    await call(H.learnedDataList, ADMIN);
+    expect(calls.find((c) => /FROM chat_memories/.test(c[0]))[1].slice(0, 2)).toEqual([7, true]);
+  });
+  test('törlés: Manager más felhasználó emlékét nem törölheti (a WHERE szűr)', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const r = await call(H.learnedDataDelete, MANAGER, [{ source: 'chat_memory', id: 8 }]);
+    expect(r.ok).toBe(false);
+    expect(pool.query.mock.calls[0][0]).toMatch(/user_id=\$3 OR \(user_id=0 AND created_by=\$3\)/);
+    expect(pool.query.mock.calls[0][1]).toEqual([7, false, 2, 8]);
+  });
+});

@@ -22,7 +22,11 @@
 //  az ügyfél-listába (`clients`), majd a fuvar ehhez az ügyfélhez kötődik.
 //
 //  Kapuk: Admin|Manager + `ai-szoveges-fuvar` csomag-flag (Pro csomagtól).
-//  Audit: CSAK metaadat (kör-szám, kész-e) — a beszélgetés szövege sosem.
+//  Audit: CSAK metaadat (kör-szám, kész-e) — a beszélgetés szövege az audit-naplóba sosem.
+//  BESZÉLGETÉS-ADATBÁZIS (lib/chatHistory): minden kör a felhasználó saját
+//  beszélgetésébe kerül (az Admin a cégen belül ellenőrizheti, a chat ebből
+//  emlékszik). Dokumentum / fájl / feltöltött kép SOHA nem tárolódik és SOHA
+//  nem kerül az AI-hoz — a dokumentumhoz kötődő válasz helyén csak jelölő megy.
 // ============================================================
 'use strict';
 
@@ -39,6 +43,7 @@ const mailChat = require('./mailChat');
 const driverInfo = require('../lib/driverInfo');
 const chatOps = require('../lib/chatOps');
 const chatRouter = require('../lib/chatRouter');
+const chatHistory = require('../lib/chatHistory');
 
 // Új fuvar leírásának tűnő szöveg (felrakás/lerakás + útvonal/dátum, kérdés nélkül) →
 // egyenesen a fuvar-vázlatba megy, nem kell hozzá külön AI-útválasztás.
@@ -53,17 +58,21 @@ function looksLikeNewOrder(text) {
 
 // AI-útválasztás (lib/chatRouter) — a determinisztikus felismerők után.
 // Kimenet: válasz-objektum (info) | { delegate } | null (hiba → marad a régi út).
-async function _route(req, a, messages, lang) {
+// Az AI a teljes beszélgetést látja (a mellékszálak jelölve), a dokumentumhoz kötődő
+// válaszokat SOHA (lib/chatHistory.aiTranscript), + a releváns emlékeket.
+async function _route(req, a, messages, lang, ctx) {
+  const c = ctx || {};
   const last = messages[messages.length - 1].text;
-  const aiHistory = messages.slice(0, -1).filter((m) => m.role === 'user' && !m.local).map((m) => m.text);
+  const aiHistory = chatHistory.aiTranscript(messages.slice(0, -1), { maxAssistant: 300, maxUser: 400, lastIsCurrent: false });
   let r;
   try {
-    r = await chatRouter.route(req, last, { lang, history: messages.slice(0, -1).map((m) => m.text).reverse(), aiHistory, ui: a.ui });
+    r = await chatRouter.route(req, last, { lang, history: messages.slice(0, -1).map((m) => m.text).reverse(), aiHistory, ui: a.ui, memory: c.mem || '', convId: c.convId || null });
   } catch (e) { console.error('orderChat router hiba:', e && e.message); return null; }
   if (!r || r.err) return null;
   if (r.delegate) return r;
-  try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: 'router', tools: r.tools || [], miss: !!r.miss }); } catch (_) {}
-  return { ok: true, info: true, reply: r.reply || '', info_html: r.html || '', questions: r.questions || [], ui: r.ui || null, miss: !!r.miss };
+  try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: r.chat ? 'chat' : 'router', tools: r.tools || [], miss: !!r.miss }); } catch (_) {}
+  return { ok: true, info: true, reply: r.reply || '', info_html: r.html || '', questions: r.questions || [], ui: r.ui || null, miss: !!r.miss,
+    kind: r.chat ? 'chat' : 'router:' + ((r.tools && r.tools[0]) || '-'), noai: chatHistory.isDocTools(r.tools) };
 }
 
 const handlers = {};
@@ -190,7 +199,8 @@ function _uitRows(codes, docs) {
 // cég-saját adatot: cég → teljes cím, felrakó cég → megrendelő, megrendelő →
 // áru-típus/méret, sofőr-becenév → sofőr. Az AI-hoz semmi nem kerül belőle:
 // a felhasználás is kizárólag a szerveren, `company_id`-szűrten történik.
-// A beszélgetés szövege SOSEM tárolódik. Self-healing: a legutóbbi mentés felülír.
+// Ebbe a memóriába a beszélgetés szövege nem kerül (azt a lib/chatHistory kezeli).
+// Self-healing: a legutóbbi mentés felülír.
 async function learnFromDraft(cid, d) {
   try {
     for (const s of d.stops || []) {
@@ -260,6 +270,8 @@ const CHAT_STYLE = [
   'Understand the conversation as a whole: short follow-ups and references ("and the second one?", "same day", "same place", "ugyanoda", "ugyanaznap", "az is", "ő", "neki", "acolo", "tot acolo", "la fel", "și el") refer to things said earlier — resolve them from the conversation and the previous draft instead of asking again.',
   'Do not repeat the same sentence you already wrote, vary your wording, mention only what changed, and never recite every field. Ask questions the way a person would ("Melyik nap rakodnak?", "Când se încarcă?"), not "Please provide…".',
   'If the dispatcher only chats, thanks you or reacts ("ok", "szuper", "mersi"), answer in one short natural sentence and leave the draft unchanged.',
+  'Lines marked SIDE TOPIC were answered by the system itself (questions about other orders, drivers, money…). Use them to understand references ("ugyanoda", "neki", "acolo"), but never copy their data into the draft unless the dispatcher clearly asks for it.',
+  'MEMORY / EARLIER CONVERSATIONS (if given) are what you remember about this dispatcher and company (nicknames, habits). Use them when they fit; what the dispatcher writes now always wins. Never mention that you have a memory list.',
 ].join('\n');
 
 function buildSystemPrompt(today) {
@@ -284,14 +296,14 @@ function buildSystemPrompt(today) {
   ].join('\n');
 }
 
-// A beszélgetés szövegként (a geminiJson egyetlen user-turnt küld).
-const HIDDEN_NOTE = 'NOTE: (some side messages here were answered by the system itself; their content is intentionally hidden — ignore them, do not change the draft because of them)';
-function buildConversation(messages, draft) {
-  const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(_aiView(draft)), '', 'CONVERSATION:'];
-  messages.forEach((m) => {
-    if (m.hidden) { lines.push(HIDDEN_NOTE); return; }
-    lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text);
-  });
+// A beszélgetés szövegként (a geminiJson egyetlen user-turnt küld). A sorok a közös
+// kivonatból (lib/chatHistory): mellékszál jelölve, dokumentum-válasz helyén
+// tartalom nélküli jelölő (m.hidden → HIDDEN_NOTE).
+function buildConversation(messages, draft, mem) {
+  const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(_aiView(draft)), ''];
+  if (mem) lines.push(mem, '');
+  lines.push('CONVERSATION:');
+  messages.forEach((m) => lines.push(chatHistory.transcriptLine(m)));
   lines.push('', 'Update the draft with the LAST dispatcher message and answer.');
   return lines.join('\n');
 }
@@ -598,12 +610,17 @@ handlers.orderChatTurn = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const messages = (Array.isArray(a.messages) ? a.messages : []).slice(-MAX_MSGS)
-      .map((m) => ({ role: m && m.role === 'assistant' ? 'assistant' : 'user', text: String((m && m.text) || '').trim().slice(0, MAX_MSG_LEN), local: !!(m && m.local) }))
+      .map((m) => ({ role: m && m.role === 'assistant' ? 'assistant' : 'user', text: String((m && m.text) || '').trim().slice(0, MAX_MSG_LEN), local: !!(m && m.local), noai: !!(m && m.noai) }))
       .filter((m) => m.text);
     if (!messages.length || messages[messages.length - 1].role !== 'user') {
       return res.json({ result: { ok: false, err: 'Mesaj gol.' } });
     }
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
+    // 💬 Beszélgetés-adatbázis: a kör (mondat + válasz) a felhasználó saját beszélgetésébe
+    // kerül (lib/chatHistory) — az Admin a cégen belül ellenőrizheti, a chat ebből emlékszik.
+    const uid = req.session.user.id;
+    const convId = await chatHistory.ensureConversation(req, a.conversation_id, messages[messages.length - 1].text);
+    res = chatHistory.wrapRes(res, { cid, uid, convId, userText: messages[messages.length - 1].text });
     // ── E-mail ág: amit a felhasználó ír, abba kezd. Üres vázlatnál az e-mail
     //    szándék („küldd el … levélben / e-mail") a levél-vázlatra vált; az
     //    e-mail módban lévő vázlat ott is marad (handlers/mailChat.js).
@@ -627,7 +644,8 @@ handlers.orderChatTurn = async function (req, res, args) {
       } catch (e) { console.error('orderChat chatOps hiba:', e && e.message); }
       if (op) {
         try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: op.kind || op.action || 'op' }); } catch (_) {}
-        return res.json({ result: { ok: true, info: true, reply: op.reply, info_html: op.html || '', questions: op.questions || [], focus: !!op.focus } });
+        return res.json({ result: { ok: true, info: true, reply: op.reply, info_html: op.html || '', questions: op.questions || [], focus: !!op.focus,
+          kind: op.kind || op.action || 'op', noai: chatHistory.isDocKind(op.kind) } });
       }
       let info = null;
       try {
@@ -635,27 +653,24 @@ handlers.orderChatTurn = async function (req, res, args) {
       } catch (e) { console.error('orderChat sofőr-kérdés hiba:', e && e.message); }
       if (info) {
         try { await audit.fromReq(req, 'order.chat_info', 'driver', null, { topics: info.topics, entity: (info.meta && info.meta.entity) || null }); } catch (_) {}
-        return res.json({ result: { ok: true, info: true, reply: info.reply, info_html: info.html || '', questions: info.questions || [] } });
+        return res.json({ result: { ok: true, info: true, reply: info.reply, info_html: info.html || '', questions: info.questions || [], kind: 'driver' } });
       }
     }
-    // ── Adat-minimalizálás: ami AI nélkül lett megválaszolva (sofőr-kérdés,
-    //    cégszintű kérdés, művelet, napi összefoglaló), az az AI-hoz SEM kerül —
-    //    az AI csak a fuvar-/levél-vázlathoz tartozó üzeneteket látja.
-    //    Helyettük egyetlen, TARTALOM NÉLKÜLI jelölő kerül a beszélgetésbe, hogy az AI tudja:
-    //    közben más téma is szóba került (így a folytatást nem keveri össze vele).
-    const aiMessages = [];
-    messages.forEach((m, i) => {
-      if (!m.local || i === messages.length - 1) { aiMessages.push(m); return; }
-      const lastM = aiMessages[aiMessages.length - 1];
-      if (!(lastM && lastM.hidden)) aiMessages.push({ role: 'system', hidden: true, text: '' });
-    });
+    // ── Az AI a TELJES beszélgetést látja, hogy következetesen tudjon folytatni:
+    //    az AI nélkül megválaszolt kérdések (sofőr, cégszintű, művelet) „SIDE TOPIC"-ként
+    //    jelölve mennek, hogy a vázlatot ne keverje össze velük. Ami DOKUMENTUMHOZ kötődik
+    //    (feltöltés, fuvar-dokumentumok, fájlnév), az SOHA — helyette tartalom nélküli
+    //    jelölő (hidden: true, text: '') kerül a beszélgetésbe (lib/chatHistory.aiTranscript).
+    const aiMessages = chatHistory.aiTranscript(messages);
+    const mem = await chatHistory.memoryContext(cid, uid, lastText, convId);
+    aiMessages.mem = mem;
     if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
       return await mailChat.mailTurn(req, res, a, aiMessages, lang);
     }
     // ── AI-chat 2.0: üres vázlatnál bármilyen kérés a képesség-katalógusra megy
     //    (lib/chatTools) — nem esik többé csendben az új-fuvar vázlatba.
     if (draftEmpty && rawDraft.mode !== 'email' && !looksLikeNewOrder(lastText) && !chatOps._isPureRef(lastText)) {
-      const rr = await _route(req, a, messages, lang);
+      const rr = await _route(req, a, messages, lang, { mem, convId });
       if (rr && rr.delegate === 'mail') return await mailChat.mailTurn(req, res, a, aiMessages, lang);
       if (rr && !rr.delegate) return res.json({ result: rr });
     }
@@ -688,7 +703,7 @@ handlers.orderChatTurn = async function (req, res, args) {
     try {
       ai = await extractJson({
         systemPrompt: buildSystemPrompt(_today()),
-        parts: [{ text: buildConversation(aiMessages, prev) }],
+        parts: [{ text: buildConversation(aiMessages, prev, mem) }],
       });
     } catch (e) {
       const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
@@ -697,7 +712,7 @@ handlers.orderChatTurn = async function (req, res, args) {
     const out = (ai && ai.json) || {};
     // A vázlat-AI jelzi, ha az üzenet nem a vázlatról szól → képesség-katalógus, a vázlat érintetlen.
     if (out.off_topic === true && !draftEmpty) {
-      const rr = await _route(req, a, messages, lang);
+      const rr = await _route(req, a, messages, lang, { mem, convId });
       if (rr && !rr.delegate) return res.json({ result: rr });
     }
     const aiDraft = sanitizeDraft(out.draft || {});
@@ -755,6 +770,7 @@ handlers.orderChatAction = async function (req, res, args) {
     if (a.client_name != null) extra.client_name = String(a.client_name).slice(0, 200);
     if (a.input != null) extra.input = String(a.input).slice(0, 40);
     const r = await chatOps.executeAction(req, String(a.token || ''), extra, lang);
+    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, (r && r.ok === false) ? '⚠️ ' + (r.err || '') : ((r && r.reply) || '✅'), (r && r.ok === false) ? 'error' : 'action');
     return res.json({ result: r });
   } catch (err) {
     console.error('orderChatAction hiba:', err);
@@ -772,9 +788,39 @@ handlers.orderChatUndo = async function (req, res, args) {
     const tools = require('../lib/chatTools');
     const ctx = chatRouter.makeCtx(req, lang, '', [], {}, null);
     const r = await tools.prepare(ctx, { tool: 'chat.undo', args: {} });
+    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, r.reply || '↩️', 'undo');
     return res.json({ result: { ok: true, info: true, reply: r.reply || '', info_html: r.html || '', questions: [] } });
   } catch (err) {
     console.error('orderChatUndo hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── 💬 Folytatás: a SAJÁT beszélgetés visszatöltése a chatbe (üzenetek + félkész vázlat).
+//    args[0]: { id? } — id nélkül a legutóbbi, 12 órán belül frissített saját beszélgetés
+//    (`peek: true` → csak a címét/idejét adja, a chat „folytatod?" sávjához).
+//    A vázlat a következő körben / mentéskor a szerveren újra ellenőrzött (sanitizeDraft + resolveDraft).
+handlers.orderChatResume = async function (req, res, args) {
+  try {
+    const gateErr = await _gate(req);
+    if (gateErr) return res.json({ result: { ok: false, err: gateErr } });
+    const u = req.session.user;
+    const a = (args && args[0]) || {};
+    const r = await chatHistory.resume(u.company_id, u.id, a.id, { maxHours: 12 });
+    if (!r) return res.json({ result: { ok: true, found: false } });
+    if (a.peek) return res.json({ result: { ok: true, found: true, conversation: r.conversation } });
+    const st = (r.state && typeof r.state === 'object') ? r.state : {};
+    const draft = st.mode === 'email' ? (st.draft || {}) : (st.draft ? sanitizeDraft(st.draft) : {});
+    if (st.mode === 'email') draft.mode = 'email';
+    return res.json({ result: {
+      ok: true, found: true, conversation_id: r.conversation.id, conversation: r.conversation, messages: r.messages,
+      mode: st.mode || null, draft, missing: Array.isArray(st.missing) ? st.missing : [], ready: !!st.ready,
+      notes: Array.isArray(st.notes) ? st.notes : [], placeholders: Array.isArray(st.placeholders) ? st.placeholders : [],
+      attachments_avail: st.attachments_avail || [], builders_avail: st.builders_avail || [], tracking_available: !!st.tracking_available, client: st.client || '',
+    } });
+  } catch (e) {
+    if (e && e.code === '42P01') return res.json({ result: { ok: true, found: false } });
+    console.error('orderChatResume hiba:', e && e.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
@@ -810,7 +856,7 @@ handlers.orderChatCreate = async function (req, res, args) {
     const pickups = d.stops.filter((s) => s.kind === 'pickup');
     const deliveries = d.stops.filter((s) => s.kind === 'delivery');
     const km = d.km != null ? d.km : (d.route_km || 0);
-    if (editing) return await _saveEdit(req, res, cid, d, pickups, deliveries, km, a.uit_docs);
+    if (editing) return await _saveEdit(req, res, cid, d, pickups, deliveries, km, a.uit_docs, a.conversation_id);
     const payload = {
       client: d.client,
       ref: d.ref || '',
@@ -844,6 +890,7 @@ handlers.orderChatCreate = async function (req, res, args) {
       catch (_) { /* oszlop hiányzik → csak név szerint kötött */ }
     }
     await learnFromDraft(cid, d);
+    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, '✅ ' + (result.fuvar_no || result.id), 'saved', { clearState: true });
     try { await audit.fromReq(req, 'order.create_from_chat', 'order', result.id, { stops: d.stops.length, client_linked: !!d.client_id }); }
     catch (_) { /* best-effort */ }
     return res.json({ result: { ok: true, id: result.id, fuvar_no: result.fuvar_no || null } });
@@ -856,7 +903,7 @@ handlers.orderChatCreate = async function (req, res, args) {
 // Meglévő fuvar módosítása a MEGLÉVŐ comUpdate-tel. A sofőrt/rendszámot csak
 // akkor küldjük, ha tényleg változott (a külsős kiosztás így érintetlen marad);
 // a stopok cseréje a replaceStopsForOrder-en át megőrzi a sofőr-állomásokat.
-async function _saveEdit(req, res, cid, d, pickups, deliveries, km, uitDocs) {
+async function _saveEdit(req, res, cid, d, pickups, deliveries, km, uitDocs, convId) {
   const id = d.edit_order_id;
   const cur = await pool.query(
     `SELECT status, email_sofer, rendszam_camion, rendszam_remorca, to_jsonb(o)->>'fuvar_no' AS fuvar_no
@@ -905,6 +952,7 @@ async function _saveEdit(req, res, cid, d, pickups, deliveries, km, uitDocs) {
     }
   } catch (e) { console.error('orderChat UIT-mentés hiba (a fuvar mentve):', e.message); }
   await learnFromDraft(cid, d);
+  if (convId) await chatHistory.note(req, convId, '✏️ ✅ ' + (c.fuvar_no || d.edit_fuvar_no || id), 'saved', { clearState: true });
   try { await audit.fromReq(req, 'order.update_from_chat', 'order', id, { stops: d.stops.length }); } catch (_) {}
   return res.json({ result: { ok: true, id, fuvar_no: c.fuvar_no || d.edit_fuvar_no || id, updated: true } });
 }

@@ -42,11 +42,16 @@ handlers.exportCompanyData = async function (req, res) {
       mail_sent: await rows('SELECT id, from_email, to_email, subject, body_text, attachments, mail_type, status, order_id, sent_by, created_at FROM mail_sent WHERE company_id = $1'),
       // AI-chat: a chat által nem értett mondatok (a felhasználó saját szövege, 30 napig).
       chat_miss_log: await rows('SELECT id, user_id, text, resolved_tool, created_at FROM chat_miss_log WHERE company_id = $1'),
+      // AI-chat beszélgetés-adatbázis (a felhasználók saját szövege + a válaszok) és a belőle tanult emlékek.
+      chat_conversations: await rows('SELECT id, user_id, title, summary, msg_count, created_at, updated_at FROM chat_conversations WHERE company_id = $1'),
+      chat_messages: await rows('SELECT id, conversation_id, user_id, role, text, card_text, kind, noai, created_at FROM chat_messages WHERE company_id = $1 ORDER BY id'),
+      chat_memories: await rows('SELECT id, user_id, text, source, hits, created_at, updated_at FROM chat_memories WHERE company_id = $1'),
     };
     audit.fromReq(req, 'gdpr.export', 'company', cid, { counts: {
       users: data.users.length, clients: data.clients.length, vehicles: data.vehicles.length, orders: data.orders.length,
       client_portal_users: data.client_portal_users.length, carrier_portal_users: data.carrier_portal_users.length,
       ecmr: data.ecmr.length, notifications: data.notifications.length, mail_log: data.mail_log.length, mail_sent: data.mail_sent.length,
+      chat_conversations: data.chat_conversations.length, chat_memories: data.chat_memories.length,
     } });
     return res.json({ result: { ok: true, generated_at: new Date().toISOString(), data } });
   } catch (err) {
@@ -87,6 +92,9 @@ handlers.anonymizeUser = async function (req, res, args) {
     }
     // AI-chat: a felhasználó nem értett mondatai (saját szöveg) — törlés.
     await pool.query(`DELETE FROM chat_miss_log WHERE company_id = $1 AND user_id = $2`, [cid, uid]).catch(() => {});
+    // AI-chat: a felhasználó beszélgetései (üzenetek CASCADE) + a személyes emlékei — törlés.
+    await pool.query(`DELETE FROM chat_conversations WHERE company_id = $1 AND user_id = $2`, [cid, uid]).catch(() => {});
+    await pool.query(`DELETE FROM chat_memories WHERE company_id = $1 AND user_id = $2`, [cid, uid]).catch(() => {});
     audit.fromReq(req, 'gdpr.anonymize', 'user', uid);
     return res.json({ result: { ok: true } });
   } catch (err) {

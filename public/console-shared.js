@@ -7478,6 +7478,8 @@ function loadLearnedData() {
     // AI-chat 2.0: megerősített mondat → képesség párok + nem értett mondatok (30 nap).
     groups.push({ key: 'chat_intent', src: 'chat_intent', clear: true, title: t('ld.chatIntent'), rows: (r.chatIntent || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
     groups.push({ key: 'chat_miss', src: 'chat_miss', clear: true, title: t('ld.chatMiss'), rows: (r.chatMiss || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
+    // 💬 A beszélgetésekből tanult emlékek (felhasználó / 🏢 cégszintű; 📌 = kifejezetten kért).
+    groups.push({ key: 'chat_memory', src: 'chat_memory', clear: true, title: t('ld.chatMemory'), rows: (r.chatMemory || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
     (r.kinds || []).forEach(function (k) {
       groups.push({ key: k, mem: true, title: t('ld.k.' + k), rows: (r.memory || []).filter(function (m) { return m.kind === k; }).map(function (m) {
         return { id: m.id, key: m.key, val: m.summary, hits: m.hits, upd: m.updated_at };
@@ -7528,7 +7530,7 @@ function ldDelete(source, id) {
 }
 function ldClearKind(kind) {
   if (!confirm(t('ld.confirmClear'))) return;
-  var arg = (kind === 'chat_miss' || kind === 'chat_intent') ? { source: kind } : { source: 'memory', kind: kind };
+  var arg = (kind === 'chat_miss' || kind === 'chat_intent' || kind === 'chat_memory') ? { source: kind } : { source: 'memory', kind: kind };
   gas('learnedDataDelete', [arg]).then(function (r) {
     if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
     toast(t('ld.deleted'), 'ok'); loadLearnedData();

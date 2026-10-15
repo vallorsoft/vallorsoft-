@@ -54,6 +54,7 @@ function loadTab(name){
   if(name==='notifications'){ if(window.Notifications) Notifications.loadPage(); }
   if(name==='mail-log'){ if(typeof loadMailLog==='function') loadMailLog(); }
   if(name==='learned-data'){ loadBonScanCard(); if(typeof loadLearnedData==='function') loadLearnedData(); }
+  if(name==='chat-history'){ if(window.ChatHistory) window.ChatHistory.mount(); }
   if(name==='email-templates' && window.EmailTemplates) EmailTemplates.mount('emailTemplatesBox');
   if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
   if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }

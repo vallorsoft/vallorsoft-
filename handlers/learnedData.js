@@ -5,6 +5,8 @@
 //   • order_scan_samples   — megrendelés-kiolvasó ügyfél-sablonok
 //   • order_chat_memory    — 💬 AI-chat memória (cím, ügyfél, áru,
 //                            sofőr-becenév, levél-címzett/stílus/sablon)
+//   • chat_memories        — 💬 a beszélgetésekből tanult emlékek (Admin: mind;
+//                            Manager: a sajátjai + a cégszintűek)
 //  (A bon-scan minták a meglévő getBonScanSettings/deleteBonScanSample
 //   handlereken át jönnek — nem duplikáljuk.)
 //  Admin/Manager, company_id-szűrt, paraméteres SQL, törlés audit-naplózva.
@@ -104,7 +106,21 @@ async function learnedDataList(req, res) {
       chatIntent = r2.rows.map(x => ({ id: Number(x.id), key: _clip(x.text, 160), summary: '→ ' + x.tool, hits: x.hits || 0, updated_at: x.updated_at }));
     } catch (_) { /* migráció előtt */ }
 
-    return res.json({ result: { ok: true, orderScan, memory, kinds: MEM_KINDS, chatMiss, chatIntent } });
+    // 💬 Beszélgetésekből tanult emlékek (lib/chatHistory) — más felhasználó személyes
+    // emlékei csak az Adminnak látszanak.
+    let chatMemory = [];
+    try {
+      const isAdmin = u.pozicio === 'Admin';
+      const r = await pool.query(
+        `SELECT m.id, m.user_id, m.text, m.source, m.hits, m.updated_at, u.nume
+           FROM chat_memories m LEFT JOIN users u ON u.id = m.user_id AND u.company_id = m.company_id
+          WHERE m.company_id = $1 AND ($2::boolean OR m.user_id IN (0, $3))
+          ORDER BY m.updated_at DESC LIMIT $4`, [cid, isAdmin, u.id, MAX_ROWS]);
+      chatMemory = r.rows.map(x => ({ id: Number(x.id), key: Number(x.user_id) ? (x.nume || '#' + x.user_id) : '🏢',
+        summary: _clip(x.text, 300) + (x.source === 'explicit' ? ' 📌' : ''), hits: x.hits || 0, updated_at: x.updated_at }));
+    } catch (_) { /* migráció előtt */ }
+
+    return res.json({ result: { ok: true, orderScan, memory, kinds: MEM_KINDS, chatMiss, chatIntent, chatMemory } });
   } catch (e) {
     console.error('learnedDataList hiba:', e);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -133,6 +149,14 @@ async function learnedDataDelete(req, res, args) {
         const r = await pool.query('DELETE FROM order_chat_memory WHERE company_id=$1 AND kind=$2', [cid, a.kind]);
         n = r.rowCount;
       } else return res.json({ result: { ok: false, err: 'Parametri invalizi' } });
+    } else if (source === 'chat_memory') {
+      // Admin: bármelyik; Manager: a saját és az általa felvett cégszintű emlékek.
+      const isAdmin = u.pozicio === 'Admin';
+      const scope = `company_id=$1 AND ($2::boolean OR user_id=$3 OR (user_id=0 AND created_by=$3))`;
+      const r = id > 0
+        ? await pool.query(`DELETE FROM chat_memories WHERE id=$4 AND ${scope}`, [cid, isAdmin, u.id, id])
+        : await pool.query(`DELETE FROM chat_memories WHERE ${scope}`, [cid, isAdmin, u.id]);
+      n = r.rowCount;
     } else if (source === 'chat_miss' || source === 'chat_intent') {
       const tbl = source === 'chat_miss' ? 'chat_miss_log' : 'chat_learned_intents';
       const r = id > 0

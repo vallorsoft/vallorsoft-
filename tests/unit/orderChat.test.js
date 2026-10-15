@@ -164,8 +164,37 @@ describe('orderChatTurn — a példa-fuvar', () => {
   });
 });
 
-describe('adat-minimalizálás', () => {
-  test('az AI nélkül megválaszolt (local) üzenetek nem kerülnek az AI-hoz', async () => {
+describe('folytatás (orderChatResume) + beszélgetés-mentés', () => {
+  test('nincs folytatható → found:false; van → üzenetek + újra-ellenőrzött vázlat', async () => {
+    expect((await call('orderChatResume', ADMIN, [{}])).found).toBe(false);
+    mockRules.push({ match: /SELECT id, title, state, updated_at FROM chat_conversations\s+WHERE company_id=\$1 AND user_id=\$2/, rows: [{ id: 12, title: 'Arad', updated_at: new Date(),
+      state: { draft: { client: 'Bilka', stops: [{ kind: 'pickup', loc: 'Arad' }], email_sofer: 'x', bogus: '<script>' }, missing: ['load_type'], ready: false } }] });
+    mockRules.push({ match: /FROM chat_messages/, rows: [{ role: 'user', text: 'holnap Arad' }] });
+    const peek = await call('orderChatResume', ADMIN, [{ peek: true }]);
+    expect(peek).toMatchObject({ found: true, conversation: { id: 12, title: 'Arad' } });
+    expect(peek.messages).toBeUndefined();
+    const r = await call('orderChatResume', ADMIN, [{}]);
+    expect(r.conversation_id).toBe(12);
+    expect(r.messages[0]).toMatchObject({ role: 'user', text: 'holnap Arad' });
+    expect(r.draft.client).toBe('Bilka');
+    expect(r.draft.bogus).toBeUndefined();               // sanitizeDraft
+    expect(r.missing).toEqual(['load_type']);
+  });
+
+  test('a kör a beszélgetésbe kerül, a válasz megkapja a conversation_id-t', async () => {
+    const ins = [];
+    mockRules.push({ match: /INSERT INTO chat_conversations/, rows: [{ id: 33 }] });
+    mockRules.push({ match: /INSERT INTO chat_messages/, fn: (sql, p) => { ins.push(p); return { rows: [] }; } });
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'Rendben', draft: AI_DRAFT } });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'Holnap Arad → Győr' }] }]);
+    await new Promise((res) => setImmediate(res));
+    expect(r.conversation_id).toBe(33);
+    expect(ins[0].slice(0, 5)).toEqual([33, 7, 1, 'user', 'Holnap Arad → Győr']);
+  });
+});
+
+describe('teljes beszélgetés az AI-nak — dokumentum soha', () => {
+  test('az AI nélkül megválaszolt (local) üzenetek mellékszálként jelölve mennek', async () => {
     mockExtract.mockResolvedValue({ json: { client: null, stops: [] }, model: 'm' });
     await call('orderChatTurn', ADMIN, [{ messages: [
       { role: 'user', text: 'Ki tartozik nekünk?', local: true },
@@ -174,9 +203,26 @@ describe('adat-minimalizálás', () => {
     ] }]);
     const conv = mockExtract.mock.calls[0][0].parts[0].text;
     expect(conv).toMatch(/Bicskére/);
-    expect(conv).not.toMatch(/tartozik|Kintlévőség|Bilka 1500/);
+    expect(conv).toMatch(/SIDE TOPIC[^\n]*Ki tartozik nekünk/);
+    expect(conv).toMatch(/SIDE TOPIC[^\n]*Bilka 1500/);
+    // Az utolsó (vázlat-)üzenet NEM mellékszál.
+    expect(conv).toMatch(/\nDISPATCHER: Holnap Brassóból/);
+  });
+
+  test('a dokumentumhoz kötődő (noai) válasz tartalma és a fájlnév sosem kerül az AI-hoz', async () => {
+    mockExtract.mockResolvedValue({ json: { client: null, stops: [] }, model: 'm' });
+    await call('orderChatTurn', ADMIN, [{ messages: [
+      { role: 'user', text: 'mutasd a 0042 dokumentumait, a cmr_bilka.pdf kell', local: true },
+      { role: 'assistant', text: '📎 CMR · szamla_titkos.pdf · 2026-10-01', local: true, noai: true },
+      { role: 'user', text: 'Holnap Brassóból Bicskére FTL' },
+    ] }]);
+    const conv = mockExtract.mock.calls[0][0].parts[0].text;
+    expect(conv).not.toMatch(/szamla_titkos|cmr_bilka\.pdf/);
+    expect(conv).toMatch(/documents — its content is intentionally hidden/);
+    expect(conv).toMatch(/Bicskére/);
   });
 });
+
 
 describe('orderChatCreate', () => {
   const READY = Object.assign({}, AI_DRAFT, { client: 'VALLOR TEAM SRL', client_id: 55, driver_name: null, pret: 1500 });
@@ -231,7 +277,7 @@ describe('segédek', () => {
     expect(h._today(new Date('2026-10-07T22:30:00Z'))).toEqual({ ymd: '2026-10-08', weekday: 'Thursday' });
   });
   test('belső segédek nem RPC-k', () => {
-    expect(Object.keys(h).sort()).toEqual(['orderChatAction', 'orderChatBrief', 'orderChatCreate', 'orderChatTurn', 'orderChatUndo']);
+    expect(Object.keys(h).sort()).toEqual(['orderChatAction', 'orderChatBrief', 'orderChatCreate', 'orderChatResume', 'orderChatTurn', 'orderChatUndo']);
   });
 });
 

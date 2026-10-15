@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-10-15 — 💬 AI-chat: beszélgetés-adatbázis + emlékezet + teljes beszélgetés az AI-nak (dokumentum soha) (PR #555)
+
+- **Természetesebb, következetes beszélgetés:** a vázlat-AI, a levél-AI és az útválasztó a teljes beszélgetést látja (az AI nélkül megválaszolt kérdések „SIDE TOPIC"-ként jelölve, `lib/chatHistory.aiTranscript`); csevegésre természetes mondattal felel (`chat:true`), nem „nem értettem".
+- **Dokumentum SOHA az AI-hoz:** a dokumentumhoz kötődő válasz (`doc_upload`, `order_view`, `docs`-domain tool) helyén tartalom nélküli jelölő (`noai`), a fájlnév minden szövegből kiszűrve; a kártyák HTML-je sosem megy AI-hoz.
+- **Beszélgetés-adatbázis** (`db/chat-conversations.sql`): `chat_conversations` / `chat_messages` / `chat_memories`. Minden kör a felhasználó saját beszélgetésébe kerül (`wrapRes`), a műveletek / mentés / levélküldés eredménye is; fájl / csatolmány soha.
+- **Emlékezet:** „jegyezd meg / felejtsd el" azonnal (`remember`/`forget`); 8 üzenetenként és új beszélgetésnél háttér-összefoglaló + emlék-kivonás; a releváns emlékek + a korábbi beszélgetések összefoglalója minden AI-hívás mellé. Titok / fájlnév / véletlen token nem lehet emlék.
+- **Ellenőrzés:** új „💬 Chat-beszélgetések" fül (Adminisztráció, `public/chat-history.js` + `handlers/chatHistory.js`): Admin a cég bármely beszélgetését (szűrés, törlés, megnyitás audit-naplózva), Manager csak a sajátját; a chat 🕘 gombja a saját előzményekhez. Emlékek a 🧠 Tanult adatok fülön.
+- **Folytatás:** a félkész vázlat állapota is mentődik (`chat_conversations.state`); a chat megnyitásakor „↩️ Folytatod az előző beszélgetést?" sáv (12 órán belüli saját beszélgetés), a 🕘 előzményekből bármelyik saját beszélgetés folytatható (`orderChatResume` — üzenetek + vázlat + levél-előnézet; a vázlat a szerveren újra ellenőrzött). Mentett fuvar / elküldött levél után a vázlat-állapot törlődik.
+- **Javítva a körben:** az útválasztó kivonatában az utolsó előzmény-üzenet is kapja a mellékszál-jelölést; „jegyezd meg" titokkal / kikapcsolt emlékezetnél nem állítja, hogy megjegyezte; felhasználó törlésekor a személyes emlékei törlődnek, a beszélgetései a mentett nevével („törölt felhasználó") ellenőrizhetők maradnak; a dátum-szűrő Europe/Bucharest szerint; a lista-lekérdezés statikus SQL (a séma-drift őr is ellenőrzi).
+- **GDPR / üzemeltetés:** export + anonimizálás; megőrzés `CHAT_HISTORY_RETENTION_DAYS` (alap 365 nap) napi takarítóval (`startChatHistoryCleanup`); `chat-history` funkció-kapcsoló; átláthatósági jelzés a chatben. +27 teszt, 1875 zöld valós Postgres 16-tal. Cache-bust `?v=20261015chathist`.
+
 ## 2026-10-13 — ⚖️ Tengelyterhelés: a hármas tengely rugózása — nyereg fel → több a vontatón, le → a hármas tengely visz többet
 
 - A pótkocsi hármas tengelye nem egy pontban tartja a vázat: ferde vázban (eleje ≠ vége) az i. tengely (eltolás e_i) `Δh_i = −(h_eleje−h_vége)·e_i/L_rak` magasan van a csoport-átlaghoz képest, terhe `F_i = F/3 − k_t·Δh_i` (k_t t/cm, alap 0,5, állítható). A tartópont `e = ΣF_i·e_i/ΣF_i`-vel eltolódik; a pótkocsi nyomatéka a királycsapra megmarad: `F' = F·L/(L+e)`, a különbség a királycsapra → a hajtottra + kormányzottra kerül.
