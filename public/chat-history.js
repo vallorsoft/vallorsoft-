@@ -32,7 +32,7 @@
     var bar = '<div class="chh-bar">'
       + (st.key === 'pane' && st.isAdmin
         ? '<select class="select chh-in" onchange="ChatHistory._f(\'' + st.key + '\',\'uid\',this.value)"><option value="">' + esc(T('chh.allUsers')) + '</option>'
-          + st.users.map(function (u) { return '<option value="' + u.id + '"' + (String(st.uid) === String(u.id) ? ' selected' : '') + '>' + esc(u.nume) + '</option>'; }).join('') + '</select>'
+          + st.users.map(function (u) { return '<option value="' + Number(u.id) + '"' + (String(st.uid) === String(u.id) ? ' selected' : '') + '>' + esc(u.nume) + (u.deleted ? ' (' + esc(T('chh.deletedUser')) + ')' : '') + '</option>'; }).join('') + '</select>'
         : '')
       + '<input class="input chh-in chh-q" type="search" placeholder="' + esc(T('chh.searchPh')) + '" value="' + esc(st.q) + '" onkeydown="if(event.key===\'Enter\'){ChatHistory._f(\'' + st.key + '\',\'q\',this.value);}">'
       + '<input class="input chh-in" type="date" value="' + esc(st.from) + '" title="' + esc(T('chh.from')) + '" onchange="ChatHistory._f(\'' + st.key + '\',\'from\',this.value)">'
@@ -54,7 +54,7 @@
       return '<button type="button" class="chh-item' + (st.sel === c.id ? ' on' : '') + '" onclick="ChatHistory._open(\'' + st.key + '\',' + Number(c.id) + ')">'
         + '<div class="chh-it-t">' + esc(c.title || '💬') + '</div>'
         + (c.summary ? '<div class="chh-it-s">' + esc(c.summary) + '</div>' : '')
-        + '<div class="chh-it-m">' + (st.isAdmin && st.key === 'pane' ? '<span class="chh-user">👤 ' + esc(c.user_name) + '</span>' : '')
+        + '<div class="chh-it-m">' + (st.isAdmin && st.key === 'pane' ? '<span class="chh-user">👤 ' + esc(c.user_name) + (c.user_deleted ? ' (' + esc(T('chh.deletedUser')) + ')' : '') + '</span>' : '')
         + '<span>💬 ' + Number(c.msg_count || 0) + '</span><span>' + esc(fmt(c.updated_at)) + '</span></div></button>';
     }).join('') + (st.more ? '<button type="button" class="btn ghost chh-more" onclick="ChatHistory._more(\'' + st.key + '\')">' + esc(T('chh.more')) + '</button>' : '');
   }
@@ -67,7 +67,8 @@
     var h = '<div class="chh-vh">'
       + '<button type="button" class="btn ghost chh-back" onclick="ChatHistory._close(\'' + st.key + '\')">← ' + esc(T('chh.back')) + '</button>'
       + '<div class="chh-vt">' + esc(c.title || '💬') + '</div>'
-      + '<div class="chh-vm">👤 ' + esc(c.user_name) + (c.user_email ? ' · ' + esc(c.user_email) : '') + ' · ' + esc(fmtD(c.created_at)) + ' → ' + esc(fmt(c.updated_at)) + '</div>'
+      + '<div class="chh-vm">👤 ' + esc(c.user_name) + (c.user_deleted ? ' (' + esc(T('chh.deletedUser')) + ')' : '') + (c.user_email ? ' · ' + esc(c.user_email) : '') + ' · ' + esc(fmtD(c.created_at)) + ' → ' + esc(fmt(c.updated_at)) + '</div>'
+      + (c.own && window.OrderChat && window.OrderChat.resume ? '<button type="button" class="btn ghost chh-res" onclick="ChatHistory._resume(\'' + st.key + '\',' + Number(c.id) + ')">↩️ ' + esc(T('chh.resume')) + '</button>' : '')
       + (st.isAdmin && st.key === 'pane' ? '<button type="button" class="btn ghost chh-del" onclick="ChatHistory._del(\'' + st.key + '\',' + Number(c.id) + ')">🗑 ' + esc(T('chh.delete')) + '</button>' : '')
       + '</div>';
     if (c.summary) h += '<div class="chh-sum">🧠 ' + esc(c.summary) + '</div>';
@@ -147,6 +148,11 @@
     },
     _more: function (key) { var st = inst(key); st.offset = st.rows.length; load(key, true); },
     _open: open,
+    // Saját beszélgetés folytatása a chatben (a szerver csak a sajátot adja vissza).
+    _resume: function (key, id) {
+      if (key === 'own') window.ChatHistory.closeOwn();
+      if (window.OrderChat && window.OrderChat.resume) window.OrderChat.resume(id);
+    },
     _close: function (key) {
       var st = inst(key); st.sel = null; st.conv = null;
       var g = root(key) && root(key).querySelector('.chh-grid');

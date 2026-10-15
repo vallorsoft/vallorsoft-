@@ -37,39 +37,38 @@ async function chatHistoryList(req, res, args) {
     const cid = u.company_id;
     const a = _a(args);
     const isAdmin = u.pozicio === 'Admin';
-    const where = ['c.company_id = $1'];
-    const p = [cid];
     // A Manager csak a sajátját látja — a kért user_id-t figyelmen kívül hagyjuk.
-    const want = isAdmin ? parseInt(a.user_id, 10) : u.id;
-    if (want > 0) { p.push(want); where.push('c.user_id = $' + p.length); }
+    const want = isAdmin ? (parseInt(a.user_id, 10) || null) : u.id;
     const q = String(a.q || '').trim().slice(0, 100);
-    if (q) {
-      p.push('%' + q.replace(/[%_\\]/g, ' ') + '%');
-      where.push(`(c.title ILIKE $${p.length} OR c.summary ILIKE $${p.length} OR EXISTS (SELECT 1 FROM chat_messages m WHERE m.conversation_id = c.id AND m.company_id = c.company_id AND m.text ILIKE $${p.length}))`);
-    }
-    const from = _date(a.from); const to = _date(a.to);
-    if (from) { p.push(from); where.push('c.updated_at >= $' + p.length + '::date'); }
-    if (to) { p.push(to); where.push('c.updated_at < ($' + p.length + "::date + INTERVAL '1 day')"); }
+    const like = q ? '%' + q.replace(/[%_\\]/g, ' ') + '%' : null;
     const off = Math.max(0, parseInt(a.offset, 10) || 0);
-    p.push(PAGE + 1, off);
+    // Statikus lekérdezés null-paraméteres szűrőkkel; a dátum Europe/Bucharest szerint.
     const r = await pool.query(
       `SELECT c.id, c.user_id, c.title, c.summary, c.msg_count, c.user_msg_count, c.created_at, c.updated_at,
-              u.nume AS user_name, u.pozicio AS user_role
+              COALESCE(u.nume, c.user_name) AS user_name, u.pozicio AS user_role, (u.id IS NULL) AS user_deleted
          FROM chat_conversations c
          LEFT JOIN users u ON u.id = c.user_id AND u.company_id = c.company_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY c.updated_at DESC LIMIT $${p.length - 1} OFFSET $${p.length}`, p);
+        WHERE c.company_id = $1
+          AND ($2::int IS NULL OR c.user_id = $2)
+          AND ($3::text IS NULL OR c.title ILIKE $3 OR c.summary ILIKE $3
+               OR EXISTS (SELECT 1 FROM chat_messages m WHERE m.conversation_id = c.id AND m.company_id = c.company_id AND m.text ILIKE $3))
+          AND ($4::date IS NULL OR (c.updated_at AT TIME ZONE 'Europe/Bucharest')::date >= $4::date)
+          AND ($5::date IS NULL OR (c.updated_at AT TIME ZONE 'Europe/Bucharest')::date <= $5::date)
+        ORDER BY c.updated_at DESC LIMIT $6 OFFSET $7`,
+      [cid, want, like, _date(a.from), _date(a.to), PAGE + 1, off]);
     const rows = r.rows.slice(0, PAGE).map((x) => ({
-      id: Number(x.id), user_id: x.user_id, user_name: x.user_name || '—', user_role: x.user_role || '',
+      id: Number(x.id), user_id: x.user_id, user_name: x.user_name || '—', user_role: x.user_role || '', user_deleted: !!x.user_deleted,
       title: x.title || '', summary: x.summary || '', msg_count: x.msg_count || 0,
       created_at: x.created_at, updated_at: x.updated_at, own: x.user_id === u.id,
     }));
     let users = [];
     if (isAdmin) {
+      // A szűrő-lista: akinek van beszélgetése — a már törölt felhasználó is (a mentett nevével).
       const ur = await pool.query(
-        `SELECT DISTINCT u.id, u.nume FROM chat_conversations c JOIN users u ON u.id = c.user_id AND u.company_id = c.company_id
-          WHERE c.company_id = $1 ORDER BY u.nume`, [cid]);
-      users = ur.rows.map((x) => ({ id: x.id, nume: x.nume }));
+        `SELECT c.user_id AS id, MAX(COALESCE(u.nume, c.user_name)) AS nume, BOOL_OR(u.id IS NULL) AS deleted
+           FROM chat_conversations c LEFT JOIN users u ON u.id = c.user_id AND u.company_id = c.company_id
+          WHERE c.company_id = $1 GROUP BY c.user_id ORDER BY 2`, [cid]);
+      users = ur.rows.map((x) => ({ id: x.id, nume: x.nume || '#' + x.id, deleted: !!x.deleted }));
     }
     return res.json({ result: { ok: true, rows, more: r.rows.length > PAGE, offset: off, users, is_admin: isAdmin, retention_days: hist.RETENTION_DAYS } });
   } catch (e) {
@@ -89,7 +88,8 @@ async function chatHistoryGet(req, res, args) {
     const id = parseInt(_a(args).id, 10);
     if (!(id > 0)) return res.json({ result: { ok: false, err: 'ID invalid' } });
     const cr = await pool.query(
-      `SELECT c.id, c.user_id, c.title, c.summary, c.msg_count, c.created_at, c.updated_at, u.nume AS user_name, u.email AS user_email
+      `SELECT c.id, c.user_id, c.title, c.summary, c.msg_count, c.created_at, c.updated_at,
+              COALESCE(u.nume, c.user_name) AS user_name, u.email AS user_email, (u.id IS NULL) AS user_deleted
          FROM chat_conversations c LEFT JOIN users u ON u.id = c.user_id AND u.company_id = c.company_id
         WHERE c.id = $1 AND c.company_id = $2`, [id, cid]);
     const c = cr.rows[0];
@@ -102,7 +102,7 @@ async function chatHistoryGet(req, res, args) {
       try { await audit.fromReq(req, 'chat.history_view', 'chat_conversation', String(id), { owner: c.user_id }); } catch (_) {}
     }
     return res.json({ result: { ok: true,
-      conversation: { id: Number(c.id), user_id: c.user_id, user_name: c.user_name || '—', user_email: c.user_email || '',
+      conversation: { id: Number(c.id), user_id: c.user_id, user_name: c.user_name || '—', user_email: c.user_email || '', user_deleted: !!c.user_deleted,
         title: c.title || '', summary: c.summary || '', msg_count: c.msg_count || 0, created_at: c.created_at, updated_at: c.updated_at, own: c.user_id === u.id },
       messages: mr.rows.map((m) => ({ id: Number(m.id), role: m.role, text: m.text || '', card: m.card_text || '', kind: m.kind || '', noai: !!m.noai, at: m.created_at })),
     } });

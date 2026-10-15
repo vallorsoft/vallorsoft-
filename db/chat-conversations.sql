@@ -1,6 +1,8 @@
 -- ============================================================
 --  💬 AI-chat — beszélgetés-adatbázis + emlékek.
---  chat_conversations: felhasználónkénti beszélgetések (cím, rövid összefoglaló).
+--  chat_conversations: felhasználónkénti beszélgetések (cím, rövid összefoglaló,
+--                      a felhasználó neve a megnyitáskor — törlés után is olvasható —,
+--                      és a félkész vázlat állapota (`state`) a folytatáshoz).
 --  chat_messages:      az üzenetek szövege (felhasználó + asszisztens); a szerver
 --                      által rajzolt kártyák CSAK sima szövegként (card_text).
 --                      `noai` = dokumentumhoz kötődő válasz → az AI-hoz SOSEM kerül.
@@ -22,6 +24,8 @@ CREATE TABLE IF NOT EXISTS chat_conversations (
   summary           TEXT,
   summarized_count  INTEGER NOT NULL DEFAULT 0,
   summarized_at     TIMESTAMPTZ,
+  user_name         VARCHAR(120),
+  state             JSONB,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

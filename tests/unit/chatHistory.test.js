@@ -171,6 +171,57 @@ describe('tárolás', () => {
   });
 });
 
+describe('folytatás + vázlat-állapot', () => {
+  test('turnState: csak vázlat-/levél-kör, a kérdések és az előnézet nélkül', () => {
+    expect(hist.turnState({ ok: true, info: true, reply: 'x' })).toBeUndefined();
+    expect(hist.turnState({ ok: false, err: 'x' })).toBeUndefined();
+    const st = hist.turnState({ ok: true, mode: 'email', draft: { body: 'b' }, missing: [], ready: true, questions: [{ text: 'q' }], preview_html: '<p>x</p>', attachments_avail: [{ key: 'cmr' }] });
+    expect(st).toEqual({ mode: 'email', draft: { body: 'b' }, missing: [], ready: true, attachments_avail: [{ key: 'cmr' }] });
+  });
+
+  test('wrapRes a vázlat-állapotot is menti; a mentés-jegyzet törli', async () => {
+    const upd = [];
+    mockRules.push({ match: /INSERT INTO chat_messages/, rows: [] });
+    mockRules.push({ match: /UPDATE chat_conversations SET msg_count/, fn: (sql, p) => { upd.push({ sql, p }); return { rows: [{ user_msg_count: 1, summarized_count: 0 }] }; } });
+    mockRules.push({ match: /SELECT id FROM chat_conversations WHERE id=\$1/, rows: [{ id: 12 }] });
+    const res = hist.wrapRes({ json: () => {} }, { cid: 7, uid: 2, convId: 12, userText: 'Arad → Győr' });
+    res.json({ result: { ok: true, reply: 'ok', draft: { client: 'Bilka', stops: [] }, missing: ['load_type'], ready: false } });
+    await flush();
+    expect(upd[0].sql).toMatch(/state = \$5::jsonb/);
+    expect(JSON.parse(upd[0].p[4])).toMatchObject({ draft: { client: 'Bilka' }, missing: ['load_type'] });
+    // info-válasz nem írja felül a vázlatot
+    res.json({ result: { ok: true, info: true, reply: 'Peto Bicske felé' } });
+    await flush();
+    expect(upd[1].sql).not.toMatch(/state =/);
+    // mentés után a vázlat törlődik
+    await hist.note(req(MANAGER), 12, '✅ CMD-2026-0042', 'saved', { clearState: true });
+    expect(upd[2].sql).toMatch(/state = \$5::jsonb/);
+    expect(upd[2].p[4]).toBeNull();
+  });
+
+  test('resume: csak a saját beszélgetés; a mellékszál-jelölés a tárolt fajtából', async () => {
+    let params = null;
+    mockRules.push({ match: /SELECT id, title, state, updated_at FROM chat_conversations WHERE id=\$1/, fn: (sql, p) => { params = p; return { rows: p[2] === 2 ? [{ id: 12, title: 'T', state: { mode: null, draft: { client: 'Bilka' } } }] : [] }; } });
+    mockRules.push({ match: /SELECT role, text, card_text, kind, noai FROM chat_messages/, rows: [
+      { role: 'assistant', text: 'Rendben', card_text: '🏢 Bilka', kind: 'draft' },
+      { role: 'user', text: 'holnap Arad → Győr' },
+      { role: 'assistant', text: '📎 dok', card_text: 'cmr.pdf', kind: 'order_view', noai: true },
+      { role: 'user', text: 'és a dokumentumai?' },
+    ] });  // (DESC sorrendben jön vissza)
+    expect(await hist.resume(7, 3, 12)).toBeNull();          // más felhasználó → nincs
+    const r = await hist.resume(7, 2, 12);
+    expect(params).toEqual([12, 7, 2]);
+    expect(r.messages.map((m) => [m.role, m.local, m.noai])).toEqual([
+      ['user', true, false], ['assistant', true, true], ['user', false, false], ['assistant', false, false],
+    ]);
+    expect(r.messages[1].card).toBe('cmr.pdf');
+    expect(r.messages[3].card).toBe('');                      // vázlat-kör: a kártya csak az ellenőrző nézetben
+    expect(r.state.draft.client).toBe('Bilka');
+    mockFeatureOn = false;
+    expect(await hist.resume(7, 2, 12)).toBeNull();
+  });
+});
+
 describe('handlers/chatHistory — ellenőrző nézet', () => {
   test('Sofőr / kijelentkezett tiltva; kikapcsolt funkció → hiba', async () => {
     expect((await call(H.chatHistoryList, SOFER, [{}])).ok).toBe(false);
@@ -181,22 +232,23 @@ describe('handlers/chatHistory — ellenőrző nézet', () => {
 
   test('Manager csak a sajátját listázza (a kért user_id-t figyelmen kívül hagyja)', async () => {
     let params = null;
-    mockRules.push({ match: /FROM chat_conversations c\s+LEFT JOIN users/, fn: (sql, p) => { params = { sql, p }; return { rows: [] }; } });
+    mockRules.push({ match: /FROM chat_conversations c\s+LEFT JOIN users/, fn: (sql, p) => { params = p; return { rows: [] }; } });
     const r = await call(H.chatHistoryList, MANAGER, [{ user_id: 99 }]);
     expect(r.ok).toBe(true);
     expect(r.is_admin).toBe(false);
-    expect(params.p.slice(0, 2)).toEqual([7, 2]);
-    expect(params.sql).toMatch(/c\.company_id = \$1 AND c\.user_id = \$2/);
+    expect(params.slice(0, 2)).toEqual([7, 2]);
+    expect(r.users).toEqual([]);
   });
 
-  test('Admin szűrhet bármely felhasználóra + szövegre; felhasználó-listát kap', async () => {
-    let params = null;
-    mockRules.push({ match: /FROM chat_conversations c\s+LEFT JOIN users/, fn: (sql, p) => { params = p; return { rows: [{ id: 5, user_id: 2, title: 't', msg_count: 4, user_name: 'Mana' }] }; } });
-    mockRules.push({ match: /SELECT DISTINCT u\.id, u\.nume/, rows: [{ id: 2, nume: 'Mana' }] });
-    const r = await call(H.chatHistoryList, ADMIN, [{ user_id: 2, q: 'Bilka%' }]);
-    expect(params.slice(0, 3)).toEqual([7, 2, '%Bilka %']);
-    expect(r.rows[0]).toMatchObject({ id: 5, user_name: 'Mana', own: false });
-    expect(r.users).toEqual([{ id: 2, nume: 'Mana' }]);
+  test('Admin szűrhet bármely felhasználóra + szövegre + dátumra; a törölt felhasználó is a mentett nevével', async () => {
+    let params = null; let sql = '';
+    mockRules.push({ match: /FROM chat_conversations c\s+LEFT JOIN users u ON u\.id = c\.user_id AND u\.company_id = c\.company_id\s+WHERE c\.company_id = \$1\s+AND/, fn: (q, p) => { sql = q; params = p; return { rows: [{ id: 5, user_id: 2, title: 't', msg_count: 4, user_name: 'Mana', user_deleted: true }] }; } });
+    mockRules.push({ match: /GROUP BY c\.user_id/, rows: [{ id: 2, nume: 'Mana', deleted: true }] });
+    const r = await call(H.chatHistoryList, ADMIN, [{ user_id: 2, q: 'Bilka%', from: '2026-10-01', to: 'rossz' }]);
+    expect(params.slice(0, 5)).toEqual([7, 2, '%Bilka %', '2026-10-01', null]);
+    expect(sql).toMatch(/AT TIME ZONE 'Europe\/Bucharest'/);
+    expect(r.rows[0]).toMatchObject({ id: 5, user_name: 'Mana', own: false, user_deleted: true });
+    expect(r.users).toEqual([{ id: 2, nume: 'Mana', deleted: true }]);
   });
 
   test('más felhasználó beszélgetése: Manager nem nyithatja meg, Admin igen (audit-naplózva)', async () => {
@@ -216,5 +268,19 @@ describe('handlers/chatHistory — ellenőrző nézet', () => {
     mockRules.push({ match: /DELETE FROM chat_conversations WHERE id = \$1 AND company_id = \$2/, fn: (sql, p) => { p0 = p; return { rows: [{ user_id: 9 }], rowCount: 1 }; } });
     expect((await call(H.chatHistoryDelete, ADMIN, [{ id: 5 }])).ok).toBe(true);
     expect(p0).toEqual([5, 7]);
+  });
+});
+
+describe('felhasználó törlése', () => {
+  test('a törölt felhasználó személyes emlékei törlődnek (cégre szűrve), a beszélgetései megmaradnak', async () => {
+    const U = require('../../handlers/users');
+    const del = [];
+    mockRules.push({ match: /SELECT id, pozicio, company_id FROM users WHERE email/, rows: [{ id: 9, pozicio: 'Manager', company_id: 7 }] });
+    mockRules.push({ match: /DELETE FROM users/, rows: [{}] });
+    mockRules.push({ match: /DELETE FROM chat_/, fn: (sql, p) => { del.push({ sql, p }); return { rows: [], rowCount: 1 }; } });
+    const r = await call(U.userDelete, ADMIN, ['mana@x.ro']);
+    expect(r.ok).toBe(true);
+    expect(del.map((d) => d.sql.trim())).toEqual(['DELETE FROM chat_memories WHERE company_id = $1 AND user_id = $2']);
+    expect(del[0].p).toEqual([7, 9]);
   });
 });

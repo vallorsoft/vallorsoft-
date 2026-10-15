@@ -63,7 +63,7 @@ function looksLikeNewOrder(text) {
 async function _route(req, a, messages, lang, ctx) {
   const c = ctx || {};
   const last = messages[messages.length - 1].text;
-  const aiHistory = chatHistory.aiTranscript(messages.slice(0, -1), { maxAssistant: 300, maxUser: 400 });
+  const aiHistory = chatHistory.aiTranscript(messages.slice(0, -1), { maxAssistant: 300, maxUser: 400, lastIsCurrent: false });
   let r;
   try {
     r = await chatRouter.route(req, last, { lang, history: messages.slice(0, -1).map((m) => m.text).reverse(), aiHistory, ui: a.ui, memory: c.mem || '', convId: c.convId || null });
@@ -770,7 +770,7 @@ handlers.orderChatAction = async function (req, res, args) {
     if (a.client_name != null) extra.client_name = String(a.client_name).slice(0, 200);
     if (a.input != null) extra.input = String(a.input).slice(0, 40);
     const r = await chatOps.executeAction(req, String(a.token || ''), extra, lang);
-    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, (r && r.ok === false) ? '⚠️ ' + (r.err || '') : ((r && r.reply) || '✅'), 'action');
+    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, (r && r.ok === false) ? '⚠️ ' + (r.err || '') : ((r && r.reply) || '✅'), (r && r.ok === false) ? 'error' : 'action');
     return res.json({ result: r });
   } catch (err) {
     console.error('orderChatAction hiba:', err);
@@ -792,6 +792,35 @@ handlers.orderChatUndo = async function (req, res, args) {
     return res.json({ result: { ok: true, info: true, reply: r.reply || '', info_html: r.html || '', questions: [] } });
   } catch (err) {
     console.error('orderChatUndo hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── 💬 Folytatás: a SAJÁT beszélgetés visszatöltése a chatbe (üzenetek + félkész vázlat).
+//    args[0]: { id? } — id nélkül a legutóbbi, 12 órán belül frissített saját beszélgetés
+//    (`peek: true` → csak a címét/idejét adja, a chat „folytatod?" sávjához).
+//    A vázlat a következő körben / mentéskor a szerveren újra ellenőrzött (sanitizeDraft + resolveDraft).
+handlers.orderChatResume = async function (req, res, args) {
+  try {
+    const gateErr = await _gate(req);
+    if (gateErr) return res.json({ result: { ok: false, err: gateErr } });
+    const u = req.session.user;
+    const a = (args && args[0]) || {};
+    const r = await chatHistory.resume(u.company_id, u.id, a.id, { maxHours: 12 });
+    if (!r) return res.json({ result: { ok: true, found: false } });
+    if (a.peek) return res.json({ result: { ok: true, found: true, conversation: r.conversation } });
+    const st = (r.state && typeof r.state === 'object') ? r.state : {};
+    const draft = st.mode === 'email' ? (st.draft || {}) : (st.draft ? sanitizeDraft(st.draft) : {});
+    if (st.mode === 'email') draft.mode = 'email';
+    return res.json({ result: {
+      ok: true, found: true, conversation_id: r.conversation.id, conversation: r.conversation, messages: r.messages,
+      mode: st.mode || null, draft, missing: Array.isArray(st.missing) ? st.missing : [], ready: !!st.ready,
+      notes: Array.isArray(st.notes) ? st.notes : [], placeholders: Array.isArray(st.placeholders) ? st.placeholders : [],
+      attachments_avail: st.attachments_avail || [], builders_avail: st.builders_avail || [], tracking_available: !!st.tracking_available, client: st.client || '',
+    } });
+  } catch (e) {
+    if (e && e.code === '42P01') return res.json({ result: { ok: true, found: false } });
+    console.error('orderChatResume hiba:', e && e.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
@@ -861,7 +890,7 @@ handlers.orderChatCreate = async function (req, res, args) {
       catch (_) { /* oszlop hiányzik → csak név szerint kötött */ }
     }
     await learnFromDraft(cid, d);
-    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, '✅ ' + (result.fuvar_no || result.id), 'saved');
+    if (a.conversation_id) await chatHistory.note(req, a.conversation_id, '✅ ' + (result.fuvar_no || result.id), 'saved', { clearState: true });
     try { await audit.fromReq(req, 'order.create_from_chat', 'order', result.id, { stops: d.stops.length, client_linked: !!d.client_id }); }
     catch (_) { /* best-effort */ }
     return res.json({ result: { ok: true, id: result.id, fuvar_no: result.fuvar_no || null } });
@@ -923,7 +952,7 @@ async function _saveEdit(req, res, cid, d, pickups, deliveries, km, uitDocs, con
     }
   } catch (e) { console.error('orderChat UIT-mentés hiba (a fuvar mentve):', e.message); }
   await learnFromDraft(cid, d);
-  if (convId) await chatHistory.note(req, convId, '✏️ ✅ ' + (c.fuvar_no || d.edit_fuvar_no || id), 'saved');
+  if (convId) await chatHistory.note(req, convId, '✏️ ✅ ' + (c.fuvar_no || d.edit_fuvar_no || id), 'saved', { clearState: true });
   try { await audit.fromReq(req, 'order.update_from_chat', 'order', id, { stops: d.stops.length }); } catch (_) {}
   return res.json({ result: { ok: true, id, fuvar_no: c.fuvar_no || d.edit_fuvar_no || id, updated: true } });
 }

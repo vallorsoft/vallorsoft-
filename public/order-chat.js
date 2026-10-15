@@ -128,7 +128,55 @@
     m.setAttribute('data-theme', (mc && mc.getAttribute('data-theme')) || 'light');
     m.classList.add('open');
     if (!S.messages.length) renderAll();
+    _peekResume();
     setTimeout(function () { var ta = $('ochInput'); if (ta) ta.focus(); }, 50);
+  }
+
+  // ─── ↩️ Folytatás (beszélgetés-adatbázis) ───
+  // Oldal-betöltésenként egyszer: van-e 12 órán belüli saját beszélgetés → „folytatod?" sáv.
+  var _peekDone = false;
+  function _peekResume() {
+    if (_peekDone || S.messages.length || S.conv || !_histOn() || !window.gas) return;
+    _peekDone = true;
+    window.gas('orderChatResume', [{ peek: true }]).then(function (r) {
+      if (r && r.ok && r.found && r.conversation && !S.messages.length && !S.conv) { S.offer = r.conversation; renderMsgs(); }
+    }).catch(function () { /* csendben: a chat enélkül is működik */ });
+  }
+  function _restoredMsg(m) {
+    var card = String(m.card || '');
+    return { role: m.role === 'user' ? 'user' : 'assistant', text: String(m.text || ''), local: !!m.local, noai: !!m.noai, err: !!m.err,
+      // A kártya csak sima szövegként jön vissza (escape-elve) — a régi gombok úgyis lejártak.
+      html: card ? '<details class="och-rcard"><summary>📋 ' + esc(T('chh.card')) + '</summary><div>' + esc(card).replace(/\n/g, '<br>') + '</div></details>' : '' };
+  }
+  // Egy SAJÁT beszélgetés visszatöltése (id nélkül a legutóbbi): üzenetek + félkész vázlat.
+  function resume(id) {
+    if (S.busy) return;
+    if (S.messages.length && !S.saved && !window.confirm(T('och.resetAsk'))) return;
+    var cid = parseInt(id, 10) || null;
+    S.busy = true;
+    if ($('ochModal')) renderMsgs();
+    window.gas('orderChatResume', [{ id: cid }]).then(function (r) {
+      S.busy = false;
+      if (!r || !r.ok || !r.found) {
+        S.offer = null;
+        if (typeof window.toast === 'function') window.toast((r && r.err) || T('och.resumeNone'), r && r.err ? 'err' : 'info');
+        if ($('ochModal')) renderAll();
+        return;
+      }
+      S = { messages: (r.messages || []).map(_restoredMsg), draft: r.draft || {}, questions: [], notes: r.notes || [], missing: r.missing || [],
+        ready: !!r.ready, busy: false, saved: null, uitDocs: {}, conv: r.conversation_id };
+      S.placeholders = r.placeholders || [];
+      S.mail = r.mode === 'email' ? { att: r.attachments_avail || [], builders: r.builders_avail || [], tracking: !!r.tracking_available, client: r.client || '' } : null;
+      S.mailHtml = '';
+      _tab = 'chat';
+      open();
+      renderAll();
+      if (r.mode === 'email' && S.draft && S.draft.body) mailRefreshPreview();
+    }).catch(function (e) {
+      S.busy = false;
+      if (typeof window.toast === 'function') window.toast((e && e.message) || T('och.err'), 'err');
+      if ($('ochModal')) renderAll();
+    });
   }
   function close() {
     var m = $('ochModal');
@@ -149,6 +197,8 @@
     if (!box) return;
     // Átláthatóság: a beszélgetés mentődik, a cég adminja megtekintheti (ha a funkció be van kapcsolva).
     var h = S.messages.length ? '' : '<div class="och-empty-chat">' + esc(T('och.emptyChat'))
+      + (S.offer && S.offer.id ? '<div class="och-resume">↩️ ' + esc(T('och.resumeAsk', { t: S.offer.title || '💬' }))
+          + ' <button type="button" class="btn ghost" onclick="OrderChat.resume(' + Number(S.offer.id) + ')">' + esc(T('och.resumeBtn')) + '</button></div>' : '')
       + (_histOn() ? '<div class="och-hist-note">🕘 ' + esc(T('och.histNotice')) + '</div>' : '') + '</div>';
     S.messages.forEach(function (m) {
       // m.html: a szerver által renderelt (escape-elt) sofőr-információs kártya.
@@ -864,5 +914,5 @@
   // 🕘 A saját korábbi beszélgetések (csak olvasható) — public/chat-history.js.
   function history() { if (window.ChatHistory && window.ChatHistory.openOwn) window.ChatHistory.openOwn(); }
 
-  window.OrderChat = { history: history, dayTog: dayTog, dayGo: dayGo, open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { resume: resume, history: history, dayTog: dayTog, dayGo: dayGo, open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, help: help, mailFile: mailFile, mailFileRemove: mailFileRemove, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

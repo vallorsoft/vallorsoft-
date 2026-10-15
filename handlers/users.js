@@ -295,7 +295,7 @@ handlers.userDelete = async function (req, res, args) {
 
       // 🔒 Lekerjuk a cel-felhasznalo poziciojat es ceg-id-jet
       const targetRes = await pool.query(
-        'SELECT pozicio, company_id FROM users WHERE email = $1',
+        'SELECT id, pozicio, company_id FROM users WHERE email = $1',
         [targetEmail]
       );
       if (targetRes.rows.length === 0) {
@@ -343,6 +343,11 @@ handlers.userDelete = async function (req, res, args) {
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
       }
+      // 💬 AI-chat: a törölt felhasználó SZEMÉLYES emlékei törlődnek (már nem használja őket);
+      // a beszélgetései a megőrzési idő végéig az Admin számára ellenőrizhetők maradnak
+      // (a megnyitáskor mentett névvel) — best-effort.
+      await pool.query('DELETE FROM chat_memories WHERE company_id = $1 AND user_id = $2',
+        [req.session.user.company_id, targetRes.rows[0].id]).catch(() => {});
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('userDelete hiba:', err);

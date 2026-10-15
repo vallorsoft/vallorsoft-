@@ -711,7 +711,10 @@ handlers.mailChatSend = async function (req, res, args) {
       const out = res;
       res = { json: (p) => {
         const r = p && p.result;
-        if (r) chatHistory.note(req, a.conversation_id, r.ok ? '✉️ ' + [d.to_email, d.subject].filter(Boolean).join(' · ') : '⚠️ ' + (r.err || ''), 'mail_sent');
+        if (r) {
+          chatHistory.note(req, a.conversation_id, r.ok ? '✉️ ' + [d.to_email, d.subject].filter(Boolean).join(' · ') : '⚠️ ' + (r.err || ''),
+            r.ok ? 'mail_sent' : 'error', { clearState: !!r.ok });
+        }
         return out.json(p);
       } };
     }

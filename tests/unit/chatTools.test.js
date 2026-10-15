@@ -278,6 +278,11 @@ describe('router', () => {
     expect(ins[0][2]).toMatch(/Pető Imre/);
     expect(ins[0][4]).toBe('explicit');
   });
+  test('„jegyezd meg" titokkal → nem állítja, hogy megjegyezte', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { steps: [], chat: true, reply: 'Rendben, megjegyeztem.', remember: [{ text: 'az SMTP jelszó: abc', scope: 'user' }] } });
+    const r = await router.route(req(ADMIN), 'jegyezd meg az SMTP jelszót: abc', { lang: 'hu', now: NOW });
+    expect(r.reply).toMatch(/nem tudom megjegyezni/);
+  });
   test('új fuvar → delegálás a vázlatra', async () => {
     mockExtract.mockResolvedValue({ model: 'm', json: { steps: [{ tool: 'order.create_chat', args: {} }], confidence: 0.9 } });
     const r = await router.route(req(ADMIN), 'holnap Arad Győr', { lang: 'hu', now: NOW });
