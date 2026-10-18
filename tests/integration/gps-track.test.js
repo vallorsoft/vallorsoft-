@@ -89,29 +89,28 @@ describe('gpsTrackRange', () => {
 });
 
 describe('gpsTrackRange — előzmény-visszatöltés', () => {
-  test('hiányzó múltbeli napok: max. 2 letöltve azonnal, a maradék jelezve', async () => {
+  test('hiányzó múltbeli napok: a válasz azonnal jön, a letöltés háttérben fut', async () => {
     setUser(ADMIN);
-    featureEnabled.mockResolvedValueOnce(true);
-    pool.query
-      .mockResolvedValueOnce(rows([{ rendszam: 'B 104 VLR', object_id: '7' }]))
-      .mockResolvedValueOnce(rows([]))                                            // nincs régi formátumú nap
-      .mockResolvedValueOnce(rows([{ credentials_enc: 'enc' }]))                  // CargoTrack kulcs
-      .mockResolvedValueOnce(rows([{ day: '2026-10-03' }, { day: '2026-10-02' }, { day: '2026-10-01' }])) // hiányzó napok
-      .mockResolvedValueOnce(rows([]))                                            // mergeDay: meglévő sor
-      .mockResolvedValueOnce(rows([]))                                            // mergeDay: upsert
-      .mockResolvedValueOnce(rows([]))
-      .mockResolvedValueOnce(rows([]))
-      .mockResolvedValueOnce(rows([]));                                           // napok lekérése
+    featureEnabled.mockResolvedValue(true);
+    pool.query.mockImplementation(async (sql) => {
+      if (/FROM vehicle_gps_map/.test(sql)) return rows([{ rendszam: 'B 104 VLR', object_id: '7' }]);
+      if (/credentials_enc/.test(sql)) return rows([{ credentials_enc: 'enc' }]);
+      if (/generate_series/.test(sql)) return rows([{ day: '2026-10-03' }, { day: '2026-10-02' }, { day: '2026-10-01' }]);
+      return rows([]);
+    });
     const r = await call('gpsTrackRange', [{ rendszam: 'b104vlr', from: '2026-10-01', to: '2026-10-03' }]);
     expect(r.body.result.ok).toBe(true);
-    expect(r.body.result.missing_days).toBe(1);
-    expect(pool.query.mock.calls[3][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-03']);
+    expect(r.body.result.missing_days).toBe(3);
+    expect(r.body.result.bg_running).toBe(true);
+    for (let i = 0; i < 300 && !pool.query.mock.calls.some((c) => /INSERT INTO gps_track_days/.test(c[0])); i++) await new Promise((x) => setTimeout(x, 20));
+    await new Promise((x) => setTimeout(x, 100));
     expect(ct.getCoordinates).toHaveBeenCalled();
     expect(ct.getCoordinates.mock.calls[0][0]).toBe('KEY-enc');
     const ups = pool.query.mock.calls.filter((c) => /INSERT INTO gps_track_days/.test(c[0]));
-    expect(ups.map((c) => c[1][3])).toEqual(['2026-10-03', '2026-10-02']);
+    expect(ups.length).toBeGreaterThan(0);
     expect(ups.every((c) => c[1][7] === true && c[1][0] === CID)).toBe(true);
-  });
+    featureEnabled.mockReset();
+  }, 15000);
 });
 
 describe('gpsTrackPoint', () => {

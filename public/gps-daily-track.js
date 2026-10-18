@@ -126,6 +126,7 @@
     if (!vehicles.length) document.getElementById('gtrStatus').textContent = tt('gtr.noVehicles', 'Niciun vehicul asociat cu GPS (CargoTrack). Asociază vehiculele la Integrări.');
   }
 
+  var _loadSeq = 0;
   function load() {
     var plate = document.getElementById('gtrVehicle').value;
     var from = document.getElementById('gtrFrom').value, to = document.getElementById('gtrTo').value;
@@ -133,9 +134,12 @@
     if (!plate) { st.textContent = tt('gtr.pickVehicleFirst', 'Alege mai întâi un vehicul.'); return; }
     if (!from || !to) return;
     st.textContent = tt('gtr.loading', 'Se încarcă traseul… (prima afișare a unei zile poate dura câteva secunde — o punem pe drum)');
-    document.getElementById('gtrLoad').disabled = true;
+    var btn = document.getElementById('gtrLoad');
+    var seq = ++_loadSeq;
+    btn.disabled = true; btn.classList.add('gtr-busy'); btn.textContent = '⏳ ' + tt('gtr.load', 'Afișează');
+    var done = function () { if (seq !== _loadSeq) return false; btn.disabled = false; btn.classList.remove('gtr-busy'); btn.textContent = tt('gtr.load', 'Afișează'); return true; };
     _gas('gpsTrackRange', [{ rendszam: plate, from: from, to: to }]).then(function (r) {
-      document.getElementById('gtrLoad').disabled = false;
+      if (!done()) return;
       if (!r || !r.ok) { st.textContent = (r && r.err) || tt('common.error', 'Eroare'); return; }
       _data = r;
       st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
@@ -143,7 +147,7 @@
       if (r.missing_days) {
         st.textContent = (st.textContent ? st.textContent + ' ' : '') + '⏳ ' + tt('gtr.backfill', 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.', { n: r.missing_days });
       }
-    }).catch(function () { document.getElementById('gtrLoad').disabled = false; st.textContent = tt('common.error', 'Eroare'); });
+    }).catch(function () { if (done()) st.textContent = tt('common.error', 'Eroare'); });
   }
 
   function row(label, val, strong) { return '<div class="gtr-row"><span>' + esc(label) + '</span><b' + (strong ? ' class="gtr-strong"' : '') + '>' + esc(val) + '</b></div>'; }
