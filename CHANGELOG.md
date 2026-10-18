@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal: tankolás + üzemanyag-veszteség (leszívás) jelölése a tartály-szintből (PR #564)
+
+- `lib/gpsTrack.js` `levelFuel` → `losses[]`/`lost`: ≤30 perc alatt a menet-fogyasztásnál (0,5 L/km) ≥15 L-rel nagyobb, tartós szintcsökkenés = veszteség; nem számít fogyasztásnak.
+- Térkép: ⛽ zöld tankolás, ⚠️ piros pulzáló veszteség (előtte/utána szint); napi lista időrendben, kattintásra odaugrik; összesítő „Tankolások” / „Üzemanyag-veszteség” sor. Cache-bust `?v=20261018gtrloss`. 1840 Jest zöld.
+
 ## 2026-10-18 — 🗺️ GPS útvonal FIX: az útvonalra kattintva újra betölt a pont-buborék (PR #562)
 
 - **Gyökér:** a `public/gps-daily-track.js` `pointPopup` a nem létező `gtrVeh` id-jű elemből olvasta a rendszámot (a valódi: `gtrVehicle`) → a lekérés előtt hibát dobott, a buborék „Betöltés…”-en ragadt (a #561-es időtúllépés sem futott le, mert az utána indult).
