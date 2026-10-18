@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-18 — 🗺️ GPS útvonal-előzmény: teljes útvonal mentve, útra illesztve, pontos km (PR #PRNUM)
+## 2026-10-18 — 🗺️ GPS útvonal-előzmény: teljes útvonal mentve, útra illesztve, pontos km (PR #559)
 
 - **Gond:** a „Napi GPS útvonal" csak 10 percenként tárolt egy pontot (≥200 m-es szűrővel), és ezeket egyenessel kötötte össze → a vonal átvágott tájon, a km pontatlan volt, 7 nap után törlődött.
 - **Új gyűjtő** (`services/scheduler.js` `startGpsTrackHistoryScheduler`, 15 percenként): a CargoTrack eszköz TELJES rögzített pont-sorát tölti le (`services/cargotrack.js` `getCoordinates`, 3 órás ablakok, 1000-es limit felett bontás/lapozás), naponként menti (`db/gps-track-days.sql` `gps_track_days`), 3 órás átfedéssel a később feltöltött pontok miatt; a lezárt napot 6 óra után teljesen újratölti. Visszatöltés első induláskor `GPS_TRACK_BACKFILL_DAYS` (alap 7), megőrzés `GPS_TRACK_RETENTION_DAYS` (alap 100 nap).
