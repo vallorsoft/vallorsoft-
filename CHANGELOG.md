@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-18 — ⚖️ Tengelyterhelés-kalkulátor: valósághű kamion-rajz (PR #PRNUM)
+## 2026-10-18 — ⚖️ Tengelyterhelés-kalkulátor: valósághű kamion-rajz (PR #557)
 
 - **Kérés:** képalapú kamion a kalkulátorba (minta: Mercedes Actros L + ponyvás pótkocsi oldalnézet).
 - **Saját vektoros rajz** (`public/axle-load.js` `drawSvg`) a mintafotók alapján — a fotók vízjelesek/szerzői jogvédettek, a logó védjegy, ezért nem kerültek be. Minden elem a beírt méterek szerint áll (tengelytáv, nyereg, királycsap, tengelyköz, platóhossz, emelhető tengely, dőlés), így a terhelés-számok mindig a kerekek alatt maradnak.
