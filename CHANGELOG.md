@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal-előzmény: teljes útvonal mentve, útra illesztve, pontos km (PR #559)
+
+- **Gond:** a „Napi GPS útvonal" csak 10 percenként tárolt egy pontot (≥200 m-es szűrővel), és ezeket egyenessel kötötte össze → a vonal átvágott tájon, a km pontatlan volt, 7 nap után törlődött.
+- **Új gyűjtő** (`services/scheduler.js` `startGpsTrackHistoryScheduler`, 15 percenként): a CargoTrack eszköz TELJES rögzített pont-sorát tölti le (`services/cargotrack.js` `getCoordinates`, 3 órás ablakok, 1000-es limit felett bontás/lapozás), naponként menti (`db/gps-track-days.sql` `gps_track_days`), 3 órás átfedéssel a később feltöltött pontok miatt; a lezárt napot 6 óra után teljesen újratölti. Visszatöltés első induláskor `GPS_TRACK_BACKFILL_DAYS` (alap 7), megőrzés `GPS_TRACK_RETENTION_DAYS` (alap 100 nap).
+- **Útra illesztés** (`lib/gpsTrack.js` `matchPoints`): OSRM map-matching 90 pontos darabokban → a vonal az úton fut, a km az úton mért táv; jelkiesésnél útvonal-áthidalás az úton, sikertelen illesztésnél a nyers pont-sor. A lezárt napokat a háttér illeszti, a mait megnyitáskor.
+- **Felület** (Flotta → GPS útvonal, `public/gps-daily-track.js`, a CargoTrack mintájára): időszak-választó (ma / tegnap / e hét / múlt hét / e hónap / 30 nap / egyedi, max. 31 nap), összesítő (indulás/érkezés helye, mozgás-/állásidő, km az úton, km-óra, üzemanyag, átlagfogyasztás, l/h), napokra bontott Start/Stop lista km-rel (kattintásra ráközelít), térkép az útvonallal, állásokkal, A/B pontokkal. Handlerek: `handlers/gpsTrack.js` `gpsTrackVehicles`/`gpsTrackRange`.
+- A régi 10 perces gyűjtő és handlerei megmaradtak (visszafelé kompatibilis). Teszt +18 (`tests/unit/gpsTrack.test.js`, `tests/integration/gps-track.test.js`). Cache-bust `?v=20261018gtr`.
+
 ## 2026-10-18 — ⚖️ Tengelyterhelés-kalkulátor: új vontató a megadott Actros-oldalnézet alapján (PR #558)
 
 - A kalkulátor vontatója a felhasználó által küldött oldalnézet arányai szerint újrarajzolva (`public/axle-load.js` `drawSvg`): magas fülke ívelt tetővel és légterelővel, nagy oldalablak, ajtó- és rekesz-vonalak, kilincs, díszléc, tükrök, sötét lökhárító fényszóróval és irányjelzővel, nagy kerékív, oldalburkolat két szellőzővel és jelzőfénnyel, hátsó sárfogó. Világos türkiz fényezés (sötét témán is).

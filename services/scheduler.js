@@ -1537,4 +1537,104 @@ function startGpsDailyTrackScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup };
+// ════════════════════════════════════════════════════════════════
+//  GPS ÚTVONAL-ELŐZMÉNY (gps_track_days) — a CargoTrack eszköz TELJES
+//  pont-sora naponként mentve, úthálózatra illesztve (lib/gpsTrack.js).
+//  15 percenként: új pontok letöltése (3 órás átfedéssel a később
+//  feltöltött pufferelt rekordok miatt), a lezárt napok végső újraletöltése
+//  és illesztése, régi napok törlése. Az első futás GPS_TRACK_BACKFILL_DAYS
+//  napot (alap 7) tölt vissza, fokozatosan.
+// ════════════════════════════════════════════════════════════════
+function startGpsTrackHistoryScheduler() {
+  const gt = require('../lib/gpsTrack');
+  const { featureEnabled } = require('../lib/featureEnabled');
+  const BACKFILL = Math.max(1, Math.min(31, parseInt(process.env.GPS_TRACK_BACKFILL_DAYS, 10) || 7));
+  const RETENTION = Math.max(35, parseInt(process.env.GPS_TRACK_RETENTION_DAYS, 10) || 100);
+  const MIN = Math.max(5, parseInt(process.env.GPS_TRACK_INTERVAL_MIN, 10) || 15);
+  const DAYS_PER_TICK = 3;          // járművenként ennyi napot tölt egy körben (visszatöltés szétterítve)
+  const MATCH_BUDGET_MS = 6 * 60 * 1000;
+  let running = false;
+
+  async function collectVehicle(cid, apiKey, plate, objectId) {
+    const now = Date.now();
+    const today = gt.localDay(now);
+    const last = await pool.query(
+      `SELECT fetched_until FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND fetched_until IS NOT NULL
+        ORDER BY day DESC LIMIT 1`, [cid, plate]);
+    let since = last.rows.length
+      ? new Date(last.rows[0].fetched_until).getTime() - 3 * 3600 * 1000
+      : gt.dayStartMs(gt.addDays(today, -(BACKFILL - 1)));
+    let day = gt.localDay(since), n = 0;
+    while (n < DAYS_PER_TICK) {
+      const ds = gt.dayStartMs(day), de = gt.dayStartMs(gt.addDays(day, 1));
+      if (ds > now) break;
+      const a = Math.max(since, ds), b = Math.min(de, now);
+      const pts = await gt.fetchRange(apiKey, objectId, a, b);
+      await gt.mergeDay(cid, plate, objectId, day, pts, b, false);
+      n++;
+      if (de > now) break;
+      day = gt.addDays(day, 1); since = de;
+    }
+    // lezárt napok: 6 óra türelem után teljes újraletöltés (késve feltöltött pontok) + lezárás
+    const open = await pool.query(
+      `SELECT day::text AS day FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND complete=false AND day < $3::date
+        ORDER BY day LIMIT 2`, [cid, plate, today]);
+    for (const r of open.rows) {
+      const ds = gt.dayStartMs(r.day), de = gt.dayStartMs(gt.addDays(r.day, 1));
+      if (de + 6 * 3600 * 1000 > now) continue;
+      const pts = await gt.fetchRange(apiKey, objectId, ds, de);
+      await gt.mergeDay(cid, plate, objectId, r.day, pts, de, true);
+    }
+  }
+
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      let companies = [];
+      try {
+        ({ rows: companies } = await pool.query(
+          `SELECT company_id, credentials_enc FROM company_integrations
+            WHERE provider='cargotrack' AND enabled=true AND credentials_enc IS NOT NULL`));
+      } catch (_) { return; }
+      for (const c of companies) {
+        try {
+          if (!(await featureEnabled(c.company_id, 'gps-integracio'))) continue;
+          if (!(await featureEnabled(c.company_id, 'gps-daily-track'))) continue;
+          const apiKey = decrypt(c.credentials_enc);
+          const { rows: maps } = await pool.query(
+            `SELECT rendszam, object_id FROM vehicle_gps_map WHERE company_id=$1 AND provider='cargotrack'`, [c.company_id]);
+          const seen = new Set();
+          for (const m of maps) {
+            if (!m.object_id || seen.has(m.object_id)) continue;
+            seen.add(m.object_id);
+            try { await collectVehicle(c.company_id, apiKey, m.rendszam, m.object_id); }
+            catch (e) { console.warn('[GpsTrack] gyűjtés hiba', c.company_id, m.rendszam, e.message); }
+          }
+        } catch (e) { console.warn('[GpsTrack] cég hiba', c.company_id, e.message); }
+      }
+      // lezárt napok illesztése az úthálózatra (időkerettel)
+      const t0 = Date.now();
+      try {
+        const { rows } = await pool.query(
+          `SELECT company_id, rendszam, day::text AS day, points_json FROM gps_track_days
+            WHERE complete=true AND matched_at IS NULL ORDER BY day DESC LIMIT 30`);
+        for (const r of rows) {
+          if (Date.now() - t0 > MATCH_BUDGET_MS) break;
+          try { await gt.matchAndSaveDay(r); } catch (e) { console.warn('[GpsTrack] illesztés hiba', r.rendszam, r.day, e.message); }
+        }
+      } catch (_) {}
+      try {
+        const r = await pool.query(`DELETE FROM gps_track_days WHERE day < (NOW() AT TIME ZONE 'Europe/Bucharest')::date - $1::int`, [RETENTION]);
+        if (r.rowCount) console.log('[GpsTrack] Törölve', r.rowCount, 'régi útvonal-nap (>' + RETENTION + ' nap).');
+      } catch (_) {}
+    } finally { running = false; }
+  }
+
+  setTimeout(tick, 2 * 60 * 1000);
+  const interval = setInterval(tick, MIN * 60 * 1000);
+  console.log('[GpsTrack] GPS útvonal-előzmény gyűjtő elindítva (' + MIN + ' perces ciklus, visszatöltés ' + BACKFILL + ' nap, megőrzés ' + RETENTION + ' nap).');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler };

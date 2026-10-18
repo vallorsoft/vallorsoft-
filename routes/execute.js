@@ -63,6 +63,7 @@ const handlers = Object.assign(
   require('../handlers/orderPostDelivery'),
   require('../handlers/morningDigest'),
   require('../handlers/gpsDailyTrack'),
+  require('../handlers/gpsTrack'),
   require('../handlers/statsV2'),
   require('../handlers/statsInsights'),
   require('../handlers/statsReports'),

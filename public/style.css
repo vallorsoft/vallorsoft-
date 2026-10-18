@@ -5615,3 +5615,61 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal .och-rcard div { margin-top:4px; }
 .chh-res { margin-left:auto; }
 .chh-res + .chh-del { margin-left:0; }
+
+/* ── GPS útvonal-előzmény (Flotta → gps-daily-track) ── */
+#gpsDailyTrackBox .gtr-wrap { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 14px; align-items: start; }
+#gpsDailyTrackBox .gtr-side { padding: 16px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 130px); overflow: auto; }
+#gpsDailyTrackBox .gtr-hint { font-size: 12.5px; color: #64748b; }
+#gpsDailyTrackBox .gtr-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+#gpsDailyTrackBox .gtr-chip { border: 1.5px solid #cbd5e1; background: #fff; color: #1e293b; border-radius: 999px; padding: 5px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+#gpsDailyTrackBox .gtr-chip.on { background: linear-gradient(135deg, #f6711e, #f6517b); border-color: transparent; color: #fff; }
+#gpsDailyTrackBox .gtr-dates { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; }
+#gpsDailyTrackBox .gtr-dates .btn { grid-column: 1 / -1; }
+#gpsDailyTrackBox .gtr-dates .input { min-width: 0; padding: 7px 8px; }
+#gpsDailyTrackBox .gtr-sum { border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 10px 12px; background: #fff; }
+#gpsDailyTrackBox .gtr-sum-h { font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+#gpsDailyTrackBox .gtr-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; }
+#gpsDailyTrackBox .gtr-row span { color: #64748b; flex: 0 0 auto; }
+#gpsDailyTrackBox .gtr-row b { color: #0f172a; font-weight: 600; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#gpsDailyTrackBox .gtr-row b.gtr-strong { font-weight: 800; color: #1d4ed8; }
+#gpsDailyTrackBox .gtr-note { margin-top: 6px; font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 8px; }
+#gpsDailyTrackBox .gtr-day { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 8px 10px; background: #fff; margin-bottom: 8px; }
+#gpsDailyTrackBox .gtr-day-h { display: flex; justify-content: space-between; font-weight: 800; color: #0f172a; font-size: 13px; }
+#gpsDailyTrackBox .gtr-day-sub { font-size: 11.5px; color: #64748b; margin-bottom: 4px; }
+#gpsDailyTrackBox .gtr-it { display: flex; align-items: center; gap: 8px; padding: 5px 4px; font-size: 12.5px; border-radius: 8px; cursor: pointer; }
+#gpsDailyTrackBox .gtr-it:hover { background: #eff6ff; }
+#gpsDailyTrackBox .gtr-t { flex: 1 1 auto; color: #1d4ed8; font-weight: 600; }
+#gpsDailyTrackBox .gtr-it.stop .gtr-t { color: #b45309; }
+#gpsDailyTrackBox .gtr-v { color: #334155; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#gpsDailyTrackBox .gtr-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
+#gpsDailyTrackBox .gtr-dot.t { background: #2563eb; }
+#gpsDailyTrackBox .gtr-dot.s { background: #f59e0b; }
+#gpsDailyTrackBox .gtr-mapwrap { position: relative; }
+#gpsDailyTrackBox .gtr-map { height: calc(100vh - 130px); min-height: 520px; border-radius: 14px; overflow: hidden; background: #f1f5f9; }
+#gpsDailyTrackBox .gtr-legend { position: absolute; left: 12px; bottom: 12px; z-index: 500; background: rgba(255,255,255,0.94); border: 1px solid #cbd5e1; border-radius: 10px; padding: 6px 10px; font-size: 11.5px; color: #334155; display: flex; gap: 12px; flex-wrap: wrap; }
+#gpsDailyTrackBox .gtr-l { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+#gpsDailyTrackBox .gtr-l.m { background: #2563eb; }
+#gpsDailyTrackBox .gtr-l.r { background: #f97316; }
+#gpsDailyTrackBox .gtr-l.g { background: repeating-linear-gradient(90deg, #64748b 0 5px, transparent 5px 9px); }
+.gtr-pin { background: none; border: none; }
+.gtr-pin > div { width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+.gtr-pin .a { background: #16a34a; }
+.gtr-pin .b { background: #dc2626; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-sum,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-day,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-chip:not(.on) { background: rgba(255,255,255,0.04); border-color: #475569; color: #e2e8f0; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-sum-h,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-day-h,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-row b { color: #f1f5f9; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-row b.gtr-strong { color: #93c5fd; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-v { color: #cbd5e1; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-t { color: #93c5fd; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.stop .gtr-t { color: #fbbf24; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it:hover { background: rgba(59,130,246,0.12); }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-row { border-color: #334155; }
+@media (max-width: 1024px) {
+  #gpsDailyTrackBox .gtr-wrap { grid-template-columns: 1fr; }
+  #gpsDailyTrackBox .gtr-side { max-height: none; }
+  #gpsDailyTrackBox .gtr-mapwrap { order: -1; }
+  #gpsDailyTrackBox .gtr-map { height: 60vh; min-height: 360px; }
+}

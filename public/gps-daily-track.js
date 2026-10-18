@@ -1,130 +1,237 @@
-// public/gps-daily-track.js — Napi GPS útvonal (breadcrumb) — Flotta aloldal.
-// Jármű-választó + dátum-picker + Leaflet-térkép polyline-nal. A pont-lista a
-// `getVehicleDailyTrack` handler-en át jön; a járművek `listVehiclesWithTrack`-
-// tel. Több jármű: külön színek. Adattakarítás: 7 nap (scheduler).
+// public/gps-daily-track.js — GPS útvonal-előzmény (Flotta aloldal).
+// Jármű + időszak (max. 31 nap) → úthálózatra illesztett útvonal a térképen,
+// összesítő (indulás/érkezés helye, menet-/állásidő, km út szerint, km-óra,
+// üzemanyag) és napokra bontott Start/Stop lista. Adat: `gpsTrackVehicles` +
+// `gpsTrackRange` (handlers/gpsTrack.js), a mentett gps_track_days táblából.
 
 (function () {
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
+  function tt(k, fb, p) {
+    var v = window.t ? window.t(k, p) : null;
+    if (!v || v === k) { v = fb; if (p) Object.keys(p).forEach(function (x) { v = String(v).replace('{' + x + '}', p[x]); }); }
+    return v;
+  }
   function _gas(fn, args) {
-    return fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+    return fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ functionName: fn, arguments: args || [] }) })
-      .then(r => r.json()).then(d => d.result);
+      .then(function (r) { return r.json(); }).then(function (d) { return d.result; });
   }
-  function _todayLocal() {
-    try { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }).format(new Date()); }
-    catch (_) { return new Date().toISOString().slice(0, 10); }
+  var TZ = 'Europe/Bucharest';
+  function todayLocal() { try { return new Intl.DateTimeFormat('sv-SE', { timeZone: TZ }).format(new Date()); } catch (_) { return new Date().toISOString().slice(0, 10); } }
+  function addDays(day, n) { var p = day.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
+  function hm(sec) { var t = new Date(sec * 1000); try { return new Intl.DateTimeFormat('ro-RO', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).format(t); } catch (_) { return t.toISOString().slice(11, 16); } }
+  function dur(sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return h ? (h + ' h ' + m + ' m') : (m + ' m'); }
+  function km(v) { return v == null ? '—' : Number(v).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km'; }
+  function num(v, u) { return v == null ? '—' : Number(v).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + (u ? ' ' + u : ''); }
+  function dayLabel(day) {
+    var p = day.split('-').map(Number);
+    try { return new Intl.DateTimeFormat((window.I18N && I18N.lang === 'hu') ? 'hu-HU' : 'ro-RO', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(p[0], p[1] - 1, p[2]))); }
+    catch (_) { return day; }
   }
-
-  // Determinisztikus szín járműhöz (rendszám-hash → HSL).
-  function _colorFor(plate) {
-    var s = String(plate || ''); var h = 0;
-    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
-    return 'hsl(' + h + ',65%,45%)';
-  }
-
-  var _map = null, _layers = null, _tile = null;
-
-  // FONTOS: a `loadGpsDailyTrack()` minden aloldal-megnyitáskor ÚJRAGENERÁLJA
-  // a `#gpsDailyTrackBox` teljes innerHTML-jét (beleértve a `#gpsDailyMap`
-  // konténert is) — tehát a régi Leaflet-példány (ha `_map` modul-szinten
-  // megmaradt) egy már LEVÁLASZTOTT (detached) DOM-node-ra mutatna. Ezért itt
-  // MINDIG lebontjuk a korábbi térképet, mielőtt egy friss konténerre új
-  // példányt építünk (a `.remove()` Leaflet API leiratkozik minden eseményről
-  // és törli a belső DOM-referenciákat is — nincs memory-leak).
-  function _initMap() {
-    if (_map) { try { _map.remove(); } catch (_) {} _map = null; _layers = null; _tile = null; }
-    var el = document.getElementById('gpsDailyMap');
-    if (!el || typeof L === 'undefined') return null;
-    _map = L.map(el, { zoomControl: true }).setView([45.94, 24.97], 7);
-    // HERE ha van cég-kulcs (developer-integráció); különben OSM fallback.
-    if (typeof vsAttachTiles === 'function') {
-      vsAttachTiles(_map, function(lyr){ _tile = lyr; });
-    } else {
-      _tile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { attribution:'&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(_map);
+  // Google polyline (precision 6) dekódolás
+  function decode(str) {
+    var idx = 0, lat = 0, lng = 0, out = [], f = 1e6;
+    while (idx < str.length) {
+      var b, sh = 0, r = 0;
+      do { b = str.charCodeAt(idx++) - 63; r |= (b & 0x1f) << sh; sh += 5; } while (b >= 0x20);
+      lat += (r & 1) ? ~(r >> 1) : (r >> 1);
+      sh = 0; r = 0;
+      do { b = str.charCodeAt(idx++) - 63; r |= (b & 0x1f) << sh; sh += 5; } while (b >= 0x20);
+      lng += (r & 1) ? ~(r >> 1) : (r >> 1);
+      out.push([lat / f, lng / f]);
     }
+    return out;
+  }
+
+  var _map = null, _layers = null, _data = null;
+
+  function initMap() {
+    if (_map) { try { _map.remove(); } catch (_) {} _map = null; }
+    var el = document.getElementById('gtrMap');
+    if (!el || typeof L === 'undefined') return;
+    _map = L.map(el, { zoomControl: true }).setView([45.94, 24.97], 6);
+    if (typeof vsAttachTiles === 'function') vsAttachTiles(_map, function () {});
+    else L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(_map);
     _layers = L.layerGroup().addTo(_map);
-    // Térkép-méret javítás async betöltésre.
-    setTimeout(function(){ try { _map.invalidateSize(); } catch(_){} }, 50);
-    return _map;
+    setTimeout(function () { try { _map.invalidateSize(); } catch (_) {} }, 60);
   }
 
-  function _drawTrack(plate, points) {
-    if (!_layers) return;
-    _layers.clearLayers();
-    if (!points || !points.length) return;
-    var latlngs = points.map(function(p){ return [parseFloat(p.lat), parseFloat(p.lng)]; })
-                        .filter(function(x){ return isFinite(x[0]) && isFinite(x[1]); });
-    if (!latlngs.length) return;
-    var color = _colorFor(plate);
-    L.polyline(latlngs, { color: color, weight: 4, opacity: 0.85 }).addTo(_layers);
-    // Start (zöld) + End (piros) marker.
-    L.circleMarker(latlngs[0], { radius: 8, color: '#16a34a', fillColor:'#16a34a', fillOpacity:0.85 })
-      .bindPopup((window.t?t('gdt.start'):'Start') + '<br>' + esc(points[0].recorded_at))
-      .addTo(_layers);
-    var last = latlngs[latlngs.length - 1];
-    L.circleMarker(last, { radius: 8, color: '#ef4444', fillColor:'#ef4444', fillOpacity:0.85 })
-      .bindPopup((window.t?t('gdt.end'):'Cél') + '<br>' + esc(points[points.length-1].recorded_at))
-      .addTo(_layers);
-    try { _map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] }); } catch(_){}
+  function presetRange(k) {
+    var t = todayLocal(), p = t.split('-').map(Number);
+    var dow = (new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay() + 6) % 7; // hétfő = 0
+    if (k === 'today') return [t, t];
+    if (k === 'yesterday') return [addDays(t, -1), addDays(t, -1)];
+    if (k === 'week') return [addDays(t, -dow), t];
+    if (k === 'lastweek') return [addDays(t, -dow - 7), addDays(t, -dow - 1)];
+    if (k === 'month') return [t.slice(0, 8) + '01', t];
+    if (k === 'last30') return [addDays(t, -29), t];
+    return null;
   }
 
-  function _renderShell(vehicles) {
+  function renderShell(r) {
     var box = document.getElementById('gpsDailyTrackBox');
     if (!box) return;
-    var opts = '<option value="">' + esc(window.t?t('gdt.pickVehicle'):'Válassz járművet…') + '</option>' +
-      vehicles.map(function(v){
-        var label = v.rendszam + (v.marca ? ' — ' + v.marca : '') + ' · ' + (v.points_7d || 0) + ' pt';
-        return '<option value="' + esc(v.rendszam) + '">' + esc(label) + '</option>';
-      }).join('');
+    var vehicles = r.vehicles || [];
+    var opts = '<option value="">' + esc(tt('gtr.pickVehicle', 'Alege un vehicul…')) + '</option>' + vehicles.map(function (v) {
+      var label = v.rendszam + (v.marca ? ' — ' + v.marca : '') + (v.days ? ' · ' + v.days + ' ' + tt('gtr.daysSaved', 'zile salvate') : '');
+      return '<option value="' + esc(v.rendszam) + '">' + esc(label) + '</option>';
+    }).join('');
+    var presets = [['today', 'gtr.pToday', 'Azi'], ['yesterday', 'gtr.pYesterday', 'Ieri'], ['week', 'gtr.pWeek', 'Săptămâna curentă'],
+      ['lastweek', 'gtr.pLastWeek', 'Săptămâna trecută'], ['month', 'gtr.pMonth', 'Luna curentă'], ['last30', 'gtr.pLast30', 'Ultimele 30 de zile']];
+    var t = todayLocal();
     box.innerHTML =
-      '<div class="glass" style="padding:22px;">' +
-        '<h2 class="h-title" data-i18n="gdt.title">🗺️ Napi GPS útvonal</h2>' +
-        '<div class="h-sub" data-i18n="gdt.sub">Egy jármű adott napi mozgás-útvonala (breadcrumb). A rögzítés 10 percenként történik, mozgás-szűrővel; adatmegőrzés 7 nap.</div>' +
-        '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:14px 0;">' +
-          '<div class="field" style="min-width:240px;"><label data-i18n="gdt.vehicle">Jármű</label>' +
-            '<select class="select" id="gdtVehicle">' + opts + '</select></div>' +
-          '<div class="field"><label data-i18n="gdt.date">Nap</label>' +
-            '<input class="input" id="gdtDate" type="date" value="' + esc(_todayLocal()) + '" max="' + esc(_todayLocal()) + '"></div>' +
-          '<button type="button" class="btn primary" id="gdtLoad">🔎 <span data-i18n="gdt.load">Betöltés</span></button>' +
-          '<div id="gdtStat" style="align-self:center;color:var(--muted);font-size:12.5px;"></div>' +
+      '<div class="gtr-wrap">' +
+        '<div class="gtr-side glass">' +
+          '<h2 class="h-title" style="margin-bottom:4px;">🗺️ ' + esc(tt('gtr.title', 'Istoric traseu GPS')) + '</h2>' +
+          '<div class="gtr-hint">' + esc(tt('gtr.sub', 'Traseul complet înregistrat de GPS, pus pe drum, cu km exacți. Se păstrează ~3 luni.')) + '</div>' +
+          '<select class="select" id="gtrVehicle">' + opts + '</select>' +
+          '<div class="gtr-presets">' + presets.map(function (p) {
+            return '<button type="button" class="gtr-chip' + (p[0] === 'week' ? ' on' : '') + '" data-gtr-preset="' + p[0] + '">' + esc(tt(p[1], p[2])) + '</button>';
+          }).join('') + '</div>' +
+          '<div class="gtr-dates">' +
+            '<input class="input" type="date" id="gtrFrom" max="' + t + '">' +
+            '<span>→</span>' +
+            '<input class="input" type="date" id="gtrTo" max="' + t + '">' +
+            '<button type="button" class="btn primary" id="gtrLoad">' + esc(tt('gtr.load', 'Afișează')) + '</button>' +
+          '</div>' +
+          '<div id="gtrStatus" class="gtr-hint"></div>' +
+          '<div id="gtrSummary"></div>' +
+          '<div id="gtrList" class="gtr-list"></div>' +
         '</div>' +
-        (vehicles.length === 0
-          ? '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;" data-i18n="gdt.emptyHint">Még nincs rögzített napi pozíció. Ha most kapcsoltad be a GPS-integrációt, várj kb. 10 percet — a scheduler ezután kezd gyűjteni.</div>'
-          : '<div id="gpsDailyMap" style="height:560px;border-radius:14px;overflow:hidden;background:#f1f5f9;"></div>') +
+        '<div class="gtr-mapwrap"><div id="gtrMap" class="gtr-map"></div>' +
+          '<div class="gtr-legend"><span><i class="gtr-l m"></i>' + esc(tt('gtr.legMatched', 'pe drum')) + '</span>' +
+          '<span><i class="gtr-l r"></i>' + esc(tt('gtr.legRaw', 'puncte GPS (neajustat)')) + '</span>' +
+          '<span><i class="gtr-l g"></i>' + esc(tt('gtr.legGap', 'lipsă semnal, completat pe drum')) + '</span></div>' +
+        '</div>' +
       '</div>';
-    if (window.I18N && I18N.apply) I18N.apply(box);
-    if (!vehicles.length) return;
-    _initMap();
-    document.getElementById('gdtLoad').addEventListener('click', _doLoad);
-    // Enter dátum-mezőn → betöltés
-    document.getElementById('gdtDate').addEventListener('keydown', function(e){ if (e.key === 'Enter') _doLoad(); });
+    var wk = presetRange('week');
+    document.getElementById('gtrFrom').value = wk[0];
+    document.getElementById('gtrTo').value = wk[1];
+    box.querySelectorAll('[data-gtr-preset]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var rg = presetRange(b.getAttribute('data-gtr-preset'));
+        document.getElementById('gtrFrom').value = rg[0]; document.getElementById('gtrTo').value = rg[1];
+        box.querySelectorAll('[data-gtr-preset]').forEach(function (x) { x.classList.toggle('on', x === b); });
+        if (document.getElementById('gtrVehicle').value) load();
+      });
+    });
+    ['gtrFrom', 'gtrTo'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', function () { box.querySelectorAll('[data-gtr-preset]').forEach(function (x) { x.classList.remove('on'); }); });
+    });
+    document.getElementById('gtrVehicle').addEventListener('change', load);
+    document.getElementById('gtrLoad').addEventListener('click', load);
+    initMap();
+    if (!vehicles.length) document.getElementById('gtrStatus').textContent = tt('gtr.noVehicles', 'Niciun vehicul asociat cu GPS (CargoTrack). Asociază vehiculele la Integrări.');
   }
 
-  function _doLoad() {
-    var plate = document.getElementById('gdtVehicle').value;
-    var date = document.getElementById('gdtDate').value;
-    var stat = document.getElementById('gdtStat');
-    if (!plate) { stat.textContent = (window.t?t('gdt.pickVehicleFirst'):'Előbb válassz járművet.'); return; }
-    stat.textContent = window.t?t('common.loading'):'Betöltés…';
-    _gas('getVehicleDailyTrack', [{ rendszam: plate, date: date }]).then(function(r){
-      if (!r || !r.ok) { stat.textContent = (r && r.err) || (window.t?t('common.error'):'Hiba'); return; }
-      var n = (r.points && r.points.length) || 0;
-      stat.textContent = n
-        ? (window.t?t('gdt.pointCount', {n: n}):(n + ' pont'))
-        : (window.t?t('gdt.noData'):'Nincs adat az adott napon.');
-      _drawTrack(plate, r.points || []);
-    }).catch(function(){ stat.textContent = window.t?t('common.error'):'Hiba'; });
+  function load() {
+    var plate = document.getElementById('gtrVehicle').value;
+    var from = document.getElementById('gtrFrom').value, to = document.getElementById('gtrTo').value;
+    var st = document.getElementById('gtrStatus');
+    if (!plate) { st.textContent = tt('gtr.pickVehicleFirst', 'Alege mai întâi un vehicul.'); return; }
+    if (!from || !to) return;
+    st.textContent = tt('gtr.loading', 'Se încarcă traseul… (prima afișare a unei zile poate dura câteva secunde — o punem pe drum)');
+    document.getElementById('gtrLoad').disabled = true;
+    _gas('gpsTrackRange', [{ rendszam: plate, from: from, to: to }]).then(function (r) {
+      document.getElementById('gtrLoad').disabled = false;
+      if (!r || !r.ok) { st.textContent = (r && r.err) || tt('common.error', 'Eroare'); return; }
+      _data = r;
+      st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
+      renderSummary(r); renderList(r); drawMap(r);
+    }).catch(function () { document.getElementById('gtrLoad').disabled = false; st.textContent = tt('common.error', 'Eroare'); });
+  }
+
+  function row(label, val, strong) { return '<div class="gtr-row"><span>' + esc(label) + '</span><b' + (strong ? ' class="gtr-strong"' : '') + '>' + esc(val) + '</b></div>'; }
+
+  function renderSummary(r) {
+    var el = document.getElementById('gtrSummary');
+    var T = r.totals;
+    if (!T) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="gtr-sum">' +
+      '<div class="gtr-sum-h">' + esc(tt('gtr.summary', 'Sumar')) + '</div>' +
+      row(tt('gtr.startLoc', 'Locație pornire'), T.start.name || (T.start.lat + ', ' + T.start.lng)) +
+      row(tt('gtr.endLoc', 'Locație oprire'), T.end.name || (T.end.lat + ', ' + T.end.lng)) +
+      row(tt('gtr.driveDur', 'Durată activitate'), dur(T.drive_sec)) +
+      row(tt('gtr.stopDur', 'Durată oprire'), dur(T.stop_sec)) +
+      row(tt('gtr.kmRoad', 'Kilometraj pe drum (GPS)'), km(T.km_road), true) +
+      row(tt('gtr.kmOdo', 'Kilometraj (bord)'), km(T.km_odo)) +
+      row(tt('gtr.fuel', 'Combustibil consumat'), num(T.fuel, 'l')) +
+      row(tt('gtr.avg', 'Medie consum'), T.avg_l100 == null ? '—' : num(T.avg_l100, 'l/100km')) +
+      row(tt('gtr.lph', 'Consum pe oră'), T.l_per_h == null ? '—' : num(T.l_per_h, 'l/h')) +
+      (T.pending_days ? '<div class="gtr-note">⏳ ' + esc(tt('gtr.pending', '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.', { n: T.pending_days })) + '</div>' : '') +
+      '</div>';
+  }
+
+  function renderList(r) {
+    var el = document.getElementById('gtrList');
+    el.innerHTML = r.days.slice().reverse().map(function (d) {
+      var items = d.trips.map(function (x, i) { return { k: 't', from: x.from, to: x.to, x: x, i: i }; })
+        .concat(d.stops.map(function (x, i) { return { k: 's', from: x.from, to: x.to, x: x, i: i }; }))
+        .sort(function (a, b) { return a.from - b.from; });
+      return '<div class="gtr-day">' +
+        '<div class="gtr-day-h"><span>' + esc(dayLabel(d.day)) + '</span><b>' + esc(km(d.km_road != null ? d.km_road : d.km_gps)) + '</b></div>' +
+        (d.km_odo != null ? '<div class="gtr-day-sub">' + esc(tt('gtr.kmOdoShort', 'bord')) + ': ' + esc(km(d.km_odo)) + (d.matched ? '' : ' · ⏳') + '</div>' : '') +
+        items.map(function (it) {
+          if (it.k === 's') return '<div class="gtr-it stop" data-gtr-stop="' + d.day + '|' + it.i + '"><span class="gtr-dot s"></span><span class="gtr-t">' + hm(it.from) + ' Stop</span><span class="gtr-v">' + dur(it.to - it.from) + '</span></div>';
+          var kmv = it.x.km_odo != null ? it.x.km_odo : it.x.km_gps;
+          return '<div class="gtr-it trip" data-gtr-trip="' + d.day + '|' + it.i + '"><span class="gtr-dot t"></span><span class="gtr-t">' + hm(it.from) + ' Start → ' + hm(it.to) + '</span><span class="gtr-v">' + dur(it.to - it.from) + ' · ' + km(kmv) + '</span></div>';
+        }).join('') +
+      '</div>';
+    }).join('');
+    el.querySelectorAll('[data-gtr-trip]').forEach(function (n) {
+      n.addEventListener('click', function () {
+        var k = n.getAttribute('data-gtr-trip').split('|'), d = findDay(k[0]); if (!d || !_map) return;
+        var b = d.trips[+k[1]].bbox; _map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [40, 40] });
+      });
+    });
+    el.querySelectorAll('[data-gtr-stop]').forEach(function (n) {
+      n.addEventListener('click', function () {
+        var k = n.getAttribute('data-gtr-stop').split('|'), d = findDay(k[0]); if (!d || !_map) return;
+        var s = d.stops[+k[1]]; _map.setView([s.lat, s.lng], 15);
+      });
+    });
+  }
+  function findDay(day) { return (_data && _data.days || []).filter(function (d) { return d.day === day; })[0]; }
+
+  function drawMap(r) {
+    if (!_map || !_layers) return;
+    _layers.clearLayers();
+    var bounds = [];
+    r.days.forEach(function (d) {
+      (d.segments || []).forEach(function (sg) {
+        var ll = decode(sg.p || ''); if (ll.length < 2) return;
+        bounds = bounds.concat(ll);
+        if (sg.k === 'm') {
+          L.polyline(ll, { color: '#ffffff', weight: 8, opacity: 0.9 }).addTo(_layers);
+          L.polyline(ll, { color: '#2563eb', weight: 5, opacity: 0.95 }).addTo(_layers);
+        } else if (sg.k === 'g') {
+          L.polyline(ll, { color: '#64748b', weight: 4, opacity: 0.9, dashArray: '8 8' }).addTo(_layers);
+        } else {
+          L.polyline(ll, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(_layers);
+        }
+      });
+      d.stops.forEach(function (s) {
+        var long = (s.to - s.from) >= 3600;
+        L.circleMarker([s.lat, s.lng], { radius: long ? 7 : 5, color: '#ffffff', weight: 2, fillColor: long ? '#dc2626' : '#f59e0b', fillOpacity: 1 })
+          .bindPopup('<b>Stop</b><br>' + esc(dayLabel(d.day)) + ' ' + hm(s.from) + ' – ' + hm(s.to) + '<br>' + esc(dur(s.to - s.from)))
+          .addTo(_layers);
+      });
+    });
+    var T = r.totals;
+    if (T) {
+      L.marker([T.start.lat, T.start.lng], { icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin a">A</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
+        .bindPopup('<b>' + esc(tt('gtr.startLoc', 'Locație pornire')) + '</b><br>' + esc(T.start.name || '')).addTo(_layers);
+      L.marker([T.end.lat, T.end.lng], { icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin b">B</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
+        .bindPopup('<b>' + esc(tt('gtr.endLoc', 'Locație oprire')) + '</b><br>' + esc(T.end.name || '')).addTo(_layers);
+    }
+    if (bounds.length) { try { _map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] }); } catch (_) {} }
   }
 
   window.loadGpsDailyTrack = function () {
-    _gas('listVehiclesWithTrack').then(function(r){
-      if (!r || !r.ok) {
-        var box = document.getElementById('gpsDailyTrackBox');
-        if (box) box.innerHTML = '<div class="glass" style="padding:22px;color:#dc2626;">' + esc((r && r.err) || 'Hiba') + '</div>';
-        return;
-      }
-      _renderShell(r.vehicles || []);
+    _gas('gpsTrackVehicles').then(function (r) {
+      var box = document.getElementById('gpsDailyTrackBox');
+      if (!r || !r.ok) { if (box) box.innerHTML = '<div class="glass" style="padding:22px;color:#dc2626;">' + esc((r && r.err) || 'Eroare') + '</div>'; return; }
+      renderShell(r);
     });
   };
 })();
