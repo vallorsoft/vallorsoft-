@@ -9,7 +9,12 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
-### 54. lépés — Chat: beszélgetés-adatbázis + emlékezet (2026-10-15, PR #555) ✅ KÉSZ
+### 55. lépés — GPS útvonal-előzmény (2026-10-18, PR #PRNUM) ✅ KÉSZ
+- **Új személyes adat-tárolás:** a jármű teljes GPS-pont-sora (helyzet, sebesség, gyújtás, km-óra, üzemanyag) naponként mentve (`gps_track_days`). Jármű-szintű adat (rendszám), a sofőr-hozzárendelésen át személyes adatnak minősül → megőrzés `GPS_TRACK_RETENTION_DAYS` (alap 100 nap) napi takarítóval; a sofőr GPS-tájékoztatása a meglévő `gdpr_settings` + belépéskori visszaigazolás alatt fut.
+- **Izoláció:** minden lekérdezés `company_id`-szűrt, paraméteres; a rendszám csak a cég saját `vehicle_gps_map` párosításából fogadható el (idegen rendszám → elutasítás). Csak Admin/Manager. A CargoTrack kulcs szerver-oldalon marad (AES), kliensbe nem kerül.
+- **Külső szolgáltatás:** az úthálózatra illesztéshez a pont-koordináták (azonosító nélkül, csak lat/lng + időbélyeg) a publikus OSRM-re mennek (`OSRM_MATCH_URL`-lel saját szerverre cserélhető); a helynév a Nominatim reverse-ből (csak az időszak első/utolsó pontja).
+
+ — Chat: beszélgetés-adatbázis + emlékezet (2026-10-15, PR #555) ✅ KÉSZ
 - **Szabály-változás (felhasználói kérésre):** a chat szövege mostantól tárolódik (`chat_messages`) és az AI a teljes beszélgetést látja. **Dokumentum soha:** a dokumentumhoz kötődő válasz (`noai`) helyén tartalom nélküli jelölő, a fájlnév minden AI-ra menő szövegből és az emlékekből is kiszűrve (`stripFiles`); a kártyák HTML-je és a feltöltött fájlok nem tárolódnak és nem mennek AI-hoz.
 - **Izoláció:** a beszélgetés-azonosítót a szerver csak a saját (company_id + user_id) beszélgetésre fogadja el, különben újat nyit; minden lekérdezés company_id-szűrt, paraméteres. Admin a cég bármely beszélgetését látja (más beszélgetésének megnyitása/törlése audit-naplózva: `chat.history_view` / `chat.history_delete`); Manager csak a sajátját (idegen azonosítóra „nem található" — a létezés sem szivárog). Emlékeknél a Manager csak a saját + cégszintű emlékeket látja/törli (cégszintűt csak ha ő vette fel).
 - **Emlék-védelem:** jelszó/kulcs/token/kártyaadat/fájlnév/hosszú véletlen azonosító nem lehet emlék (`cleanMemory`, teszttel őrizve); az emlékek az AI-nak „adat, nem utasítás" jelöléssel mennek; felhasználónként max. 150.

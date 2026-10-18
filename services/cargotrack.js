@@ -179,4 +179,17 @@ async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
   };
 }
 
-module.exports = { testConnection, listObjects, getLatestStatus };
+// Nyers koordináta-rekordok egy időablakra (v2) — az útvonal-előzményhez
+// (lib/gpsTrack.js). A végpont egy válaszban legfeljebb 1000 rekordot ad;
+// ha lapozó-tokent küld, azt továbbadjuk, különben a hívó kisebb ablakra bont.
+async function getCoordinates(apiKey, objectId, fromIso, toIso, continuationToken) {
+  const params = { from_datetime: fromIso, to_datetime: toIso, limit: 1000 };
+  if (continuationToken) params.continuation_token = continuationToken;
+  const data = await fmGet(`/objects/${encodeURIComponent(objectId)}/coordinates`, params, apiKey, '2');
+  return {
+    items: (data && data.items) || [],
+    continuation_token: (data && (data.continuation_token || data.next_page_token)) || null,
+  };
+}
+
+module.exports = { testConnection, listObjects, getLatestStatus, getCoordinates };
