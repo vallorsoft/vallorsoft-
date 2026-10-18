@@ -1,5 +1,5 @@
 // public/gps-daily-track.js — GPS útvonal-előzmény (Flotta aloldal).
-// Jármű + időszak (max. 31 nap) → úthálózatra illesztett útvonal a térképen,
+// Jármű + időszak (max. 62 nap) → úthálózatra illesztett útvonal a térképen,
 // összesítő (indulás/érkezés helye, menet-/állásidő, km út szerint, km-óra,
 // üzemanyag) és napokra bontott Start/Stop lista. Adat: `gpsTrackVehicles` +
 // `gpsTrackRange` (handlers/gpsTrack.js), a mentett gps_track_days táblából.
@@ -65,6 +65,7 @@
     if (k === 'lastweek') return [addDays(t, -dow - 7), addDays(t, -dow - 1)];
     if (k === 'month') return [t.slice(0, 8) + '01', t];
     if (k === 'last30') return [addDays(t, -29), t];
+    if (k === 'last60') return [addDays(t, -59), t];
     return null;
   }
 
@@ -77,7 +78,7 @@
       return '<option value="' + esc(v.rendszam) + '">' + esc(label) + '</option>';
     }).join('');
     var presets = [['today', 'gtr.pToday', 'Azi'], ['yesterday', 'gtr.pYesterday', 'Ieri'], ['week', 'gtr.pWeek', 'Săptămâna curentă'],
-      ['lastweek', 'gtr.pLastWeek', 'Săptămâna trecută'], ['month', 'gtr.pMonth', 'Luna curentă'], ['last30', 'gtr.pLast30', 'Ultimele 30 de zile']];
+      ['lastweek', 'gtr.pLastWeek', 'Săptămâna trecută'], ['month', 'gtr.pMonth', 'Luna curentă'], ['last30', 'gtr.pLast30', 'Ultimele 30 de zile'], ['last60', 'gtr.pLast60', 'Ultimele 60 de zile']];
     var t = todayLocal();
     box.innerHTML =
       '<div class="gtr-wrap">' +
@@ -139,6 +140,9 @@
       _data = r;
       st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
       renderSummary(r); renderList(r); drawMap(r);
+      if (r.missing_days) {
+        st.textContent = (st.textContent ? st.textContent + ' ' : '') + '⏳ ' + tt('gtr.backfill', 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.', { n: r.missing_days });
+      }
     }).catch(function () { document.getElementById('gtrLoad').disabled = false; st.textContent = tt('common.error', 'Eroare'); });
   }
 

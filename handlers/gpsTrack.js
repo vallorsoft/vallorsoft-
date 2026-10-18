@@ -1,5 +1,5 @@
 // ============================================================
-//  handlers/gpsTrack.js — GPS útvonal-előzmény (napi bontás, max. 31 nap)
+//  handlers/gpsTrack.js — GPS útvonal-előzmény (napi bontás, max. 62 nap)
 //    gpsTrackVehicles  — a cég GPS-párosított járművei + hány nap van mentve
 //    gpsTrackRange     — egy jármű útvonala egy időszakra: úthálózatra
 //                        illesztett vonal, km (út / km-óra / GPS), menetek
@@ -17,7 +17,10 @@ const { featureEnabled } = require('../lib/featureEnabled');
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
 const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-const MAX_DAYS = 31;
+const MAX_DAYS = 62;
+const ONDEMAND_BACKFILL_DAYS = 2;         // kérésenként ennyi hiányzó múltbeli napot tölt le azonnal
+const HISTORY_DAYS = Math.max(1, Math.min(Math.max(35, parseInt(process.env.GPS_TRACK_RETENTION_DAYS, 10) || 100),
+  parseInt(process.env.GPS_TRACK_HISTORY_DAYS, 10) || 60));
 const ONDEMAND_MATCH_DAYS = 2;            // kérésenként ennyi még nem illesztett napot illeszt azonnal
 const _liveRefresh = new Map();           // `${cid}|${plate}` -> utolsó élő frissítés ideje
 const _upgradeTried = new Map();          // `${cid}|${plate}|${day}` -> utolsó formátum-frissítés ideje
@@ -122,6 +125,25 @@ handlers.gpsTrackRange = async function (req, res, args) {
       } catch (e) { if (!(e && (e.code === '42703' || e.code === '42P01'))) console.warn('[GpsTrack] formátum-frissítés hiba', plate, e.message); }
     }
 
+    // hiányzó múltbeli napok: a legfrissebb 2 azonnal, a többit az ütemező tölti
+    let missing = 0;
+    if (map.object_id) {
+      const oldest = gt.addDays(today, -(HISTORY_DAYS - 1));
+      const bFrom = from < oldest ? oldest : from;
+      try {
+        const apiKey = await getKey();
+        if (apiKey) {
+          const bk = cid + '|' + plate + '|bf';
+          if (!_upgradeTried.has(bk) || now - _upgradeTried.get(bk) > 20000) {
+            _upgradeTried.set(bk, now);
+            missing = (await gt.backfillDays(cid, apiKey, plate, map.object_id, bFrom, to, ONDEMAND_BACKFILL_DAYS, { pauseMs: 0 })).left;
+          } else {
+            missing = (await gt.missingDays(cid, plate, bFrom, to < today ? to : gt.addDays(today, -1))).length;
+          }
+        }
+      } catch (e) { if (!(e && e.code === '42P01')) console.warn('[GpsTrack] előzmény-letöltés hiba', plate, e.message); }
+    }
+
     // élő frissítés: ha a mai nap az időszakban van, a legújabb pontok letöltése (max. 1×/perc)
     let liveErr = null;
     if (to >= today && from <= today && map.object_id) {
@@ -219,7 +241,7 @@ handlers.gpsTrackRange = async function (req, res, args) {
         end: { lat: last[1], lng: last[2], t: last[0], name: endLoc },
       };
     }
-    return res.json({ result: { ok: true, rendszam: plate, from, to, days, totals, live_error: liveErr } });
+    return res.json({ result: { ok: true, rendszam: plate, from, to, days, totals, live_error: liveErr, missing_days: missing, history_days: HISTORY_DAYS } });
   } catch (err) {
     console.error('gpsTrackRange hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
