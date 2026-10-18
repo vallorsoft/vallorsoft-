@@ -5453,12 +5453,25 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #axleLoadBox .axl-svg { display: block; width: 100%; height: auto; max-width: 900px; margin: 0 auto; }
 #axleLoadBox .axl-legend { font-size: 12px; color: #64748b; margin-top: 6px; text-align: center; }
 #axleLoadBox .axl-blk { cursor: pointer; }
-#axleLoadBox .axl-cab { fill: #475569; }
-#axleLoadBox .axl-win { fill: #cbd5e1; }
+#axleLoadBox .axl-cab { fill: #e2e8f0; stroke: #64748b; stroke-width: 1.5; }
+#axleLoadBox .axl-glass { fill: #475569; opacity: 0.85; }
+#axleLoadBox .axl-line { fill: none; stroke: #94a3b8; stroke-width: 1.2; }
+#axleLoadBox .axl-line-f { fill: #64748b; }
+#axleLoadBox .axl-headlight { fill: #fde68a; stroke: #b45309; stroke-width: 0.8; }
+#axleLoadBox .axl-taillight { fill: #dc2626; }
+#axleLoadBox .axl-tank { fill: #cbd5e1; stroke: #64748b; stroke-width: 1.2; }
+#axleLoadBox .axl-guard { fill: none; stroke: #334155; stroke-width: 3; stroke-linecap: round; }
+#axleLoadBox .axl-rail { fill: #94a3b8; }
+#axleLoadBox .axl-rail-line { stroke: #64748b; stroke-width: 2.5; stroke-linecap: round; }
+#axleLoadBox .axl-strap { stroke: #94a3b8; stroke-width: 1.5; opacity: 0.7; }
+#axleLoadBox .axl-ground { stroke: #cbd5e1; stroke-width: 1.5; }
+#axleLoadBox .axl-rim { fill: #cbd5e1; stroke: #64748b; stroke-width: 1; }
+#axleLoadBox .axl-hub { fill: #475569; }
+#axleLoadBox .axl-rim-up { opacity: 0.35; }
 #axleLoadBox .axl-chassis { fill: #334155; }
-#axleLoadBox .axl-bed { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.5; }
+#axleLoadBox .axl-bed { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1.5; }
 #axleLoadBox .axl-kp { fill: #f6711e; }
-#axleLoadBox .axl-wheel { fill: #1e293b; stroke: #94a3b8; stroke-width: 3; }
+#axleLoadBox .axl-wheel { fill: #1e293b; stroke: #0f172a; stroke-width: 1.5; }
 #axleLoadBox .axl-load { font-weight: 800; fill: #166534; }
 #axleLoadBox .axl-load.warn { fill: #b45309; }
 #axleLoadBox .axl-load.over { fill: #dc2626; }
@@ -5511,7 +5524,13 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-cfg-h { color: #e2e8f0; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-kpi-bar { background: #334155; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-bed { fill: rgba(255,255,255,0.04); stroke: #64748b; }
-.main-content[data-theme="dark"] #axleLoadBox .axl-cab { fill: #94a3b8; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-cab { fill: #94a3b8; stroke: #cbd5e1; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-glass { fill: #1e293b; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-line { stroke: #475569; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-tank, .main-content[data-theme="dark"] #axleLoadBox .axl-rim { fill: #64748b; stroke: #94a3b8; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-guard { stroke: #94a3b8; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-wheel { stroke: #64748b; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-ground { stroke: #475569; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-chassis { fill: #64748b; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-load { fill: #4ade80; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-load.warn { fill: #fbbf24; }
