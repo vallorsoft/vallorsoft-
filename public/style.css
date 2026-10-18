@@ -5676,6 +5676,15 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 
 /* GPS útvonal: kattintott pont buborék + tankolás jelölő */
 #gpsDailyTrackBox .gtr-pin.f { background: #16a34a; font-size: 13px; }
+.gtr-pin .f { background: #16a34a; }
+.gtr-pin .l { background: #dc2626; font-size: 12px; animation: gtrLossPulse 1.6s ease-in-out infinite; }
+@keyframes gtrLossPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.55), 0 2px 6px rgba(0,0,0,0.35); } 50% { box-shadow: 0 0 0 8px rgba(220,38,38,0), 0 2px 6px rgba(0,0,0,0.35); } }
+#gpsDailyTrackBox .gtr-it.refuel { background: rgba(22,163,74,0.08); }
+#gpsDailyTrackBox .gtr-it.refuel .gtr-v { color: #15803d; font-weight: 700; }
+#gpsDailyTrackBox .gtr-it.loss { background: rgba(220,38,38,0.10); }
+#gpsDailyTrackBox .gtr-it.loss .gtr-t, #gpsDailyTrackBox .gtr-it.loss .gtr-v { color: #b91c1c; font-weight: 700; }
+#gpsDailyTrackBox .gtr-ev { width: 18px; text-align: center; flex: 0 0 18px; }
+#gpsDailyTrackBox .gtr-loss-row { color: #b91c1c; }
 .gtr-ppop .leaflet-popup-content-wrapper { background: #1e4f8c; color: #fff; border-radius: 12px; padding: 0; }
 .gtr-ppop .leaflet-popup-tip { background: #1e4f8c; }
 .gtr-ppop .leaflet-popup-content { margin: 0; min-width: 240px; }
@@ -5690,3 +5699,5 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .gtr-pp-r span { opacity: 0.85; }
 .gtr-pp-arrow { display: inline-block; }
 .gtr-hit { cursor: pointer; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.loss .gtr-t, .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.loss .gtr-v, .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-loss-row { color: #fca5a5; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.refuel .gtr-v { color: #86efac; }

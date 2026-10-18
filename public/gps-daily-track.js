@@ -158,7 +158,8 @@
       row(tt('gtr.kmOdo', 'Kilometraj (bord)'), km(T.km_odo)) +
       row(tt('gtr.fuel', 'Combustibil consumat') + (T.fuel_src === 'level' ? ' (' + tt('gtr.fromLevel', 'din nivel') + ')' : ''), num(T.fuel, 'l')) +
       (T.fuel_src === 'counter' && T.fuel_level_used != null ? row(tt('gtr.fuelByLevel', 'Consum după nivel rezervor'), num(T.fuel_level_used, 'l')) : '') +
-      (T.refuel_count ? row(tt('gtr.refuels', 'Alimentări detectate'), T.refuel_count + ' · ' + num(T.refuel_l, 'l')) : '') +
+      (T.refuel_count ? row('⛽ ' + tt('gtr.refuels', 'Alimentări detectate'), T.refuel_count + ' · +' + num(T.refuel_l, 'l')) : '') +
+      (T.loss_count ? '<div class="gtr-loss-row">' + row('⚠️ ' + tt('gtr.losses', 'Pierderi de combustibil'), T.loss_count + ' · −' + num(T.loss_l, 'l')) + '</div>' : '') +
       row(tt('gtr.avg', 'Medie consum'), T.avg_l100 == null ? '—' : num(T.avg_l100, 'l/100km')) +
       row(tt('gtr.lph', 'Consum pe oră'), T.l_per_h == null ? '—' : num(T.l_per_h, 'l/h')) +
       (T.pending_days ? '<div class="gtr-note">⏳ ' + esc(tt('gtr.pending', '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.', { n: T.pending_days })) + '</div>' : '') +
@@ -170,11 +171,20 @@
     el.innerHTML = r.days.slice().reverse().map(function (d) {
       var items = d.trips.map(function (x, i) { return { k: 't', from: x.from, to: x.to, x: x, i: i }; })
         .concat(d.stops.map(function (x, i) { return { k: 's', from: x.from, to: x.to, x: x, i: i }; }))
+        .concat((d.refuels || []).map(function (x, i) { return { k: 'f', from: x.t, x: x, i: i }; }))
+        .concat((d.losses || []).map(function (x, i) { return { k: 'l', from: x.from_t || x.t, x: x, i: i }; }))
         .sort(function (a, b) { return a.from - b.from; });
       return '<div class="gtr-day">' +
         '<div class="gtr-day-h"><span>' + esc(dayLabel(d.day)) + '</span><b>' + esc(km(d.km_road != null ? d.km_road : d.km_gps)) + '</b></div>' +
         (d.km_odo != null ? '<div class="gtr-day-sub">' + esc(tt('gtr.kmOdoShort', 'bord')) + ': ' + esc(km(d.km_odo)) + (d.matched ? '' : ' · ⏳') + '</div>' : '') +
         items.map(function (it) {
+          if (it.k === 'f' || it.k === 'l') {
+            var isL = it.k === 'l';
+            return '<div class="gtr-it ' + (isL ? 'loss' : 'refuel') + '" data-gtr-ev="' + it.x.lat + '|' + it.x.lng + '">' +
+              '<span class="gtr-ev">' + (isL ? '⚠️' : '⛽') + '</span><span class="gtr-t">' + hm(isL ? (it.x.from_t || it.x.t) : it.x.t) + ' ' +
+              esc(isL ? tt('gtr.loss', 'Pierdere combustibil') : tt('gtr.refuelShort', 'Alimentare')) + '</span>' +
+              '<span class="gtr-v">' + (isL ? '−' : '+') + esc(num(it.x.liters, 'l')) + '</span></div>';
+          }
           if (it.k === 's') return '<div class="gtr-it stop" data-gtr-stop="' + d.day + '|' + it.i + '"><span class="gtr-dot s"></span><span class="gtr-t">' + hm(it.from) + ' Stop</span><span class="gtr-v">' + dur(it.to - it.from) + '</span></div>';
           var kmv = it.x.km_odo != null ? it.x.km_odo : it.x.km_gps;
           return '<div class="gtr-it trip" data-gtr-trip="' + d.day + '|' + it.i + '"><span class="gtr-dot t"></span><span class="gtr-t">' + hm(it.from) + ' Start → ' + hm(it.to) + '</span><span class="gtr-v">' + dur(it.to - it.from) + ' · ' + km(kmv) + (it.x.fuel != null || it.x.fuel_level_used != null ? ' · ' + num(it.x.fuel != null ? it.x.fuel : it.x.fuel_level_used, 'l') : '') + '</span></div>';
@@ -185,6 +195,12 @@
       n.addEventListener('click', function () {
         var k = n.getAttribute('data-gtr-trip').split('|'), d = findDay(k[0]); if (!d || !_map) return;
         var b = d.trips[+k[1]].bbox; _map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: [40, 40] });
+      });
+    });
+    el.querySelectorAll('[data-gtr-ev]').forEach(function (n) {
+      n.addEventListener('click', function () {
+        var k = n.getAttribute('data-gtr-ev').split('|'); if (!_map) return;
+        _map.setView([+k[0], +k[1]], 15);
       });
     });
     el.querySelectorAll('[data-gtr-stop]').forEach(function (n) {
@@ -221,6 +237,13 @@
         L.marker([f.lat, f.lng], { icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin f">⛽</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) })
           .bindPopup('<b>' + esc(tt('gtr.refuel', 'Alimentare (din nivel rezervor)')) + '</b><br>' + esc(dayLabel(d.day)) + ' ' + hm(f.t) +
             '<br>+' + esc(num(f.liters, 'l')) + ' (' + esc(num(f.before, 'l')) + ' → ' + esc(num(f.after, 'l')) + ')')
+          .addTo(_layers);
+      });
+      (d.losses || []).forEach(function (f) {
+        L.marker([f.lat, f.lng], { zIndexOffset: 500, icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin l">⚠️</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
+          .bindPopup('<b>' + esc(tt('gtr.lossTitle', 'Pierdere de combustibil (din nivel rezervor)')) + '</b><br>' + esc(dayLabel(d.day)) + ' ' + hm(f.from_t || f.t) + ' – ' + hm(f.t) +
+            '<br>−' + esc(num(f.liters, 'l')) + ' (' + esc(num(f.before, 'l')) + ' → ' + esc(num(f.after, 'l')) + ')' +
+            '<br><span style="color:#64748b;font-size:12px">' + esc(tt('gtr.lossHint', 'Scădere bruscă, peste consumul din mers — verificați (furt, scurgere).')) + '</span>')
           .addTo(_layers);
       });
       d.stops.forEach(function (s) {

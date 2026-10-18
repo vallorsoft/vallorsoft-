@@ -191,7 +191,7 @@ handlers.gpsTrackRange = async function (req, res, args) {
       days.push({
         day: r.day, matched, source: matched ? r.match_source : 'raw', point_count: pts.length,
         km_road: kmRoad, km_gps: kmGps, km_odo: gt.odoDelta(pts, 0, pts.length - 1), fuel: gt.fuelDelta(pts, 0, pts.length - 1),
-        fuel_level_used: lf ? lf.used : null, refuels: lf ? lf.refuels : [],
+        fuel_level_used: lf ? lf.used : null, refuels: lf ? lf.refuels : [], losses: lf ? lf.losses : [],
         drive_sec: drive, stop_sec: stopS, trips: tl.trips, stops: tl.stops, segments,
         first_at: pts[0][0], last_at: pts[pts.length - 1][0],
       });
@@ -211,7 +211,8 @@ handlers.gpsTrackRange = async function (req, res, args) {
         km_road: Math.round(T.km_road * 100) / 100, km_gps: Math.round(T.km_gps * 100) / 100, km_odo: kmOdo,
         fuel, fuel_src: fuelSrc, fuel_level_used: lfAll ? lfAll.used : null,
         refuel_l: lfAll ? Math.round(lfAll.refuels.reduce((a, x) => a + x.liters, 0) * 10) / 10 : null,
-        refuel_count: lfAll ? lfAll.refuels.length : 0, avg_l100: (fuel != null && kmOdo) ? Math.round(fuel / kmOdo * 10000) / 100 : null,
+        refuel_count: lfAll ? lfAll.refuels.length : 0,
+        loss_l: lfAll ? lfAll.lost : null, loss_count: lfAll ? lfAll.losses.length : 0, avg_l100: (fuel != null && kmOdo) ? Math.round(fuel / kmOdo * 10000) / 100 : null,
         l_per_h: (fuel != null && T.drive_sec > 0) ? Math.round(fuel / (T.drive_sec / 3600) * 100) / 100 : null,
         drive_sec: T.drive_sec, stop_sec: T.stop_sec, pending_days: T.pending_days,
         start: { lat: first[1], lng: first[2], t: first[0], name: startLoc },

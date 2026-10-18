@@ -76,16 +76,35 @@ describe('menetek és állások', () => {
 describe('tartály-szint fogyasztás + legközelebbi pont', () => {
   test('fogyasztás = kezdő − záró + tankolás; zaj nem tankolás', () => {
     const pts = [];
-    // 600 L → 400 L (zajjal), tankolás +300 L, majd 700 L → 650 L
-    for (let i = 0; i <= 40; i++) pts.push([i * 60, 45, 25 + i * 0.001, 60, 1, null, null, 600 - i * 5 + (i % 2 ? 3 : -3)]);
-    for (let i = 1; i <= 5; i++) pts.push([2400 + i * 60, 45, 25.04, 0, 0, null, null, 400 + i * 60]);
-    for (let i = 1; i <= 10; i++) pts.push([2700 + i * 60, 45, 25.04 + i * 0.001, 60, 1, null, null, 700 - i * 5]);
+    // 300 L → 280 L menet közben (zajjal), tankolás +300 L, majd 580 L → 575 L
+    for (let i = 0; i <= 40; i++) pts.push([i * 60, 45, 25 + i * 0.02, 90, 1, null, null, 300 - i * 0.5 + (i % 2 ? 3 : -3)]);
+    for (let i = 1; i <= 5; i++) pts.push([2400 + i * 60, 45, 25.8, 0, 0, null, null, 280 + i * 60]);
+    for (let i = 1; i <= 10; i++) pts.push([2700 + i * 60, 45, 25.8 + i * 0.02, 90, 1, null, null, 580 - i * 0.5]);
     const r = gt.levelFuel(pts);
     expect(r.refuels).toHaveLength(1);
     expect(r.refuels[0].liters).toBeGreaterThan(270);
-    expect(r.used).toBeGreaterThan(215);
-    expect(r.used).toBeLessThan(270);
+    expect(r.losses).toHaveLength(0);
+    expect(r.used).toBeGreaterThan(15);
+    expect(r.used).toBeLessThan(40);
     expect(gt.levelFuel([[0, 45, 25, 0, 0, null, null]])).toBeNull();
+  });
+  test('levelFuel: hirtelen leszívás = veszteség (nem fogyasztás)', () => {
+    const pts = []; let t = 0;
+    for (let i = 0; i < 60; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 400, 0]); t += 60; }
+    for (let i = 0; i < 10; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 400 - 6 * (i + 1), 0]); t += 60; }
+    for (let i = 0; i < 30; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 340, 0]); t += 60; }
+    for (let i = 0; i < 100; i++) { pts.push([t, 45 + i * 0.009, 25, 60, 1, 1000 + i, null, 340 - 0.3 * i, 0]); t += 60; }
+    const r = gt.levelFuel(pts);
+    expect(r.losses).toHaveLength(1);
+    expect(r.losses[0].liters).toBeCloseTo(60, 0);
+    expect(r.lost).toBeCloseTo(60, 0);
+    expect(r.used).toBeLessThan(35);
+    expect(r.refuels).toHaveLength(0);
+  });
+  test('levelFuel: normál menet-fogyasztás nem veszteség', () => {
+    const pts = []; let t = 0;
+    for (let i = 0; i < 200; i++) { pts.push([t, 45 + i * 0.015, 25, 90, 1, 1000 + i, null, 500 - 0.5 * i, 0]); t += 60; }
+    expect(gt.levelFuel(pts).losses).toHaveLength(0);
   });
   test('nearestPoint', () => {
     const pts = [[0, 45, 25], [1, 45.01, 25], [2, 45.02, 25]];
