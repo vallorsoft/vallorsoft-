@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal: 60 napos előzmény-visszatöltés + 62 napos lekérdezés (PR #566)
+- Eddig csak az első bekapcsoláskori 7 nap + onnan előre töltődött le → sokszor csak 1 nap adat. Új `lib/gpsTrack.js` `missingDays`/`backfillDays`: a hiányzó múltbeli napok a legfrissebbtől visszafelé jönnek le a CargoTrackből (üres nap is sort kap → nem próbálja újra).
+- Ütemező: járművenként tickenként 3 nap, 60 napra vissza (`GPS_TRACK_HISTORY_DAYS`, a megőrzésen belül); az üres napokat nem illeszti. `gpsTrackRange`: kérésenként 2 hiányzó nap azonnal + `missing_days` jelzés; max. időszak 31 → 62 nap. UI: „Utolsó 60 nap" gomb. Cache-bust `?v=20261018gtr60`.
+
 ## 2026-10-18 — 🗺️ GPS útvonal: tankolás + üzemanyag-veszteség (leszívás) jelölése a tartály-szintből (PR #564)
 
 - `lib/gpsTrack.js` `levelFuel` → `losses[]`/`lost`: ≤30 perc alatt a menet-fogyasztásnál (0,5 L/km) ≥15 L-rel nagyobb, tartós szintcsökkenés = veszteség; nem számít fogyasztásnak.
