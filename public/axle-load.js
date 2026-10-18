@@ -577,42 +577,63 @@
     var groundY = wheelY + R;
     var chH = small ? 6 : 9;
     s += '<line x1="' + o(PAD) + '" y1="' + o(groundY) + '" x2="' + o(W - PAD) + '" y2="' + o(groundY) + '" class="axl-ground"/>';
-    // vontató alváz (a fülke mögött, a hajtott/emelhető tengely mögé nyúlik)
-    var frameEnd = Math.max(driveAxle, liftM || 0) + 0.9;
-    s += '<rect x="' + o(X(0.4)) + '" y="' + o(bedBot + 2) + '" width="' + o((frameEnd - 0.4) * sx) + '" height="' + o(chH) + '" rx="2" class="axl-chassis"/>';
-    // nyeregszerkezet
+    // ── Vontató: a megadott oldalnézet (fülke + légterelő + oldalburkolat) arányai szerint ──
+    // vízszintesen méter (X), függőlegesen a talajtól mért magasság (Yh); a 4,0 m = a felépítmény teteje
+    var vs = (groundY - bedTop) / 4.0;
+    var Yh = function (h) { return groundY - h * vs; };
+    // a fülke 1 m fölötti részét kicsit megnyújtjuk, hogy a légterelő teteje a felépítmény tetejéhez érjen (~4 m)
+    var Yc = function (h) { return Yh(h > 1 ? 1 + (h - 1) * 1.12 : h); };
+    var P = function (m, h) { return o(X(m)) + ' ' + o(Yc(h)); };
+    var fx = X(frontAxle), dx = X(driveAxle);
+    var yb = Yh(1.0);                                   // fülke alsó éle
+    var arP = Math.max(R * 1.55, (wheelY - yb) + R * 0.35);
+    var archHalf = Math.sqrt(Math.max(0, arP * arP - (wheelY - yb) * (wheelY - yb)));
+    var frameEnd = Math.max(driveAxle, liftM || 0) + 0.75;
+    // alváz + nyeregszerkezet
+    s += '<rect x="' + o(X(2.2)) + '" y="' + o(bedBot + 2) + '" width="' + o((frameEnd - 2.2) * sx) + '" height="' + o(chH) + '" rx="2" class="axl-chassis"/>';
     s += '<rect x="' + o(X(fifth - 0.5)) + '" y="' + o(bedBot - 1) + '" width="' + o(1.0 * sx) + '" height="4" rx="1.5" class="axl-chassis"/>';
-    // üzemanyagtartály a két tengely között
-    var arF = R * 1.45;
-    var tankL = X(frontAxle) + arF + 3, tankR = X(driveAxle) - R * 1.45 - 3;
-    if (tankR - tankL > 10) s += '<rect x="' + o(tankL) + '" y="' + o(wheelY - R * 0.75) + '" width="' + o(tankR - tankL) + '" height="' + o(R * 1.05) + '" rx="' + o(Math.min(6, R * 0.4)) + '" class="axl-tank"/>';
-    // sárvédő a hajtott (és emelhető) tengely fölött
-    var guard = function (m) { var cx = X(m), ar = R * 1.3; return '<path d="M' + o(cx - ar) + ' ' + o(wheelY) + ' A' + o(ar) + ' ' + o(ar) + ' 0 0 1 ' + o(cx + ar) + ' ' + o(wheelY) + '" class="axl-guard"/>'; };
-    s += guard(driveAxle);
+    // oldalburkolat (tartály-takaró) szellőzőkkel, a két kerékív között
+    var fL = fx + archHalf + 2, fR = dx - R * 1.35 - 2;
+    var fTop = bedBot + 2 + chH, fBot = Yh(0.22);
+    if (fR - fL > 12 && fBot - fTop > 6) {
+      s += '<path d="M' + o(fL) + ' ' + o(fTop) + ' L' + o(fR) + ' ' + o(fTop) + ' L' + o(fR) + ' ' + o(fBot - 4) + ' Q' + o(fR) + ' ' + o(fBot) + ' ' + o(fR - 4) + ' ' + o(fBot) + ' L' + o(fL + 4) + ' ' + o(fBot) + ' Q' + o(fL) + ' ' + o(fBot) + ' ' + o(fL) + ' ' + o(fBot - 4) + ' Z" class="axl-cab"/>';
+      var vw = (fR - fL) * 0.38, fh = fBot - fTop;
+      if (vw > 10) {
+        s += '<rect x="' + o(fL + 4) + '" y="' + o(fTop + fh * 0.18) + '" width="' + o(vw) + '" height="' + o(fh * 0.24) + '" rx="' + o(Math.min(6, fh * 0.1)) + '" class="axl-vent"/>';
+        s += '<rect x="' + o(fL + 4) + '" y="' + o(fTop + fh * 0.56) + '" width="' + o(vw * 1.12) + '" height="' + o(fh * 0.24) + '" rx="' + o(Math.min(6, fh * 0.1)) + '" class="axl-vent"/>';
+        s += '<rect x="' + o(fL + vw * 1.45) + '" y="' + o(fTop + fh * 0.3) + '" width="' + o(Math.max(4, vw * 0.1)) + '" height="3" rx="1" class="axl-taillight"/>';
+      }
+    }
+    // kerékívek / sárvédők
+    var guard = function (m) { var cx = X(m), ar = R * 1.3; return '<path d="M' + o(cx - ar) + ' ' + o(wheelY + R * 0.15) + ' A' + o(ar) + ' ' + o(ar) + ' 0 0 1 ' + o(cx + ar) + ' ' + o(wheelY + R * 0.15) + '" class="axl-guard"/>'; };
+    s += guard(frontAxle) + guard(driveAxle);
     if (liftM !== null) s += guard(liftM);
-    // fülke (menetirány balra)
-    var x0 = X(0.05), cw = 2.3 * sx, x1 = x0 + cw;
-    var cTop = bedTop, cBot = wheelY + R * 0.35, cH = cBot - cTop;
-    var rr = Math.min(cw * 0.12, 10);
-    var aL = X(frontAxle) - arF, aR = X(frontAxle) + arF;
-    var yv = function (k) { return o(cTop + cH * k); };
-    s += '<path d="M' + o(x0) + ' ' + o(cBot - 3) + ' L' + o(x0) + ' ' + yv(0.42) + ' L' + o(x0 + cw * 0.045) + ' ' + yv(0.12) +
-      ' Q' + o(x0 + cw * 0.06) + ' ' + o(cTop) + ' ' + o(x0 + cw * 0.16) + ' ' + o(cTop) + ' L' + o(x1 - rr) + ' ' + o(cTop) +
-      ' Q' + o(x1) + ' ' + o(cTop) + ' ' + o(x1) + ' ' + o(cTop + rr) + ' L' + o(x1) + ' ' + o(cBot) + ' L' + o(Math.min(aR, x1)) + ' ' + o(cBot) +
-      ' A' + o(arF) + ' ' + o(arF) + ' 0 0 0 ' + o(aL) + ' ' + o(cBot) + ' L' + o(x0 + 3) + ' ' + o(cBot) + ' Q' + o(x0) + ' ' + o(cBot) + ' ' + o(x0) + ' ' + o(cBot - 3) + ' Z" class="axl-cab"/>';
-    // szélvédő + oldalablak
-    s += '<polygon points="' + o(x0 + 1) + ',' + yv(0.42) + ' ' + o(x0 + cw * 0.045 + 1) + ',' + yv(0.13) + ' ' + o(x0 + cw * 0.11) + ',' + yv(0.13) + ' ' + o(x0 + cw * 0.075) + ',' + yv(0.42) + '" class="axl-glass"/>';
-    s += '<polygon points="' + o(x0 + cw * 0.15) + ',' + yv(0.15) + ' ' + o(x0 + cw * 0.45) + ',' + yv(0.15) + ' ' + o(x0 + cw * 0.45) + ',' + yv(0.40) + ' ' + o(x0 + cw * 0.12) + ',' + yv(0.40) + '" class="axl-glass"/>';
-    // ajtó-vonal, kilincs, lépcső
-    var doorBot = Math.min(cBot - cH * 0.05, wheelY - arF - 2);
-    s += '<path d="M' + o(x0 + cw * 0.11) + ' ' + yv(0.13) + ' L' + o(x0 + cw * 0.48) + ' ' + yv(0.13) + ' L' + o(x0 + cw * 0.48) + ' ' + o(doorBot) + ' L' + o(x0 + cw * 0.10) + ' ' + o(doorBot) + '" class="axl-line"/>';
-    s += '<rect x="' + o(x0 + cw * 0.40) + '" y="' + yv(0.47) + '" width="' + o(Math.max(4, cw * 0.05)) + '" height="2" rx="1" class="axl-line-f"/>';
-    // hűtőrács + fényszóró + lökhárító
-    for (var gi = 0; gi < 3; gi++) s += '<line x1="' + o(x0 + 1) + '" y1="' + yv(0.52 + gi * 0.07) + '" x2="' + o(x0 + cw * 0.05) + '" y2="' + yv(0.52 + gi * 0.07) + '" class="axl-line"/>';
-    s += '<rect x="' + o(x0 + 1) + '" y="' + yv(0.76) + '" width="' + o(Math.max(4, cw * 0.06)) + '" height="' + o(Math.max(3, cH * 0.05)) + '" rx="1.5" class="axl-headlight"/>';
-    s += '<rect x="' + o(x0 - 1) + '" y="' + o(cBot - cH * 0.09) + '" width="' + o(Math.max(6, Math.min(cw * 0.16, aL - x0 - 2))) + '" height="' + o(cH * 0.09) + '" rx="2" class="axl-chassis"/>';
-    // tetőlégterelő-vonal
-    s += '<line x1="' + o(x0 + cw * 0.18) + '" y1="' + o(cTop + 2) + '" x2="' + o(x1 - rr) + '" y2="' + o(cTop + 2) + '" class="axl-line"/>';
+    // hátsó sárfogó + lámpa
+    var mfx = X(driveAxle) + R * 1.35;
+    s += '<rect x="' + o(mfx) + '" y="' + o(bedBot + 2) + '" width="' + o(Math.max(3, 0.07 * sx)) + '" height="' + o(Yh(0.12) - bedBot - 2) + '" class="axl-chassis"/>';
+    s += '<rect x="' + o(X(frameEnd) - 4) + '" y="' + o(bedBot + 2 + chH) + '" width="4" height="3" rx="1" class="axl-taillight"/>';
+    // fülke-test (menetirány balra): homlokfal → szélvédő → tető → légterelő → hátfal → kerékív
+    s += '<path d="M' + P(0.05, 1.0) + ' L' + P(0.06, 2.70) + ' Q' + P(0.10, 2.92) + ' ' + P(0.30, 2.96) +
+      ' C' + P(0.45, 3.30) + ' ' + P(0.70, 3.37) + ' ' + P(1.00, 3.39) + ' L' + P(1.95, 3.43) + ' L' + P(2.22, 3.67) + ' L' + P(2.34, 3.67) +
+      ' L' + P(2.58, 1.18) + ' Q' + P(2.60, 1.0) + ' ' + P(2.44, 1.0) + ' L' + o(fx + archHalf) + ' ' + o(yb) +
+      ' A' + o(arP) + ' ' + o(arP) + ' 0 0 0 ' + o(fx - archHalf) + ' ' + o(yb) + ' Z" class="axl-cab"/>';
+    // lökhárító + hűtőrács + fényszóró
+    var bR = Math.max(X(0.3), fx - archHalf - 2);
+    s += '<path d="M' + P(0.05, 1.0) + ' L' + o(bR) + ' ' + o(yb) + ' L' + o(bR) + ' ' + o(Yh(0.30)) + ' L' + P(0.12, 0.28) + ' Q' + P(0.03, 0.28) + ' ' + P(0.03, 0.38) + ' Z" class="axl-bumper"/>';
+    s += '<rect x="' + o(X(0.06)) + '" y="' + o(Yh(0.86)) + '" width="' + o(Math.max(3, 0.1 * sx)) + '" height="' + o(0.36 * vs) + '" rx="2" class="axl-headlight"/>';
+    s += '<rect x="' + o(X(0.20)) + '" y="' + o(Yh(0.80)) + '" width="' + o(Math.max(2, 0.05 * sx)) + '" height="' + o(0.2 * vs) + '" rx="1" class="axl-indicator"/>';
+    // díszléc a tető alatt
+    s += '<path d="M' + P(0.32, 2.97) + ' L' + P(2.30, 2.97) + '" class="axl-trim"/>';
+    // oldalablak
+    s += '<path d="M' + P(0.40, 2.80) + ' L' + P(1.22, 2.80) + ' Q' + P(1.27, 2.80) + ' ' + P(1.27, 2.74) + ' L' + P(1.27, 2.16) +
+      ' Q' + P(1.27, 2.08) + ' ' + P(1.18, 2.08) + ' L' + P(0.42, 2.08) + ' Q' + P(0.37, 2.08) + ' ' + P(0.37, 2.15) + ' Z" class="axl-glass"/>';
+    // ajtó-vonalak, kilincs, hátsó tárolórekesz
+    s += '<path d="M' + P(0.28, 2.88) + ' L' + P(0.27, 1.40) + ' L' + P(1.36, 1.40) + ' M' + P(1.36, 2.92) + ' L' + o(X(1.36)) + ' ' + o(Math.min(Yc(1.4), wheelY - arP - 2)) + '" class="axl-line"/>';
+    s += '<rect x="' + o(X(1.02)) + '" y="' + o(Yc(1.62)) + '" width="' + o(Math.max(5, 0.28 * sx)) + '" height="' + o(Math.max(2.5, 0.07 * vs)) + '" rx="2" class="axl-bumper"/>';
+    s += '<rect x="' + o(X(1.42)) + '" y="' + o(Yc(2.10)) + '" width="' + o(0.66 * sx) + '" height="' + o(0.58 * 1.12 * vs) + '" rx="3" class="axl-line"/>';
+    // visszapillantó tükör
+    s += '<rect x="' + o(X(0.21)) + '" y="' + o(Yc(3.02)) + '" width="' + o(Math.max(3, 0.17 * sx)) + '" height="' + o(0.30 * 1.12 * vs) + '" rx="2" class="axl-bumper"/>';
+    s += '<rect x="' + o(X(0.03)) + '" y="' + o(Yc(2.12)) + '" width="' + o(Math.max(2, 0.07 * sx)) + '" height="' + o(0.18 * vs) + '" rx="1" class="axl-bumper"/>';
     // pótkocsi (a dőlést felnagyítva, a királycsap körül forgatva mutatjuk)
     var visDeg = Math.max(-6, Math.min(6, r.tilt.deg * 3));
     s += '<g transform="rotate(' + visDeg.toFixed(2) + ' ' + o(X(fifth)) + ' ' + o(bedBot) + ')">';
