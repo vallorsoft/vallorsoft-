@@ -9,7 +9,7 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
-### 56. lépés — GPS útvonal pont-lekérdezés (2026-10-18, PR #PRNUM) ✅ KÉSZ
+### 56. lépés — GPS útvonal pont-lekérdezés (2026-10-18, PR #560) ✅ KÉSZ
 - Új `gpsTrackPoint` RPC: csak Admin/Manager, `company_id`-szűrt paraméteres SQL, a rendszám a cég saját `vehicle_gps_map` párosításából (idegen → elutasítás); bemenet-validáció (nap, lat/lng tartomány), 3 km-nél távolabbi kattintásra nincs adat. Új tárolt mező a meglévő `gps_track_days` pontokban (tartály-szint, irány) — a meglévő megőrzés/takarítás vonatkozik rá. A tartály-szint a jármű korrekciójával megy ki.
 
 ### 55. lépés — GPS útvonal-előzmény (2026-10-18, PR #559) ✅ KÉSZ

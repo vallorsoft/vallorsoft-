@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-18 — 🗺️ GPS útvonal: kattintható pont-adatok + fogyasztás/tankolás a GPS-ből (PR #PRNUM)
+## 2026-10-18 — 🗺️ GPS útvonal: kattintható pont-adatok + fogyasztás/tankolás a GPS-ből (PR #560)
 
 - **Kattintás az útvonalra** (`public/gps-daily-track.js` `pointPopup`, széles láthatatlan kattintó-sáv): a CargoTrack-szerű kék buborék mutatja a legközelebbi GPS-rekordot — időpont, helynév, sebesség, irány, gyújtás, **üzemanyag-szint** (a jármű `fuel_correction_l` korrekciójával), km-óra, aznap megtett km, aznapi fogyasztás és átlag. Új RPC: `handlers/gpsTrack.js` `gpsTrackPoint` (Admin/Manager, company_id-szűrt, a rendszám csak a cég saját GPS-párosításából).
 - **Pont-formátum bővítve** (`lib/gpsTrack.js` `normalizeItem`): + tartály-szint, + irány (a régi mentett pontokban hiányozhat — kezelve).
