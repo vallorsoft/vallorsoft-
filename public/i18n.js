@@ -1215,6 +1215,7 @@
     'gtr.fuelByLevel': { hu: 'Fogyasztás tartály-szint szerint', ro: 'Consum după nivel rezervor' },
     'gtr.refuels': { hu: 'Észlelt tankolások', ro: 'Alimentări detectate' },
     'gtr.clickHint': { hu: 'kattints az útvonalra = GPS-adatok azon a ponton', ro: 'click pe traseu = date GPS în acel punct' },
+    'gtr.ptTimeout': { hu: 'A szerver nem válaszolt — próbáld újra.', ro: 'Serverul nu a răspuns — încearcă din nou.' },
     'gtr.lph': { hu: 'Fogyasztás óránként', ro: 'Consum pe oră' },
     'gtr.pending': { hu: '{n} nap még nincs az útra illesztve — a km GPS-pontokból becsült; magától véglegesedik.', ro: '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.' },
     'gtr.kmOdoShort': { hu: 'km-óra', ro: 'bord' },

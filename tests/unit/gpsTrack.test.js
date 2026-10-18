@@ -29,6 +29,18 @@ describe('pontok', () => {
     const c = gt.cleanPoints(pts);
     expect(c.map((p) => p[0])).toEqual([100, 200]);   // a 150-es ~111 km/50 mp → ugrás
   });
+  test('normalizeItem: eltérő mezőnevek (can_*, raw_inputs)', () => {
+    const p = gt.normalizeItem({ datetime: '2026-07-15T08:00:00Z', position: { latitude: 45, longitude: 25, speed: 0, course: 90 },
+      inputs: { calculated_inputs: { can_mileage: 1000.04 }, raw_inputs: { total_fuel_used: 77, can_fuel_level: 512.3 } } });
+    expect(p.slice(5)).toEqual([1000, 77, 512.3, 90]);
+  });
+  test('cleanPoints: azonos időpontnál a teljesebb rekord marad', () => {
+    const c = gt.cleanPoints([[100, 45, 25, 0, 1, 1000, 5], [100, 45, 25, 0, 1, 1000, 5, 600, 90]]);
+    expect(c).toHaveLength(1);
+    expect(c[0][7]).toBe(600);
+    expect(gt.needsUpgrade([[1, 45, 25, 0, 1, 1, 1]])).toBe(true);
+    expect(gt.needsUpgrade(c)).toBe(false);
+  });
   test('polyline6 kódolás', () => {
     expect(gt.encodePolyline([[38.5, -120.2], [40.7, -120.95]], 5)).toBe('_p~iF~ps|U_ulLnnqC');
   });
