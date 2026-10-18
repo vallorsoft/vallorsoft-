@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal: 2 éves megőrzés + 2 évre visszamenő letöltés (PR #567)
+- `lib/gpsTrack.js` `RETENTION_DAYS`/`HISTORY_DAYS` (alap 730 nap, env-vel felülírható; a visszatöltés sosem mehet a megőrzés elé) — az ütemező és a lekérdezés ugyanebből dolgozik. Ütemező: járművenként körönként 6 múltbeli nap (2 év ≈ 30 óra alatt jön le). A szolgáltató végleges hibájára (400/404/422, pl. túl régi adat) a nap üresnek jelölődik, nem próbálja újra; átmeneti hibára igen. Teszt +3.
+
 ## 2026-10-18 — 🗺️ GPS útvonal: 60 napos előzmény-visszatöltés + 62 napos lekérdezés (PR #566)
 - Eddig csak az első bekapcsoláskori 7 nap + onnan előre töltődött le → sokszor csak 1 nap adat. Új `lib/gpsTrack.js` `missingDays`/`backfillDays`: a hiányzó múltbeli napok a legfrissebbtől visszafelé jönnek le a CargoTrackből (üres nap is sort kap → nem próbálja újra).
 - Ütemező: járművenként tickenként 3 nap, 60 napra vissza (`GPS_TRACK_HISTORY_DAYS`, a megőrzésen belül); az üres napokat nem illeszti. `gpsTrackRange`: kérésenként 2 hiányzó nap azonnal + `missing_days` jelzés; max. időszak 31 → 62 nap. UI: „Utolsó 60 nap" gomb. Cache-bust `?v=20261018gtr60`.

@@ -1549,10 +1549,11 @@ function startGpsTrackHistoryScheduler() {
   const gt = require('../lib/gpsTrack');
   const { featureEnabled } = require('../lib/featureEnabled');
   const BACKFILL = Math.max(1, Math.min(31, parseInt(process.env.GPS_TRACK_BACKFILL_DAYS, 10) || 7));
-  const RETENTION = Math.max(35, parseInt(process.env.GPS_TRACK_RETENTION_DAYS, 10) || 100);
+  const RETENTION = gt.RETENTION_DAYS;
   const MIN = Math.max(5, parseInt(process.env.GPS_TRACK_INTERVAL_MIN, 10) || 15);
-  // ennyi napra visszamenőleg töltjük vissza az előzményt (a megőrzésen belül)
-  const HISTORY = Math.max(1, Math.min(RETENTION, parseInt(process.env.GPS_TRACK_HISTORY_DAYS, 10) || 60));
+  // ennyi napra visszamenőleg töltjük vissza az előzményt (a megőrzésen belül, alap 2 év)
+  const HISTORY = gt.HISTORY_DAYS;
+  const BACKFILL_PER_TICK = 6;      // járművenként ennyi múltbeli nap körönként
   const DAYS_PER_TICK = 3;          // járművenként ennyi napot tölt egy körben (visszatöltés szétterítve)
   const MATCH_BUDGET_MS = 6 * 60 * 1000;
   let running = false;
@@ -1589,7 +1590,7 @@ function startGpsTrackHistoryScheduler() {
     }
     // előzmény-visszatöltés: a hiányzó múltbeli napok, a legfrissebbtől visszafelé
     try {
-      await gt.backfillDays(cid, apiKey, plate, objectId, gt.addDays(today, -(HISTORY - 1)), today, DAYS_PER_TICK);
+      await gt.backfillDays(cid, apiKey, plate, objectId, gt.addDays(today, -(HISTORY - 1)), today, BACKFILL_PER_TICK);
     } catch (e) { console.warn('[GpsTrack] előzmény-visszatöltés hiba', plate, e.message); }
     // régi formátumú napok (tartály-szint nélkül): tickenként 2, a legfrissebbek elöl
     try {

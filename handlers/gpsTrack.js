@@ -19,8 +19,7 @@ const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
 const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const MAX_DAYS = 62;
 const ONDEMAND_BACKFILL_DAYS = 2;         // kérésenként ennyi hiányzó múltbeli napot tölt le azonnal
-const HISTORY_DAYS = Math.max(1, Math.min(Math.max(35, parseInt(process.env.GPS_TRACK_RETENTION_DAYS, 10) || 100),
-  parseInt(process.env.GPS_TRACK_HISTORY_DAYS, 10) || 60));
+const HISTORY_DAYS = gt.HISTORY_DAYS;
 const ONDEMAND_MATCH_DAYS = 2;            // kérésenként ennyi még nem illesztett napot illeszt azonnal
 const _liveRefresh = new Map();           // `${cid}|${plate}` -> utolsó élő frissítés ideje
 const _upgradeTried = new Map();          // `${cid}|${plate}|${day}` -> utolsó formátum-frissítés ideje
