@@ -766,18 +766,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       </table>
     </div>
 
-    <div class="sec-title">📍 Puncte de traseu (${puncte.length})</div>
-    <table class="grid-table tbl-pu">
-      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:96px;">Dată</th></tr></thead>
-      <tbody>${puncteHtml}</tbody>
-    </table>
-
-    <div class="sec-title">⛽ Alimentări (${alimentari.length})</div>
-    <table class="grid-table tbl-al">
-      <thead><tr><th>Loc</th><th style="width:88px;">Data</th><th style="width:92px;">Combustibil</th><th class="num" style="width:62px;">Litri</th><th class="num" style="width:78px;">Km</th><th style="width:88px;">Plată</th><th class="num" style="width:92px;">Sumă</th></tr></thead>
-      <tbody>${alimHtml}</tbody>
-    </table>
-
+    <div class="keep">
     <div class="sec-title">🧮 Calcul consum combustibil</div>
     <div class="sum-block keep">
       <table>
@@ -796,6 +785,19 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         <td class="v">${f.consum_100 || 0} L</td>
       </tr></table>
     </div>
+    </div>
+
+    <div class="sec-title">📍 Puncte de traseu (${puncte.length})</div>
+    <table class="grid-table tbl-pu">
+      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:96px;">Dată</th></tr></thead>
+      <tbody>${puncteHtml}</tbody>
+    </table>
+
+    <div class="sec-title">⛽ Alimentări (${alimentari.length})</div>
+    <table class="grid-table tbl-al">
+      <thead><tr><th>Loc</th><th style="width:88px;">Data</th><th style="width:92px;">Combustibil</th><th class="num" style="width:62px;">Litri</th><th class="num" style="width:78px;">Km</th><th style="width:88px;">Plată</th><th class="num" style="width:92px;">Sumă</th></tr></thead>
+      <tbody>${alimHtml}</tbody>
+    </table>
 
     <div class="sec-title">🛒 Achiziții / Cheltuieli (${achizitii.length})</div>
     <table class="grid-table tbl-ac">
