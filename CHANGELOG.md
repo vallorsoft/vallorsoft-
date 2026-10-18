@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal: a 2 éves előzmény magától töltődik le (PR #569)
+- `services/scheduler.js` `startGpsTrackHistoryScheduler`: külön előzmény-letöltő kör (`backfillRound`, percenként, járművenként 10 nap/kör, saját futás-őr) — a hiányzó múltbeli napokat a legfrissebbtől visszafelé folyamatosan letölti, az oldal megnyitása nélkül. Eddig a 15 perces körben 6 nap/jármű ment (~30 óra/jármű a 2 évhez). Ha minden nap megvan, egy kör csak egy olcsó lekérdezés járművenként.
+- Állítható: `GPS_TRACK_BACKFILL_INTERVAL_MIN` (alap 1), `GPS_TRACK_BACKFILL_PER_ROUND` (alap 10, max 60).
+
 ## 2026-10-18 — 🗺️ GPS útvonal FIX: a „Mutasd" gomb azonnal válaszol (PR #568)
 - **Gyökér:** a `gpsTrackRange` a válasz ELŐTT, szinkronban töltötte le a CargoTrack-ből a hiányzó/régi formátumú napokat (napi 8+ ablak lapozással) → a kérés percekig tartott, a gomb „halottnak" tűnt.
 - `handlers/gpsTrack.js`: a régi napok újratöltése + a hiányzó napok letöltése HÁTTÉRBEN fut (járművenként egy futó feladat, `_bgJobs`), a válasz azonnal jön a már mentett napokkal + `missing_days`/`bg_running`.
