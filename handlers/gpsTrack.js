@@ -3,7 +3,9 @@
 //    gpsTrackVehicles  — a cég GPS-párosított járművei + hány nap van mentve
 //    gpsTrackRange     — egy jármű útvonala egy időszakra: úthálózatra
 //                        illesztett vonal, km (út / km-óra / GPS), menetek
-//                        és állások naponként, összesítő
+//                        és állások naponként, összesítő, tankolások
+//    gpsTrackPoint     — a térképen kattintott ponthoz legközelebbi GPS-rekord
+//                        (idő, sebesség, km-óra, tartály-szint, fogyasztás)
 //  Admin/Manager, company_id-szűrt, paraméteres SQL. Adat: gps_track_days
 //  (a services/scheduler.js startGpsTrackHistoryScheduler gyűjti).
 // ============================================================
@@ -154,12 +156,14 @@ handlers.gpsTrackRange = async function (req, res, args) {
       if (!matched) T.pending_days++;
       T.km_road += kmRoad != null ? kmRoad : kmGps;
       T.km_gps += kmGps;
+      const lf = gt.levelFuel(pts);
       const drive = tl.trips.reduce((s, x) => s + (x.to - x.from), 0);
       const stopS = tl.stops.reduce((s, x) => s + (x.to - x.from), 0);
       T.drive_sec += drive; T.stop_sec += stopS;
       days.push({
         day: r.day, matched, source: matched ? r.match_source : 'raw', point_count: pts.length,
         km_road: kmRoad, km_gps: kmGps, km_odo: gt.odoDelta(pts, 0, pts.length - 1), fuel: gt.fuelDelta(pts, 0, pts.length - 1),
+        fuel_level_used: lf ? lf.used : null, refuels: lf ? lf.refuels : [],
         drive_sec: drive, stop_sec: stopS, trips: tl.trips, stops: tl.stops, segments,
         first_at: pts[0][0], last_at: pts[pts.length - 1][0],
       });
@@ -168,12 +172,18 @@ handlers.gpsTrackRange = async function (req, res, args) {
     let totals = null;
     if (all.length) {
       const kmOdo = gt.odoDelta(all, 0, all.length - 1, 50000);
-      const fuel = gt.fuelDelta(all, 0, all.length - 1, 20000);
+      const fuelCnt = gt.fuelDelta(all, 0, all.length - 1, 20000);
+      const lfAll = gt.levelFuel(all);
+      // a fogyasztás-számláló elsőbbséget élvez; ha az eszköz nem adja, a tartály-szintből
+      const fuel = fuelCnt != null ? fuelCnt : (lfAll ? lfAll.used : null);
+      const fuelSrc = fuelCnt != null ? 'counter' : (lfAll ? 'level' : null);
       const first = all[0], last = all[all.length - 1];
       const [startLoc, endLoc] = await Promise.all([reverseName(first[1], first[2]), reverseName(last[1], last[2])]);
       totals = {
         km_road: Math.round(T.km_road * 100) / 100, km_gps: Math.round(T.km_gps * 100) / 100, km_odo: kmOdo,
-        fuel, avg_l100: (fuel != null && kmOdo) ? Math.round(fuel / kmOdo * 10000) / 100 : null,
+        fuel, fuel_src: fuelSrc, fuel_level_used: lfAll ? lfAll.used : null,
+        refuel_l: lfAll ? Math.round(lfAll.refuels.reduce((a, x) => a + x.liters, 0) * 10) / 10 : null,
+        refuel_count: lfAll ? lfAll.refuels.length : 0, avg_l100: (fuel != null && kmOdo) ? Math.round(fuel / kmOdo * 10000) / 100 : null,
         l_per_h: (fuel != null && T.drive_sec > 0) ? Math.round(fuel / (T.drive_sec / 3600) * 100) / 100 : null,
         drive_sec: T.drive_sec, stop_sec: T.stop_sec, pending_days: T.pending_days,
         start: { lat: first[1], lng: first[2], t: first[0], name: startLoc },
@@ -183,6 +193,52 @@ handlers.gpsTrackRange = async function (req, res, args) {
     return res.json({ result: { ok: true, rendszam: plate, from, to, days, totals, live_error: liveErr } });
   } catch (err) {
     console.error('gpsTrackRange hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.gpsTrackPoint = async function (req, res, args) {
+  try {
+    const u = req.session.user;
+    if (!_am(u)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const a = (args && args[0]) || {};
+    const day = String(a.day || '').trim();
+    const lat = parseFloat(a.lat), lng = parseFloat(a.lng);
+    if (!gt.isDay(day) || !isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return res.json({ result: { ok: false, err: 'Date invalide.' } });
+    }
+    const mp = await pool.query(`SELECT rendszam FROM vehicle_gps_map WHERE company_id=$1 AND provider='cargotrack'`, [cid]);
+    const map = mp.rows.find((r) => normPlate(r.rendszam) === normPlate(a.rendszam));
+    if (!map) return res.json({ result: { ok: false, err: 'Vehiculul nu este asociat cu GPS.' } });
+    const { rows } = await pool.query(
+      `SELECT points_json FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND day=$3::date`, [cid, map.rendszam, day]);
+    let pts = [];
+    try { pts = JSON.parse((rows[0] && rows[0].points_json) || '[]'); } catch (_) {}
+    const near = gt.nearestPoint(pts, lat, lng);
+    if (!near || near.dist_m > 3000) return res.json({ result: { ok: false, err: 'Nu există punct GPS în apropiere.' } });
+    const p = pts[near.i];
+    // tartály-szint korrekció a jármű adatlapjáról (mint a menetlevél GPS-gombjánál)
+    let corr = 0;
+    try {
+      const v = await pool.query(
+        `SELECT fuel_correction_l FROM vehicles WHERE company_id=$1
+            AND UPPER(REGEXP_REPLACE(COALESCE(rendszam,''),'[^A-Za-z0-9]','','g')) = $2 LIMIT 1`, [cid, normPlate(map.rendszam)]);
+      corr = parseFloat(v.rows[0] && v.rows[0].fuel_correction_l) || 0;
+    } catch (_) { corr = 0; }
+    const level = p[7] != null ? Math.max(0, Math.round((p[7] + corr) * 10) / 10) : null;
+    const kmDay = gt.odoDelta(pts, 0, near.i);
+    const fuelDay = gt.fuelDelta(pts, 0, near.i);
+    const lf = gt.levelFuel(pts, 0, near.i);
+    return res.json({ result: { ok: true, point: {
+      t: p[0], lat: p[1], lng: p[2], speed: p[3], ignition: p[4], mileage: p[5], fuel_counter: p[6],
+      fuel_level: level, direction: p[8] != null ? p[8] : null, dist_m: near.dist_m,
+      km_day: kmDay, fuel_day: fuelDay != null ? fuelDay : (lf ? lf.used : null),
+      avg_day: (kmDay >= 20 && (fuelDay != null || lf)) ? Math.round((fuelDay != null ? fuelDay : lf.used) / kmDay * 10000) / 100 : null,
+      name: await reverseName(p[1], p[2]),
+    } } });
+  } catch (err) {
+    console.error('gpsTrackPoint hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
