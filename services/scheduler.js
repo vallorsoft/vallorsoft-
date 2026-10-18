@@ -1553,7 +1553,9 @@ function startGpsTrackHistoryScheduler() {
   const MIN = Math.max(5, parseInt(process.env.GPS_TRACK_INTERVAL_MIN, 10) || 15);
   // ennyi napra visszamenőleg töltjük vissza az előzményt (a megőrzésen belül, alap 2 év)
   const HISTORY = gt.HISTORY_DAYS;
-  const BACKFILL_PER_TICK = 6;      // járművenként ennyi múltbeli nap körönként
+  // előzmény-letöltő kör: magától, percenként fut, amíg minden nap meg nincs (oldal megnyitása nélkül)
+  const BF_MIN = Math.max(1, parseInt(process.env.GPS_TRACK_BACKFILL_INTERVAL_MIN, 10) || 1);
+  const BF_PER_ROUND = Math.max(1, Math.min(60, parseInt(process.env.GPS_TRACK_BACKFILL_PER_ROUND, 10) || 10));
   const DAYS_PER_TICK = 3;          // járművenként ennyi napot tölt egy körben (visszatöltés szétterítve)
   const MATCH_BUDGET_MS = 6 * 60 * 1000;
   let running = false;
@@ -1588,10 +1590,7 @@ function startGpsTrackHistoryScheduler() {
       const pts = await gt.fetchRange(apiKey, objectId, ds, de);
       await gt.mergeDay(cid, plate, objectId, r.day, pts, de, true);
     }
-    // előzmény-visszatöltés: a hiányzó múltbeli napok, a legfrissebbtől visszafelé
-    try {
-      await gt.backfillDays(cid, apiKey, plate, objectId, gt.addDays(today, -(HISTORY - 1)), today, BACKFILL_PER_TICK);
-    } catch (e) { console.warn('[GpsTrack] előzmény-visszatöltés hiba', plate, e.message); }
+    // az előzmény-visszatöltést a külön, percenként futó letöltő-kör végzi (lent)
     // régi formátumú napok (tartály-szint nélkül): tickenként 2, a legfrissebbek elöl
     try {
       const old = await pool.query(
@@ -1644,6 +1643,45 @@ function startGpsTrackHistoryScheduler() {
       } catch (_) {}
     } finally { running = false; }
   }
+
+  // ── Előzmény-letöltő kör: a hiányzó múltbeli napokat (2 év) folyamatosan letölti,
+  // járművenként körönként BF_PER_ROUND napot, a legfrissebbtől visszafelé. Ha minden
+  // nap megvan, egy kör csak egy olcsó lekérdezés járművenként.
+  let bfRunning = false;
+  async function backfillRound() {
+    if (bfRunning) return;
+    bfRunning = true;
+    try {
+      let companies = [];
+      try {
+        ({ rows: companies } = await pool.query(
+          `SELECT company_id, credentials_enc FROM company_integrations
+            WHERE provider='cargotrack' AND enabled=true AND credentials_enc IS NOT NULL`));
+      } catch (_) { return; }
+      const today = gt.localDay(Date.now());
+      const from = gt.addDays(today, -(HISTORY - 1));
+      for (const c of companies) {
+        try {
+          if (!(await featureEnabled(c.company_id, 'gps-integracio'))) continue;
+          if (!(await featureEnabled(c.company_id, 'gps-daily-track'))) continue;
+          const apiKey = decrypt(c.credentials_enc);
+          const { rows: maps } = await pool.query(
+            `SELECT rendszam, object_id FROM vehicle_gps_map WHERE company_id=$1 AND provider='cargotrack'`, [c.company_id]);
+          const seen = new Set();
+          for (const m of maps) {
+            if (!m.object_id || seen.has(m.object_id)) continue;
+            seen.add(m.object_id);
+            try {
+              const r = await gt.backfillDays(c.company_id, apiKey, m.rendszam, m.object_id, from, today, BF_PER_ROUND);
+              if (r.done) console.log('[GpsTrack] Előzmény letöltve', m.rendszam, r.done, 'nap, hátra', r.left);
+            } catch (e) { console.warn('[GpsTrack] előzmény-visszatöltés hiba', m.rendszam, e.message); }
+          }
+        } catch (e) { console.warn('[GpsTrack] előzmény cég hiba', c.company_id, e.message); }
+      }
+    } finally { bfRunning = false; }
+  }
+  setTimeout(backfillRound, 3 * 60 * 1000);
+  setInterval(backfillRound, BF_MIN * 60 * 1000);
 
   setTimeout(tick, 2 * 60 * 1000);
   const interval = setInterval(tick, MIN * 60 * 1000);
