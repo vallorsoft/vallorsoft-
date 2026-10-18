@@ -564,24 +564,62 @@
     var X = function (m) { return PAD + (m - startM) * sx; };
     var lanes = assignLanes(r.placed);
     var bedTop = fs + 12;
-    var bedH = Math.max(small ? 46 : 70, Math.min(110, lanes.count * (fs + 14)));
+    // a felépítmény magassága a valós arányhoz igazodik (~2,6 m), de a rakomány-sávoknak is elég legyen
+    var bedH = Math.max(small ? 46 : 70, Math.min(150, 2.6 * sx), Math.min(150, lanes.count * (fs + 14)));
     var bedBot = bedTop + bedH;
-    var R = Math.max(7, Math.min(15, sx * 0.48));
-    var wheelY = bedBot + 10 + R;
+    var R = Math.max(7, Math.min(24, sx * 0.5));
+    var wheelY = bedBot + (small ? 4 : 6) + R * 0.9;
     var H = wheelY + R + fs + 12 + (r.hasLift ? fs + 4 : 0);
     var laneH = bedH / lanes.count;
     var o = function (n) { return n.toFixed(1); };
     var s = '';
-    // vontató (fülke + alváz)
-    var cabTop = bedTop + bedH * 0.25;
-    s += '<rect x="' + o(X(0.2)) + '" y="' + o(cabTop) + '" width="' + o(2.1 * sx) + '" height="' + o(bedBot - cabTop + 6) + '" rx="' + o(Math.min(10, sx * 0.4)) + '" class="axl-cab"/>';
-    s += '<rect x="' + o(X(0.2) + 2.1 * sx * 0.55) + '" y="' + o(cabTop + 6) + '" width="' + o(2.1 * sx * 0.35) + '" height="' + o((bedBot - cabTop) * 0.3) + '" rx="3" class="axl-win"/>';
-    s += '<rect x="' + o(X(0.2)) + '" y="' + o(bedBot) + '" width="' + o((Math.max(driveAxle, liftM || 0) + 1.0 - 0.2) * sx) + '" height="' + o(small ? 8 : 12) + '" rx="3" class="axl-chassis"/>';
+    // ── Valósághű oldalnézet (saját vektoros rajz, a beírt méterek szerint) ──
+    var groundY = wheelY + R;
+    var chH = small ? 6 : 9;
+    s += '<line x1="' + o(PAD) + '" y1="' + o(groundY) + '" x2="' + o(W - PAD) + '" y2="' + o(groundY) + '" class="axl-ground"/>';
+    // vontató alváz (a fülke mögött, a hajtott/emelhető tengely mögé nyúlik)
+    var frameEnd = Math.max(driveAxle, liftM || 0) + 0.9;
+    s += '<rect x="' + o(X(0.4)) + '" y="' + o(bedBot + 2) + '" width="' + o((frameEnd - 0.4) * sx) + '" height="' + o(chH) + '" rx="2" class="axl-chassis"/>';
+    // nyeregszerkezet
+    s += '<rect x="' + o(X(fifth - 0.5)) + '" y="' + o(bedBot - 1) + '" width="' + o(1.0 * sx) + '" height="4" rx="1.5" class="axl-chassis"/>';
+    // üzemanyagtartály a két tengely között
+    var arF = R * 1.45;
+    var tankL = X(frontAxle) + arF + 3, tankR = X(driveAxle) - R * 1.45 - 3;
+    if (tankR - tankL > 10) s += '<rect x="' + o(tankL) + '" y="' + o(wheelY - R * 0.75) + '" width="' + o(tankR - tankL) + '" height="' + o(R * 1.05) + '" rx="' + o(Math.min(6, R * 0.4)) + '" class="axl-tank"/>';
+    // sárvédő a hajtott (és emelhető) tengely fölött
+    var guard = function (m) { var cx = X(m), ar = R * 1.3; return '<path d="M' + o(cx - ar) + ' ' + o(wheelY) + ' A' + o(ar) + ' ' + o(ar) + ' 0 0 1 ' + o(cx + ar) + ' ' + o(wheelY) + '" class="axl-guard"/>'; };
+    s += guard(driveAxle);
+    if (liftM !== null) s += guard(liftM);
+    // fülke (menetirány balra)
+    var x0 = X(0.05), cw = 2.3 * sx, x1 = x0 + cw;
+    var cTop = bedTop, cBot = wheelY + R * 0.35, cH = cBot - cTop;
+    var rr = Math.min(cw * 0.12, 10);
+    var aL = X(frontAxle) - arF, aR = X(frontAxle) + arF;
+    var yv = function (k) { return o(cTop + cH * k); };
+    s += '<path d="M' + o(x0) + ' ' + o(cBot - 3) + ' L' + o(x0) + ' ' + yv(0.42) + ' L' + o(x0 + cw * 0.045) + ' ' + yv(0.12) +
+      ' Q' + o(x0 + cw * 0.06) + ' ' + o(cTop) + ' ' + o(x0 + cw * 0.16) + ' ' + o(cTop) + ' L' + o(x1 - rr) + ' ' + o(cTop) +
+      ' Q' + o(x1) + ' ' + o(cTop) + ' ' + o(x1) + ' ' + o(cTop + rr) + ' L' + o(x1) + ' ' + o(cBot) + ' L' + o(Math.min(aR, x1)) + ' ' + o(cBot) +
+      ' A' + o(arF) + ' ' + o(arF) + ' 0 0 0 ' + o(aL) + ' ' + o(cBot) + ' L' + o(x0 + 3) + ' ' + o(cBot) + ' Q' + o(x0) + ' ' + o(cBot) + ' ' + o(x0) + ' ' + o(cBot - 3) + ' Z" class="axl-cab"/>';
+    // szélvédő + oldalablak
+    s += '<polygon points="' + o(x0 + 1) + ',' + yv(0.42) + ' ' + o(x0 + cw * 0.045 + 1) + ',' + yv(0.13) + ' ' + o(x0 + cw * 0.11) + ',' + yv(0.13) + ' ' + o(x0 + cw * 0.075) + ',' + yv(0.42) + '" class="axl-glass"/>';
+    s += '<polygon points="' + o(x0 + cw * 0.15) + ',' + yv(0.15) + ' ' + o(x0 + cw * 0.45) + ',' + yv(0.15) + ' ' + o(x0 + cw * 0.45) + ',' + yv(0.40) + ' ' + o(x0 + cw * 0.12) + ',' + yv(0.40) + '" class="axl-glass"/>';
+    // ajtó-vonal, kilincs, lépcső
+    var doorBot = Math.min(cBot - cH * 0.05, wheelY - arF - 2);
+    s += '<path d="M' + o(x0 + cw * 0.11) + ' ' + yv(0.13) + ' L' + o(x0 + cw * 0.48) + ' ' + yv(0.13) + ' L' + o(x0 + cw * 0.48) + ' ' + o(doorBot) + ' L' + o(x0 + cw * 0.10) + ' ' + o(doorBot) + '" class="axl-line"/>';
+    s += '<rect x="' + o(x0 + cw * 0.40) + '" y="' + yv(0.47) + '" width="' + o(Math.max(4, cw * 0.05)) + '" height="2" rx="1" class="axl-line-f"/>';
+    // hűtőrács + fényszóró + lökhárító
+    for (var gi = 0; gi < 3; gi++) s += '<line x1="' + o(x0 + 1) + '" y1="' + yv(0.52 + gi * 0.07) + '" x2="' + o(x0 + cw * 0.05) + '" y2="' + yv(0.52 + gi * 0.07) + '" class="axl-line"/>';
+    s += '<rect x="' + o(x0 + 1) + '" y="' + yv(0.76) + '" width="' + o(Math.max(4, cw * 0.06)) + '" height="' + o(Math.max(3, cH * 0.05)) + '" rx="1.5" class="axl-headlight"/>';
+    s += '<rect x="' + o(x0 - 1) + '" y="' + o(cBot - cH * 0.09) + '" width="' + o(Math.max(6, Math.min(cw * 0.16, aL - x0 - 2))) + '" height="' + o(cH * 0.09) + '" rx="2" class="axl-chassis"/>';
+    // tetőlégterelő-vonal
+    s += '<line x1="' + o(x0 + cw * 0.18) + '" y1="' + o(cTop + 2) + '" x2="' + o(x1 - rr) + '" y2="' + o(cTop + 2) + '" class="axl-line"/>';
     // pótkocsi (a dőlést felnagyítva, a királycsap körül forgatva mutatjuk)
     var visDeg = Math.max(-6, Math.min(6, r.tilt.deg * 3));
     s += '<g transform="rotate(' + visDeg.toFixed(2) + ' ' + o(X(fifth)) + ' ' + o(bedBot) + ')">';
-    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedTop) + '" width="' + o(c.bedLength * sx) + '" height="' + o(bedH) + '" class="axl-bed"/>';
-    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedBot) + '" width="' + o(c.bedLength * sx) + '" height="' + o(small ? 5 : 7) + '" class="axl-chassis"/>';
+    // ponyvás felépítmény
+    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedTop) + '" width="' + o(c.bedLength * sx) + '" height="' + o(bedH) + '" rx="3" class="axl-bed"/>';
+    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedTop) + '" width="' + o(c.bedLength * sx) + '" height="3" class="axl-rail"/>';
+    for (var sm = 0.6; sm < c.bedLength - 0.2; sm += 0.75) s += '<line x1="' + o(X(trailerFront + sm)) + '" y1="' + o(bedBot - 1) + '" x2="' + o(X(trailerFront + sm)) + '" y2="' + o(bedBot - Math.max(5, bedH * 0.12)) + '" class="axl-strap"/>';
     // rakomány
     r.placed.forEach(function (p) {
       var col = COLORS[p.idx % COLORS.length];
@@ -596,6 +634,27 @@
       else if (bw > fs) s += '<text x="' + o(bx + bw / 2) + '" y="' + o(y + h / 2 + fs * 0.36) + '" text-anchor="middle" class="axl-blk-t" font-size="' + fs + '">' + (p.idx + 1) + '</text>';
       s += '</g>';
     });
+    // alváz-hossztartó
+    s += '<rect x="' + o(X(trailerFront)) + '" y="' + o(bedBot) + '" width="' + o(c.bedLength * sx) + '" height="' + o(small ? 5 : 7) + '" class="axl-chassis"/>';
+    // támasztóláb
+    var tFirst = trailerAxle - c.tridemSpacing;
+    var lgM = fifth + Math.max(0.6, Math.min(2.3, (tFirst - fifth) * 0.4));
+    var legW = Math.max(3, Math.min(6, 0.12 * sx));
+    s += '<rect x="' + o(X(lgM) - legW / 2) + '" y="' + o(bedBot + 5) + '" width="' + o(legW) + '" height="' + o(wheelY + R * 0.55 - bedBot - 5) + '" class="axl-chassis"/>';
+    s += '<rect x="' + o(X(lgM) - legW * 1.5) + '" y="' + o(wheelY + R * 0.55) + '" width="' + o(legW * 3) + '" height="3" rx="1" class="axl-chassis"/>';
+    // oldalsó aláfutásgátló
+    var ruL = X(lgM) + legW * 2, ruR = X(tFirst) - R * 1.4;
+    if (ruR - ruL > 8) {
+      [0.45, 0.75].forEach(function (k) { var yy = bedBot + (wheelY - bedBot) * k; s += '<line x1="' + o(ruL) + '" y1="' + o(yy) + '" x2="' + o(ruR) + '" y2="' + o(yy) + '" class="axl-rail-line"/>'; });
+    }
+    // sárvédő a hármas tengely fölött
+    var gL = X(tFirst) - R * 1.3, gR = X(trailerAxle + c.tridemSpacing) + R * 1.3, gY = wheelY - R * 1.3;
+    s += '<path d="M' + o(gL) + ' ' + o(wheelY - R * 0.15) + ' L' + o(gL) + ' ' + o(gY) + ' L' + o(gR) + ' ' + o(gY) + ' L' + o(gR) + ' ' + o(wheelY - R * 0.15) + '" class="axl-guard"/>';
+    // hátsó aláfutásgátló + lámpa
+    var bmpX = X(trailerEnd) - Math.max(6, 0.25 * sx);
+    s += '<rect x="' + o(bmpX + 2) + '" y="' + o(bedBot + 5) + '" width="3" height="' + o(wheelY - R * 0.35 - bedBot - 5) + '" class="axl-chassis"/>';
+    s += '<rect x="' + o(bmpX) + '" y="' + o(wheelY - R * 0.35) + '" width="' + o(X(trailerEnd) - bmpX) + '" height="4" rx="1" class="axl-chassis"/>';
+    s += '<rect x="' + o(X(trailerEnd) - 6) + '" y="' + o(bedBot + 2) + '" width="5" height="3" rx="1" class="axl-taillight"/>';
     s += '</g>';
     if (Math.abs(r.tilt.deg) >= 0.05) {
       s += '<line x1="' + o(X(trailerFront)) + '" y1="' + o(bedBot) + '" x2="' + o(X(trailerEnd)) + '" y2="' + o(bedBot) + '" class="axl-level"/>';
@@ -609,7 +668,12 @@
     function axle(m, load, st, triple, raised, row) {
       var out = '';
       var cy = raised ? wheelY - R * 0.9 : wheelY;
-      (triple ? [-c.tridemSpacing, 0, c.tridemSpacing] : [0]).forEach(function (d) { out += '<circle cx="' + o(X(m + d)) + '" cy="' + o(cy) + '" r="' + o(raised ? R * 0.85 : R) + '" class="axl-wheel' + (raised ? ' axl-raised' : '') + '"/>'; });
+      (triple ? [-c.tridemSpacing, 0, c.tridemSpacing] : [0]).forEach(function (d) {
+        var rw = raised ? R * 0.85 : R, wx = o(X(m + d)), wy = o(cy);
+        out += '<circle cx="' + wx + '" cy="' + wy + '" r="' + o(rw) + '" class="axl-wheel' + (raised ? ' axl-raised' : '') + '"/>';
+        out += '<circle cx="' + wx + '" cy="' + wy + '" r="' + o(rw * 0.58) + '" class="axl-rim' + (raised ? ' axl-rim-up' : '') + '"/>';
+        out += '<circle cx="' + wx + '" cy="' + wy + '" r="' + o(Math.max(1.5, rw * 0.18)) + '" class="axl-hub' + (raised ? ' axl-rim-up' : '') + '"/>';
+      });
       var lx = Math.min(Math.max(X(m), PAD + fs * 2), W - PAD - fs * 2);
       var txt = raised ? '⬆ 0 t' : f1(Math.round(load * 100) / 100) + ' t';
       out += '<text x="' + o(lx) + '" y="' + o(wheelY + R + fs + 4 + (row ? fs + 4 : 0)) + '" text-anchor="middle" class="axl-load ' + st + '" font-size="' + (fs + 1) + '">' + txt + '</text>';

@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-18 — ⚖️ Tengelyterhelés-kalkulátor: valósághű kamion-rajz (PR #PRNUM)
+
+- **Kérés:** képalapú kamion a kalkulátorba (minta: Mercedes Actros L + ponyvás pótkocsi oldalnézet).
+- **Saját vektoros rajz** (`public/axle-load.js` `drawSvg`) a mintafotók alapján — a fotók vízjelesek/szerzői jogvédettek, a logó védjegy, ezért nem kerültek be. Minden elem a beírt méterek szerint áll (tengelytáv, nyereg, királycsap, tengelyköz, platóhossz, emelhető tengely, dőlés), így a terhelés-számok mindig a kerekek alatt maradnak.
+- Elemek: fülke (szélvédő, oldalablak, ajtó, hűtőrács, fényszóró, lökhárító, kerékív), üzemanyagtartály, sárvédők, nyeregszerkezet, ponyvás felépítmény tetősínnel és pántokkal, támasztóláb, oldalsó és hátsó aláfutásgátló, hátsó lámpa, abroncs + felni + agy, talajvonal. A felépítmény magassága a valós arányhoz igazodik (~2,6 m), nagyobb kerekek.
+- `public/style.css` új `.axl-*` osztályok (világos + sötét téma). A számítás és a rakomány-blokkok kattintása érintetlen. Cache-bust `?v=20261018truck`.
+
 ## 2026-10-18 — 🖨️ Menetlevél-nyomtatvány: a „Calcul consum combustibil" blokk fixen a 2. helyen (PR #556)
 
 - **Kérés:** a nyomtatható menetlevélen a teljes fogyasztás-számítási blokk kerüljön a fejléc + adat-kártya UTÁN, fixen 2. blokként (eddig a Tankolások táblázat után, a lap közepén volt).
