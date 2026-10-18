@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-18 — 🗺️ GPS útvonal FIX: tartály-szint/fogyasztás a régi napokra is + a pont-buborék nem ragad „Betöltés…”-en (PR #PRNUM)
+## 2026-10-18 — 🗺️ GPS útvonal FIX: tartály-szint/fogyasztás a régi napokra is + a pont-buborék nem ragad „Betöltés…”-en (PR #561)
 
 - **Gyökér:** a már letöltött napok régi formátumban (tartály-szint és irány nélkül) voltak mentve, és az újratöltés azonos időpontnál a RÉGI pontot tartotta meg → a szint/fogyasztás sosem jelent meg.
 - **Javítás** (`lib/gpsTrack.js`): azonos időpontnál a teljesebb rekord marad (`cleanPoints`); új `fmt` jelző (`db/gps-track-days-fmt.sql`) + `upgradeDay` teljes napi újratöltés. Az ütemező tickenként 2 régi napot frissít, a lekérdezés (`gpsTrackRange`) a kért időszak legfrissebb 2 régi napját azonnal.
