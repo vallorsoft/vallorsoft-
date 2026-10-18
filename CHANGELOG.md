@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal FIX: az útvonalra kattintva újra betölt a pont-buborék (PR #562)
+
+- **Gyökér:** a `public/gps-daily-track.js` `pointPopup` a nem létező `gtrVeh` id-jű elemből olvasta a rendszámot (a valódi: `gtrVehicle`) → a lekérés előtt hibát dobott, a buborék „Betöltés…”-en ragadt (a #561-es időtúllépés sem futott le, mert az utána indult).
+- **Javítás:** a rendszám a betöltött útvonal válaszából (`_data.rendszam`), tartaléknak a választó; a buborék-renderelés try/catch-ben (hiba → üzenet). Cache-bust `gps-daily-track.js?v=20261018gtrpt`. 1838 Jest zöld.
+
 ## 2026-10-18 — 🗺️ GPS útvonal FIX: tartály-szint/fogyasztás a régi napokra is + a pont-buborék nem ragad „Betöltés…”-en (PR #561)
 
 - **Gyökér:** a már letöltött napok régi formátumban (tartály-szint és irány nélkül) voltak mentve, és az újratöltés azonos időpontnál a RÉGI pontot tartotta meg → a szint/fogyasztás sosem jelent meg.
