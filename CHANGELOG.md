@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal FIX: a „Mutasd" gomb azonnal válaszol (PR #568)
+- **Gyökér:** a `gpsTrackRange` a válasz ELŐTT, szinkronban töltötte le a CargoTrack-ből a hiányzó/régi formátumú napokat (napi 8+ ablak lapozással) → a kérés percekig tartott, a gomb „halottnak" tűnt.
+- `handlers/gpsTrack.js`: a régi napok újratöltése + a hiányzó napok letöltése HÁTTÉRBEN fut (járművenként egy futó feladat, `_bgJobs`), a válasz azonnal jön a már mentett napokkal + `missing_days`/`bg_running`.
+- `public/gps-daily-track.js`: a gomb betöltés közben „⏳" jelzést mutat; az elavult (közben lecserélt) válasz nem írja felül az újat. Cache-bust `?v=20261018gtrbg`.
+
 ## 2026-10-18 — 🗺️ GPS útvonal: 2 éves megőrzés + 2 évre visszamenő letöltés (PR #567)
 - `lib/gpsTrack.js` `RETENTION_DAYS`/`HISTORY_DAYS` (alap 730 nap, env-vel felülírható; a visszatöltés sosem mehet a megőrzés elé) — az ütemező és a lekérdezés ugyanebből dolgozik. Ütemező: járművenként körönként 6 múltbeli nap (2 év ≈ 30 óra alatt jön le). A szolgáltató végleges hibájára (400/404/422, pl. túl régi adat) a nap üresnek jelölődik, nem próbálja újra; átmeneti hibára igen. Teszt +3.
 
