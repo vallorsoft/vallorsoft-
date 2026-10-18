@@ -65,6 +65,7 @@ describe('gpsTrackRange', () => {
     for (let i = 1; i <= 10; i++) pts.push([t0 + 4200 + i * 60, 45.09, 25.0, 0, 0, 1060, 68]);
     pool.query
       .mockResolvedValueOnce(rows([{ rendszam: 'B 104 VLR', object_id: '7' }]))
+      .mockResolvedValueOnce(rows([]))                       // nincs régi formátumú nap
       .mockResolvedValueOnce(rows([{ company_id: CID, rendszam: 'B 104 VLR', day: '2026-10-01', points_json: JSON.stringify(pts),
         point_count: pts.length, complete: true, segments: [{ p: '_ibE_ibE', k: 'm' }], km_road: 61.2, km_raw: 60, match_source: 'osrm',
         matched_count: pts.length, matched_at: '2026-10-02T00:00:00Z' }]));
@@ -78,7 +79,7 @@ describe('gpsTrackRange', () => {
     expect(res.totals.km_odo).toBeCloseTo(60);
     expect(res.totals.fuel).toBeCloseTo(18);
     expect(res.totals.avg_l100).toBeCloseTo(30);
-    expect(pool.query.mock.calls[1][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-01']);
+    expect(pool.query.mock.calls[2][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-01']);
   });
 });
 

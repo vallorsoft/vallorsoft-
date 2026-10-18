@@ -20,6 +20,7 @@ const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const MAX_DAYS = 31;
 const ONDEMAND_MATCH_DAYS = 2;            // kérésenként ennyi még nem illesztett napot illeszt azonnal
 const _liveRefresh = new Map();           // `${cid}|${plate}` -> utolsó élő frissítés ideje
+const _upgradeTried = new Map();          // `${cid}|${plate}|${day}` -> utolsó formátum-frissítés ideje
 
 // Hely-név (indulás/érkezés) — Nominatim reverse, memória-cache, rövid timeout
 const _revCache = new Map();
@@ -93,6 +94,34 @@ handlers.gpsTrackRange = async function (req, res, args) {
     const now = Date.now();
     const today = gt.localDay(now);
 
+    // CargoTrack kulcs — csak ha tényleg letöltünk valamit
+    let _key;
+    const getKey = async () => {
+      if (_key !== undefined) return _key;
+      _key = null;
+      if (!(await featureEnabled(cid, 'gps-integracio'))) return _key;
+      const k = await pool.query(`SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='cargotrack' AND enabled=true`, [cid]);
+      if (k.rows.length && k.rows[0].credentials_enc) _key = decrypt(k.rows[0].credentials_enc);
+      return _key;
+    };
+
+    // régi formátumú napok (tartály-szint nélkül): a legfrissebb 2 azonnal újratöltve
+    if (map.object_id) {
+      try {
+        const old = await pool.query(
+          `SELECT day::text AS day FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND day BETWEEN $3::date AND $4::date
+              AND fmt < 2 AND point_count > 0 ORDER BY day DESC LIMIT 2`, [cid, plate, from, to]);
+        for (const r of (old.rows || [])) {
+          const uk = cid + '|' + plate + '|' + r.day;
+          if (_upgradeTried.has(uk) && now - _upgradeTried.get(uk) < 10 * 60000) continue;
+          _upgradeTried.set(uk, now);
+          const apiKey = await getKey();
+          if (!apiKey) break;
+          await gt.upgradeDay(cid, apiKey, plate, map.object_id, r.day, { pauseMs: 0 });
+        }
+      } catch (e) { if (!(e && (e.code === '42703' || e.code === '42P01'))) console.warn('[GpsTrack] formátum-frissítés hiba', plate, e.message); }
+    }
+
     // élő frissítés: ha a mai nap az időszakban van, a legújabb pontok letöltése (max. 1×/perc)
     let liveErr = null;
     if (to >= today && from <= today && map.object_id) {
@@ -100,10 +129,9 @@ handlers.gpsTrackRange = async function (req, res, args) {
       if (!_liveRefresh.has(lk) || now - _liveRefresh.get(lk) > 60000) {
         _liveRefresh.set(lk, now);
         try {
-          if (await featureEnabled(cid, 'gps-integracio')) {
-            const k = await pool.query(`SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='cargotrack' AND enabled=true`, [cid]);
-            if (k.rows.length && k.rows[0].credentials_enc) {
-              const apiKey = decrypt(k.rows[0].credentials_enc);
+          {
+            const apiKey = await getKey();
+            if (apiKey) {
               const f = await pool.query(`SELECT fetched_until FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND day=$3`, [cid, plate, today]);
               const ds = gt.dayStartMs(today);
               const since = f.rows.length && f.rows[0].fetched_until ? Math.max(ds, new Date(f.rows[0].fetched_until).getTime() - 15 * 60000) : ds;
@@ -235,7 +263,7 @@ handlers.gpsTrackPoint = async function (req, res, args) {
       fuel_level: level, direction: p[8] != null ? p[8] : null, dist_m: near.dist_m,
       km_day: kmDay, fuel_day: fuelDay != null ? fuelDay : (lf ? lf.used : null),
       avg_day: (kmDay >= 20 && (fuelDay != null || lf)) ? Math.round((fuelDay != null ? fuelDay : lf.used) / kmDay * 10000) / 100 : null,
-      name: await reverseName(p[1], p[2]),
+      name: await Promise.race([reverseName(p[1], p[2]), new Promise((r) => setTimeout(() => r(null), 2500))]),
     } } });
   } catch (err) {
     console.error('gpsTrackPoint hiba:', err);

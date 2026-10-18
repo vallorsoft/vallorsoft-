@@ -1585,6 +1585,13 @@ function startGpsTrackHistoryScheduler() {
       const pts = await gt.fetchRange(apiKey, objectId, ds, de);
       await gt.mergeDay(cid, plate, objectId, r.day, pts, de, true);
     }
+    // régi formátumú napok (tartály-szint nélkül): tickenként 2, a legfrissebbek elöl
+    try {
+      const old = await pool.query(
+        `SELECT day::text AS day FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND fmt < 2 AND point_count > 0
+          ORDER BY day DESC LIMIT 2`, [cid, plate]);
+      for (const r of old.rows) await gt.upgradeDay(cid, apiKey, plate, objectId, r.day);
+    } catch (e) { if (!(e && e.code === '42703')) console.warn('[GpsTrack] formátum-frissítés hiba', plate, e.message); }
   }
 
   async function tick() {

@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal FIX: tartály-szint/fogyasztás a régi napokra is + a pont-buborék nem ragad „Betöltés…”-en (PR #561)
+
+- **Gyökér:** a már letöltött napok régi formátumban (tartály-szint és irány nélkül) voltak mentve, és az újratöltés azonos időpontnál a RÉGI pontot tartotta meg → a szint/fogyasztás sosem jelent meg.
+- **Javítás** (`lib/gpsTrack.js`): azonos időpontnál a teljesebb rekord marad (`cleanPoints`); új `fmt` jelző (`db/gps-track-days-fmt.sql`) + `upgradeDay` teljes napi újratöltés. Az ütemező tickenként 2 régi napot frissít, a lekérdezés (`gpsTrackRange`) a kért időszak legfrissebb 2 régi napját azonnal.
+- **Eltérő mezőnevek:** km-óra / fogyasztás-számláló / tartály-szint több lehetséges kulcsról (`can_*`, `total_fuel_used`, `raw_inputs`).
+- **Pont-buborék:** 20 mp-es kliens-időkorlát hibaüzenettel; a helynév-keresés legfeljebb 2,5 mp-et várhat (`gpsTrackPoint`).
+- Teszt +2; cache-bust `?v=20261018gtrfix`.
+
 ## 2026-10-18 — 🗺️ GPS útvonal: kattintható pont-adatok + fogyasztás/tankolás a GPS-ből (PR #560)
 
 - **Kattintás az útvonalra** (`public/gps-daily-track.js` `pointPopup`, széles láthatatlan kattintó-sáv): a CargoTrack-szerű kék buborék mutatja a legközelebbi GPS-rekordot — időpont, helynév, sebesség, irány, gyújtás, **üzemanyag-szint** (a jármű `fuel_correction_l` korrekciójával), km-óra, aznap megtett km, aznapi fogyasztás és átlag. Új RPC: `handlers/gpsTrack.js` `gpsTrackPoint` (Admin/Manager, company_id-szűrt, a rendszám csak a cég saját GPS-párosításából).
