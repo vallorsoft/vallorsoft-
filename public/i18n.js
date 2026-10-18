@@ -1222,6 +1222,8 @@
     'gtr.clickHint': { hu: 'kattints az útvonalra = GPS-adatok azon a ponton', ro: 'click pe traseu = date GPS în acel punct' },
     'gtr.ptTimeout': { hu: 'A szerver nem válaszolt — próbáld újra.', ro: 'Serverul nu a răspuns — încearcă din nou.' },
     'gtr.lph': { hu: 'Fogyasztás óránként', ro: 'Consum pe oră' },
+    'gtr.pLast60': { hu: 'Utolsó 60 nap', ro: 'Ultimele 60 de zile' },
+    'gtr.backfill': { hu: 'Még {n} nap töltődik le a GPS-ből a háttérben — pár perc múlva töltsd újra.', ro: 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.' },
     'gtr.pending': { hu: '{n} nap még nincs az útra illesztve — a km GPS-pontokból becsült; magától véglegesedik.', ro: '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.' },
     'gtr.kmOdoShort': { hu: 'km-óra', ro: 'bord' },
     'gdt.title': { hu: '🗺️ Napi GPS útvonal', ro: '🗺️ Traseu zilnic GPS' },

@@ -1,5 +1,10 @@
 // handlers/gpsTrack.js — GPS útvonal-előzmény lekérdezés (Admin/Manager, company_id-szűrt)
 jest.mock('../../db', () => require('../helpers/db-mock').pool);
+jest.mock('../../lib/featureEnabled', () => ({ featureEnabled: jest.fn(async () => false) }));
+jest.mock('../../lib/crypto', () => ({ decrypt: (x) => 'KEY-' + x, encrypt: (x) => x }));
+jest.mock('../../services/cargotrack', () => ({ getCoordinates: jest.fn(async () => ({ items: [], continuation_token: null })) }));
+const { featureEnabled } = require('../../lib/featureEnabled');
+const ct = require('../../services/cargotrack');
 
 const request = require('supertest');
 const express = require('express');
@@ -45,7 +50,7 @@ describe('gpsTrackRange', () => {
     setUser(ADMIN);
     let r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2026-10-10', to: '2026-10-01' }]);
     expect(r.body.result.ok).toBe(false);
-    r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2026-08-01', to: '2026-09-15' }]);
+    r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2026-07-01', to: '2026-09-15' }]);
     expect(r.body.result.ok).toBe(false);
     expect(pool.query).not.toHaveBeenCalled();
   });
@@ -80,6 +85,32 @@ describe('gpsTrackRange', () => {
     expect(res.totals.fuel).toBeCloseTo(18);
     expect(res.totals.avg_l100).toBeCloseTo(30);
     expect(pool.query.mock.calls[2][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-01']);
+  });
+});
+
+describe('gpsTrackRange — előzmény-visszatöltés', () => {
+  test('hiányzó múltbeli napok: max. 2 letöltve azonnal, a maradék jelezve', async () => {
+    setUser(ADMIN);
+    featureEnabled.mockResolvedValueOnce(true);
+    pool.query
+      .mockResolvedValueOnce(rows([{ rendszam: 'B 104 VLR', object_id: '7' }]))
+      .mockResolvedValueOnce(rows([]))                                            // nincs régi formátumú nap
+      .mockResolvedValueOnce(rows([{ credentials_enc: 'enc' }]))                  // CargoTrack kulcs
+      .mockResolvedValueOnce(rows([{ day: '2026-10-03' }, { day: '2026-10-02' }, { day: '2026-10-01' }])) // hiányzó napok
+      .mockResolvedValueOnce(rows([]))                                            // mergeDay: meglévő sor
+      .mockResolvedValueOnce(rows([]))                                            // mergeDay: upsert
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));                                           // napok lekérése
+    const r = await call('gpsTrackRange', [{ rendszam: 'b104vlr', from: '2026-10-01', to: '2026-10-03' }]);
+    expect(r.body.result.ok).toBe(true);
+    expect(r.body.result.missing_days).toBe(1);
+    expect(pool.query.mock.calls[3][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-03']);
+    expect(ct.getCoordinates).toHaveBeenCalled();
+    expect(ct.getCoordinates.mock.calls[0][0]).toBe('KEY-enc');
+    const ups = pool.query.mock.calls.filter((c) => /INSERT INTO gps_track_days/.test(c[0]));
+    expect(ups.map((c) => c[1][3])).toEqual(['2026-10-03', '2026-10-02']);
+    expect(ups.every((c) => c[1][7] === true && c[1][0] === CID)).toBe(true);
   });
 });
 

@@ -1551,6 +1551,8 @@ function startGpsTrackHistoryScheduler() {
   const BACKFILL = Math.max(1, Math.min(31, parseInt(process.env.GPS_TRACK_BACKFILL_DAYS, 10) || 7));
   const RETENTION = Math.max(35, parseInt(process.env.GPS_TRACK_RETENTION_DAYS, 10) || 100);
   const MIN = Math.max(5, parseInt(process.env.GPS_TRACK_INTERVAL_MIN, 10) || 15);
+  // ennyi napra visszamenőleg töltjük vissza az előzményt (a megőrzésen belül)
+  const HISTORY = Math.max(1, Math.min(RETENTION, parseInt(process.env.GPS_TRACK_HISTORY_DAYS, 10) || 60));
   const DAYS_PER_TICK = 3;          // járművenként ennyi napot tölt egy körben (visszatöltés szétterítve)
   const MATCH_BUDGET_MS = 6 * 60 * 1000;
   let running = false;
@@ -1585,6 +1587,10 @@ function startGpsTrackHistoryScheduler() {
       const pts = await gt.fetchRange(apiKey, objectId, ds, de);
       await gt.mergeDay(cid, plate, objectId, r.day, pts, de, true);
     }
+    // előzmény-visszatöltés: a hiányzó múltbeli napok, a legfrissebbtől visszafelé
+    try {
+      await gt.backfillDays(cid, apiKey, plate, objectId, gt.addDays(today, -(HISTORY - 1)), today, DAYS_PER_TICK);
+    } catch (e) { console.warn('[GpsTrack] előzmény-visszatöltés hiba', plate, e.message); }
     // régi formátumú napok (tartály-szint nélkül): tickenként 2, a legfrissebbek elöl
     try {
       const old = await pool.query(
@@ -1625,7 +1631,7 @@ function startGpsTrackHistoryScheduler() {
       try {
         const { rows } = await pool.query(
           `SELECT company_id, rendszam, day::text AS day, points_json FROM gps_track_days
-            WHERE complete=true AND matched_at IS NULL ORDER BY day DESC LIMIT 30`);
+            WHERE complete=true AND matched_at IS NULL AND point_count > 1 ORDER BY day DESC LIMIT 30`);
         for (const r of rows) {
           if (Date.now() - t0 > MATCH_BUDGET_MS) break;
           try { await gt.matchAndSaveDay(r); } catch (e) { console.warn('[GpsTrack] illesztés hiba', r.rendszam, r.day, e.message); }
