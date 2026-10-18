@@ -5453,9 +5453,13 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #axleLoadBox .axl-svg { display: block; width: 100%; height: auto; max-width: 900px; margin: 0 auto; }
 #axleLoadBox .axl-legend { font-size: 12px; color: #64748b; margin-top: 6px; text-align: center; }
 #axleLoadBox .axl-blk { cursor: pointer; }
-#axleLoadBox .axl-cab { fill: #e2e8f0; stroke: #64748b; stroke-width: 1.5; }
+#axleLoadBox .axl-cab { fill: #a9d3d6; stroke: #4f8389; stroke-width: 1.4; stroke-linejoin: round; }
+#axleLoadBox .axl-bumper { fill: #1f2937; }
+#axleLoadBox .axl-vent { fill: #374151; stroke: #1f2937; stroke-width: 1; }
+#axleLoadBox .axl-trim { fill: none; stroke: #1f2937; stroke-width: 3; stroke-linecap: round; }
+#axleLoadBox .axl-indicator { fill: #f59e0b; }
 #axleLoadBox .axl-glass { fill: #475569; opacity: 0.85; }
-#axleLoadBox .axl-line { fill: none; stroke: #94a3b8; stroke-width: 1.2; }
+#axleLoadBox .axl-line { fill: none; stroke: #4f8389; stroke-width: 1.2; }
 #axleLoadBox .axl-line-f { fill: #64748b; }
 #axleLoadBox .axl-headlight { fill: #fde68a; stroke: #b45309; stroke-width: 0.8; }
 #axleLoadBox .axl-taillight { fill: #dc2626; }
@@ -5524,9 +5528,9 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-cfg-h { color: #e2e8f0; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-kpi-bar { background: #334155; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-bed { fill: rgba(255,255,255,0.04); stroke: #64748b; }
-.main-content[data-theme="dark"] #axleLoadBox .axl-cab { fill: #94a3b8; stroke: #cbd5e1; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-cab { fill: #8fc1c5; stroke: #cfe8ea; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-glass { fill: #1e293b; }
-.main-content[data-theme="dark"] #axleLoadBox .axl-line { stroke: #475569; }
+.main-content[data-theme="dark"] #axleLoadBox .axl-line { stroke: #4f8389; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-tank, .main-content[data-theme="dark"] #axleLoadBox .axl-rim { fill: #64748b; stroke: #94a3b8; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-guard { stroke: #94a3b8; }
 .main-content[data-theme="dark"] #axleLoadBox .axl-wheel { stroke: #64748b; }

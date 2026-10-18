@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-18 — ⚖️ Tengelyterhelés-kalkulátor: új vontató a megadott Actros-oldalnézet alapján (PR #558)
+
+- A kalkulátor vontatója a felhasználó által küldött oldalnézet arányai szerint újrarajzolva (`public/axle-load.js` `drawSvg`): magas fülke ívelt tetővel és légterelővel, nagy oldalablak, ajtó- és rekesz-vonalak, kilincs, díszléc, tükrök, sötét lökhárító fényszóróval és irányjelzővel, nagy kerékív, oldalburkolat két szellőzővel és jelzőfénnyel, hátsó sárfogó. Világos türkiz fényezés (sötét témán is).
+- A kép maga nem került be (jogvédett render, gyártói logóval); a rajz méter-koordinátákból épül, így a tengelytáv/nyereg/emelhető tengely továbbra is pontos. Cache-bust `?v=20261018tractor`.
+
 ## 2026-10-18 — ⚖️ Tengelyterhelés-kalkulátor: valósághű kamion-rajz (PR #557)
 
 - **Kérés:** képalapú kamion a kalkulátorba (minta: Mercedes Actros L + ponyvás pótkocsi oldalnézet).
