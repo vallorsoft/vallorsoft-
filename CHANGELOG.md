@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-18 — 🖨️ Menetlevél-nyomtatvány: a „Calcul consum combustibil" blokk fixen a 2. helyen (PR #PRNUM)
+## 2026-10-18 — 🖨️ Menetlevél-nyomtatvány: a „Calcul consum combustibil" blokk fixen a 2. helyen (PR #556)
 
 - **Kérés:** a nyomtatható menetlevélen a teljes fogyasztás-számítási blokk kerüljön a fejléc + adat-kártya UTÁN, fixen 2. blokként (eddig a Tankolások táblázat után, a lap közepén volt).
 - **`routes/soferApi.js` `/api/pdf-download/:id`:** sorrend: fejléc → sofőr/jármű/km adat-kártya → 🧮 Calcul consum combustibil (összegző + „Consum mediu / 100 km") → útvonal-pontok → tankolások → kiadások → mențiuni → aláírás. A cím + két kártya egy `keep` blokkban marad (nyomtatáskor nem törik szét). Adattartalom változatlan; tisztán szerver-oldali sablon-csere.
