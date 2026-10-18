@@ -19,9 +19,9 @@ describe('idő (Europe/Bucharest)', () => {
 describe('pontok', () => {
   test('normalizeItem: CargoTrack v2 rekord → tömör pont', () => {
     const p = gt.normalizeItem({ datetime: '2026-07-15T08:00:00Z', ignition_status: 'on',
-      position: { latitude: 45.123456, longitude: 25.654321, speed: 82 },
-      inputs: { calculated_inputs: { mileage: 123456.78, fuel_consumption: 5000.123 } } });
-    expect(p).toEqual([Date.parse('2026-07-15T08:00:00Z') / 1000, 45.12346, 25.65432, 82, 1, 123456.8, 5000.12]);
+      position: { latitude: 45.123456, longitude: 25.654321, speed: 82, direction: 271 },
+      inputs: { calculated_inputs: { mileage: 123456.78, fuel_consumption: 5000.123, fuel_level: 660.04 } } });
+    expect(p).toEqual([Date.parse('2026-07-15T08:00:00Z') / 1000, 45.12346, 25.65432, 82, 1, 123456.8, 5000.12, 660, 271]);
     expect(gt.normalizeItem({ datetime: '2026-07-15T08:00:00Z', position: { latitude: 0, longitude: 0 } })).toBeNull();
   });
   test('cleanPoints: rendez, duplikátumot és GPS-ugrást szűr', () => {
@@ -58,6 +58,28 @@ describe('menetek és állások', () => {
     expect(gt.fuelDelta(pts, 0, pts.length - 1)).toBeCloseTo(4, 0);
     expect(gt.odoDelta([[0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 9000]], 0, 1)).toBeNull();
     expect(gt.odoDelta([[0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 9000]], 0, 1, 50000)).toBe(9000);
+  });
+});
+
+describe('tartály-szint fogyasztás + legközelebbi pont', () => {
+  test('fogyasztás = kezdő − záró + tankolás; zaj nem tankolás', () => {
+    const pts = [];
+    // 600 L → 400 L (zajjal), tankolás +300 L, majd 700 L → 650 L
+    for (let i = 0; i <= 40; i++) pts.push([i * 60, 45, 25 + i * 0.001, 60, 1, null, null, 600 - i * 5 + (i % 2 ? 3 : -3)]);
+    for (let i = 1; i <= 5; i++) pts.push([2400 + i * 60, 45, 25.04, 0, 0, null, null, 400 + i * 60]);
+    for (let i = 1; i <= 10; i++) pts.push([2700 + i * 60, 45, 25.04 + i * 0.001, 60, 1, null, null, 700 - i * 5]);
+    const r = gt.levelFuel(pts);
+    expect(r.refuels).toHaveLength(1);
+    expect(r.refuels[0].liters).toBeGreaterThan(270);
+    expect(r.used).toBeGreaterThan(215);
+    expect(r.used).toBeLessThan(270);
+    expect(gt.levelFuel([[0, 45, 25, 0, 0, null, null]])).toBeNull();
+  });
+  test('nearestPoint', () => {
+    const pts = [[0, 45, 25], [1, 45.01, 25], [2, 45.02, 25]];
+    const n = gt.nearestPoint(pts, 45.011, 25);
+    expect(n.i).toBe(1);
+    expect(n.dist_m).toBeLessThan(200);
   });
 });
 

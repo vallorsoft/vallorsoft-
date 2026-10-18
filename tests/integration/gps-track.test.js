@@ -81,3 +81,37 @@ describe('gpsTrackRange', () => {
     expect(pool.query.mock.calls[1][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-01']);
   });
 });
+
+describe('gpsTrackPoint', () => {
+  test('Sofer nem éri el', async () => {
+    setUser(SOFER);
+    const r = await call('gpsTrackPoint', [{ rendszam: 'B104VLR', day: '2026-10-01', lat: 45, lng: 25 }]);
+    expect(r.body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+  test('legközelebbi pont + tartály-korrekció, cégre szűrve', async () => {
+    setUser(ADMIN);
+    const pts = [[100, 45.0, 25.0, 0, 0, 1000, 50, 500, 90], [160, 45.01, 25.0, 70, 1, 1001.1, 50.4, 499.6, 0], [220, 45.02, 25.0, 75, 1, 1002.2, 50.8, 499.2, 0]];
+    pool.query
+      .mockResolvedValueOnce(rows([{ rendszam: 'B 104 VLR' }]))
+      .mockResolvedValueOnce(rows([{ points_json: JSON.stringify(pts) }]))
+      .mockResolvedValueOnce(rows([{ fuel_correction_l: -20 }]));
+    const r = await call('gpsTrackPoint', [{ rendszam: 'b104vlr', day: '2026-10-01', lat: 45.0102, lng: 25.0 }]);
+    const p = r.body.result.point;
+    expect(r.body.result.ok).toBe(true);
+    expect(p.speed).toBe(70);
+    expect(p.fuel_level).toBeCloseTo(479.6);
+    expect(p.mileage).toBeCloseTo(1001.1);
+    expect(p.km_day).toBeCloseTo(1.1);
+    expect(p.fuel_day).toBeCloseTo(0.4);
+    expect(pool.query.mock.calls[1][1]).toEqual([CID, 'B 104 VLR', '2026-10-01']);
+  });
+  test('messze a ponttól → hiba', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce(rows([{ rendszam: 'B104VLR' }]))
+      .mockResolvedValueOnce(rows([{ points_json: JSON.stringify([[100, 45, 25, 0, 0, 1, 1, 1]]) }]));
+    const r = await call('gpsTrackPoint', [{ rendszam: 'B104VLR', day: '2026-10-01', lat: 46, lng: 25 }]);
+    expect(r.body.result.ok).toBe(false);
+  });
+});

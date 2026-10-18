@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-18 — 🗺️ GPS útvonal: kattintható pont-adatok + fogyasztás/tankolás a GPS-ből (PR #PRNUM)
+
+- **Kattintás az útvonalra** (`public/gps-daily-track.js` `pointPopup`, széles láthatatlan kattintó-sáv): a CargoTrack-szerű kék buborék mutatja a legközelebbi GPS-rekordot — időpont, helynév, sebesség, irány, gyújtás, **üzemanyag-szint** (a jármű `fuel_correction_l` korrekciójával), km-óra, aznap megtett km, aznapi fogyasztás és átlag. Új RPC: `handlers/gpsTrack.js` `gpsTrackPoint` (Admin/Manager, company_id-szűrt, a rendszám csak a cég saját GPS-párosításából).
+- **Pont-formátum bővítve** (`lib/gpsTrack.js` `normalizeItem`): + tartály-szint, + irány (a régi mentett pontokban hiányozhat — kezelve).
+- **Fogyasztás a tartály-szintből** (`levelFuel`): medián-simítás (tankolás-ugráson nem nyúlik át), tankolás-felismerés (≥20 L emelkedés), fogyasztás = kezdő − záró + tankolás. Ha az eszköz nem ad fogyasztás-számlálót, az összesítő ebből számol („din nivel" jelzés); ha ad, mellette ellenőrzésként is látszik. Menetenkénti fogyasztás a listában, ⛽ tankolás-jelölők a térképen.
+- Teszt: +5 eset. i18n `gtr.*` (RO+HU), cache-bust `?v=20261018gtrpt`.
+
 ## 2026-10-18 — 🗺️ GPS útvonal-előzmény: teljes útvonal mentve, útra illesztve, pontos km (PR #559)
 
 - **Gond:** a „Napi GPS útvonal" csak 10 percenként tárolt egy pontot (≥200 m-es szűrővel), és ezeket egyenessel kötötte össze → a vonal átvágott tájon, a km pontatlan volt, 7 nap után törlődött.

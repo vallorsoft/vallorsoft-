@@ -101,7 +101,8 @@
         '<div class="gtr-mapwrap"><div id="gtrMap" class="gtr-map"></div>' +
           '<div class="gtr-legend"><span><i class="gtr-l m"></i>' + esc(tt('gtr.legMatched', 'pe drum')) + '</span>' +
           '<span><i class="gtr-l r"></i>' + esc(tt('gtr.legRaw', 'puncte GPS (neajustat)')) + '</span>' +
-          '<span><i class="gtr-l g"></i>' + esc(tt('gtr.legGap', 'lipsă semnal, completat pe drum')) + '</span></div>' +
+          '<span><i class="gtr-l g"></i>' + esc(tt('gtr.legGap', 'lipsă semnal, completat pe drum')) + '</span>' +
+          '<span>👆 ' + esc(tt('gtr.clickHint', 'click pe traseu = date GPS în acel punct')) + '</span></div>' +
         '</div>' +
       '</div>';
     var wk = presetRange('week');
@@ -155,7 +156,9 @@
       row(tt('gtr.stopDur', 'Durată oprire'), dur(T.stop_sec)) +
       row(tt('gtr.kmRoad', 'Kilometraj pe drum (GPS)'), km(T.km_road), true) +
       row(tt('gtr.kmOdo', 'Kilometraj (bord)'), km(T.km_odo)) +
-      row(tt('gtr.fuel', 'Combustibil consumat'), num(T.fuel, 'l')) +
+      row(tt('gtr.fuel', 'Combustibil consumat') + (T.fuel_src === 'level' ? ' (' + tt('gtr.fromLevel', 'din nivel') + ')' : ''), num(T.fuel, 'l')) +
+      (T.fuel_src === 'counter' && T.fuel_level_used != null ? row(tt('gtr.fuelByLevel', 'Consum după nivel rezervor'), num(T.fuel_level_used, 'l')) : '') +
+      (T.refuel_count ? row(tt('gtr.refuels', 'Alimentări detectate'), T.refuel_count + ' · ' + num(T.refuel_l, 'l')) : '') +
       row(tt('gtr.avg', 'Medie consum'), T.avg_l100 == null ? '—' : num(T.avg_l100, 'l/100km')) +
       row(tt('gtr.lph', 'Consum pe oră'), T.l_per_h == null ? '—' : num(T.l_per_h, 'l/h')) +
       (T.pending_days ? '<div class="gtr-note">⏳ ' + esc(tt('gtr.pending', '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.', { n: T.pending_days })) + '</div>' : '') +
@@ -174,7 +177,7 @@
         items.map(function (it) {
           if (it.k === 's') return '<div class="gtr-it stop" data-gtr-stop="' + d.day + '|' + it.i + '"><span class="gtr-dot s"></span><span class="gtr-t">' + hm(it.from) + ' Stop</span><span class="gtr-v">' + dur(it.to - it.from) + '</span></div>';
           var kmv = it.x.km_odo != null ? it.x.km_odo : it.x.km_gps;
-          return '<div class="gtr-it trip" data-gtr-trip="' + d.day + '|' + it.i + '"><span class="gtr-dot t"></span><span class="gtr-t">' + hm(it.from) + ' Start → ' + hm(it.to) + '</span><span class="gtr-v">' + dur(it.to - it.from) + ' · ' + km(kmv) + '</span></div>';
+          return '<div class="gtr-it trip" data-gtr-trip="' + d.day + '|' + it.i + '"><span class="gtr-dot t"></span><span class="gtr-t">' + hm(it.from) + ' Start → ' + hm(it.to) + '</span><span class="gtr-v">' + dur(it.to - it.from) + ' · ' + km(kmv) + (it.x.fuel != null || it.x.fuel_level_used != null ? ' · ' + num(it.x.fuel != null ? it.x.fuel : it.x.fuel_level_used, 'l') : '') + '</span></div>';
         }).join('') +
       '</div>';
     }).join('');
@@ -209,6 +212,16 @@
         } else {
           L.polyline(ll, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(_layers);
         }
+        // széles, láthatatlan kattintó-sáv: a vonal bármely pontjára kattintva a GPS-adatok
+        L.polyline(ll, { color: '#000', weight: 18, opacity: 0, interactive: true, className: 'gtr-hit' })
+          .on('click', function (e) { pointPopup(d.day, e.latlng); })
+          .addTo(_layers);
+      });
+      (d.refuels || []).forEach(function (f) {
+        L.marker([f.lat, f.lng], { icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin f">⛽</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) })
+          .bindPopup('<b>' + esc(tt('gtr.refuel', 'Alimentare (din nivel rezervor)')) + '</b><br>' + esc(dayLabel(d.day)) + ' ' + hm(f.t) +
+            '<br>+' + esc(num(f.liters, 'l')) + ' (' + esc(num(f.before, 'l')) + ' → ' + esc(num(f.after, 'l')) + ')')
+          .addTo(_layers);
       });
       d.stops.forEach(function (s) {
         var long = (s.to - s.from) >= 3600;
@@ -225,6 +238,34 @@
         .bindPopup('<b>' + esc(tt('gtr.endLoc', 'Locație oprire')) + '</b><br>' + esc(T.end.name || '')).addTo(_layers);
     }
     if (bounds.length) { try { _map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] }); } catch (_) {} }
+  }
+
+  // Kattintott pont adatai (CargoTrack-szerű buborék)
+  function pointPopup(day, latlng) {
+    if (!_map) return;
+    var pop = L.popup({ maxWidth: 300, className: 'gtr-ppop' }).setLatLng(latlng)
+      .setContent('<div class="gtr-pp-load">' + esc(tt('gtr.loadingPt', 'Se încarcă…')) + '</div>').openOn(_map);
+    var plate = document.getElementById('gtrVeh').value;
+    _gas('gpsTrackPoint', [{ rendszam: plate, day: day, lat: latlng.lat, lng: latlng.lng }]).then(function (r) {
+      if (!r || !r.ok) { pop.setContent('<div class="gtr-pp-load">' + esc((r && r.err) || tt('common.error', 'Eroare')) + '</div>'); return; }
+      var p = r.point;
+      var dir = p.direction != null ? '<span class="gtr-pp-arrow" style="transform:rotate(' + Number(p.direction) + 'deg)">➤</span> ' + p.direction + '°' : '—';
+      var ign = p.ignition == null ? '—' : (p.ignition ? tt('gtr.ignOn', 'pornit') : tt('gtr.ignOff', 'oprit'));
+      function pr(l, v) { return '<div class="gtr-pp-r"><span>' + esc(l) + '</span><b>' + v + '</b></div>'; }
+      pop.setLatLng([p.lat, p.lng]).setContent(
+        '<div class="gtr-pp">' +
+          '<div class="gtr-pp-h"><b>' + esc(plate) + '</b><span>' + esc(dayLabel(day)) + ' ' + hm(p.t) + '</span></div>' +
+          (p.name ? '<div class="gtr-pp-loc">' + esc(p.name) + '</div>' : '') +
+          pr(tt('gtr.speed', 'Viteză'), esc(num(p.speed, 'km/h'))) +
+          pr(tt('gtr.dir', 'Direcție'), dir) +
+          pr(tt('gtr.ign', 'Contact'), esc(ign)) +
+          pr(tt('gtr.fuelLevel', 'Nivel combustibil'), esc(num(p.fuel_level, 'l'))) +
+          pr(tt('gtr.odo', 'Kilometraj GPS'), esc(p.mileage == null ? '—' : km(p.mileage))) +
+          pr(tt('gtr.kmDay', 'Km în ziua respectivă'), esc(km(p.km_day))) +
+          pr(tt('gtr.fuelDay', 'Consum în ziua respectivă'), esc(num(p.fuel_day, 'l'))) +
+          (p.avg_day != null ? pr(tt('gtr.avg', 'Medie consum'), esc(num(p.avg_day, 'l/100km'))) : '') +
+        '</div>');
+    }).catch(function () { pop.setContent('<div class="gtr-pp-load">' + esc(tt('common.error', 'Eroare')) + '</div>'); });
   }
 
   window.loadGpsDailyTrack = function () {

@@ -5673,3 +5673,20 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   #gpsDailyTrackBox .gtr-mapwrap { order: -1; }
   #gpsDailyTrackBox .gtr-map { height: 60vh; min-height: 360px; }
 }
+
+/* GPS útvonal: kattintott pont buborék + tankolás jelölő */
+#gpsDailyTrackBox .gtr-pin.f { background: #16a34a; font-size: 13px; }
+.gtr-ppop .leaflet-popup-content-wrapper { background: #1e4f8c; color: #fff; border-radius: 12px; padding: 0; }
+.gtr-ppop .leaflet-popup-tip { background: #1e4f8c; }
+.gtr-ppop .leaflet-popup-content { margin: 0; min-width: 240px; }
+.gtr-ppop a.leaflet-popup-close-button { color: #fff; }
+.gtr-pp-load { padding: 12px 14px; font-size: 13px; }
+.gtr-pp-h { display: flex; flex-direction: column; gap: 2px; padding: 12px 30px 8px 14px; }
+.gtr-pp-h b { font-size: 15px; }
+.gtr-pp-h span { font-size: 12px; opacity: 0.85; }
+.gtr-pp-loc { padding: 0 14px 10px; font-size: 12.5px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.22); }
+.gtr-pp-r { display: flex; justify-content: space-between; gap: 12px; padding: 5px 14px; font-size: 12.5px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+.gtr-pp-r:last-child { border-bottom: 0; padding-bottom: 10px; }
+.gtr-pp-r span { opacity: 0.85; }
+.gtr-pp-arrow { display: inline-block; }
+.gtr-hit { cursor: pointer; }
