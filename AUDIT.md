@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 57. lépés — GPS útvonal-előzmény 2 éves megőrzés + visszatöltés (2026-10-18, PR #567) ✅ KÉSZ
+- **Megőrzés-változás (felhasználói kérésre):** a `gps_track_days` alap megőrzése 100 nap → **730 nap (2 év)**, és a CargoTrackből visszamenőleg 2 évig töltődik vissza (`GPS_TRACK_RETENTION_DAYS` / `GPS_TRACK_HISTORY_DAYS`, egy forrás: `lib/gpsTrack.js`). A napi takarító továbbra is törli a megőrzésnél régebbi napokat. **GDPR-teendő:** a jogi oldalakon a sofőr GPS-adatának megőrzési idejét ehhez kell igazítani (jelenleg „foglalkoztatás + 1 év").
+- Izoláció változatlan: a visszatöltés csak a cég saját párosított járműveire fut, `company_id`-szűrt paraméteres SQL; a végleges szolgáltató-hiba (400/404/422) üres napként jelölődik, átmeneti hiba (5xx/timeout) újrapróbálódik.
+
 ### 56. lépés — GPS útvonal pont-lekérdezés (2026-10-18, PR #560) ✅ KÉSZ
 - Új `gpsTrackPoint` RPC: csak Admin/Manager, `company_id`-szűrt paraméteres SQL, a rendszám a cég saját `vehicle_gps_map` párosításából (idegen → elutasítás); bemenet-validáció (nap, lat/lng tartomány), 3 km-nél távolabbi kattintásra nincs adat. Új tárolt mező a meglévő `gps_track_days` pontokban (tartály-szint, irány) — a meglévő megőrzés/takarítás vonatkozik rá. A tartály-szint a jármű korrekciójával megy ki.
 

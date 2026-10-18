@@ -174,3 +174,31 @@ describe('fetchRange (CargoTrack)', () => {
     expect(pts).toHaveLength(2);
   });
 });
+
+describe('backfillDays (előzmény-visszatöltés)', () => {
+  const { pool, rows, reset } = require('../helpers/db-mock');
+  beforeEach(() => { reset(); ct.getCoordinates.mockReset(); });
+  test('alap: 2 év megőrzés és visszatöltés', () => {
+    expect(gt.RETENTION_DAYS).toBe(730);
+    expect(gt.HISTORY_DAYS).toBe(730);
+  });
+  test('végleges szolgáltató-hiba (400) → üres nap mentve, nem dob', async () => {
+    ct.getCoordinates.mockRejectedValue(Object.assign(new Error('too old'), { status: 400 }));
+    pool.query
+      .mockResolvedValueOnce(rows([{ day: '2025-01-02' }]))   // hiányzó nap
+      .mockResolvedValueOnce(rows([]))                        // mergeDay: meglévő sor
+      .mockResolvedValueOnce(rows([]));                       // upsert
+    const r = await gt.backfillDays(1, 'K', 'B1', '7', '2025-01-01', '2025-01-03', 6, { pauseMs: 0 });
+    expect(r.done).toBe(1);
+    const up = pool.query.mock.calls.find((c) => /INSERT INTO gps_track_days/.test(c[0]));
+    expect(up[1][3]).toBe('2025-01-02');
+    expect(up[1][5]).toBe(0);
+    expect(up[1][7]).toBe(true);
+  });
+  test('átmeneti hiba (503) → dob, a nap nem jelölődik üresnek', async () => {
+    ct.getCoordinates.mockRejectedValue(Object.assign(new Error('busy'), { status: 503 }));
+    pool.query.mockResolvedValueOnce(rows([{ day: '2025-01-02' }]));
+    await expect(gt.backfillDays(1, 'K', 'B1', '7', '2025-01-01', '2025-01-03', 6, { pauseMs: 0 })).rejects.toThrow('busy');
+    expect(pool.query.mock.calls.some((c) => /INSERT INTO gps_track_days/.test(c[0]))).toBe(false);
+  });
+});
