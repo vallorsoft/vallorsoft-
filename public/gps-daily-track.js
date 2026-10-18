@@ -245,12 +245,14 @@
     if (!_map) return;
     var pop = L.popup({ maxWidth: 300, className: 'gtr-ppop' }).setLatLng(latlng)
       .setContent('<div class="gtr-pp-load">' + esc(tt('gtr.loadingPt', 'Se încarcă…')) + '</div>').openOn(_map);
-    var plate = document.getElementById('gtrVeh').value;
+    var selEl = document.getElementById('gtrVehicle');
+    var plate = (_data && _data.rendszam) || (selEl ? selEl.value : '');
     var done = false;
     var tmo = setTimeout(function () { if (!done) { done = true; pop.setContent('<div class="gtr-pp-load">' + esc(tt('gtr.ptTimeout', 'Serverul nu a răspuns — încearcă din nou.')) + '</div>'); } }, 20000);
     _gas('gpsTrackPoint', [{ rendszam: plate, day: day, lat: latlng.lat, lng: latlng.lng }]).then(function (r) {
       if (done) return; done = true; clearTimeout(tmo);
       if (!r || !r.ok) { pop.setContent('<div class="gtr-pp-load">' + esc((r && r.err) || tt('common.error', 'Eroare')) + '</div>'); return; }
+      try {
       var p = r.point;
       var dir = p.direction != null ? '<span class="gtr-pp-arrow" style="transform:rotate(' + Number(p.direction) + 'deg)">➤</span> ' + p.direction + '°' : '—';
       var ign = p.ignition == null ? '—' : (p.ignition ? tt('gtr.ignOn', 'pornit') : tt('gtr.ignOff', 'oprit'));
@@ -268,6 +270,10 @@
           pr(tt('gtr.fuelDay', 'Consum în ziua respectivă'), esc(num(p.fuel_day, 'l'))) +
           (p.avg_day != null ? pr(tt('gtr.avg', 'Medie consum'), esc(num(p.avg_day, 'l/100km'))) : '') +
         '</div>');
+      } catch (e) {
+        try { console.warn('[GpsTrack] buborék-render hiba', e); } catch (_) {}
+        pop.setContent('<div class="gtr-pp-load">' + esc(tt('common.error', 'Eroare')) + '</div>');
+      }
     }).catch(function (e) {
       if (done) return; done = true; clearTimeout(tmo);
       try { console.warn('[GpsTrack] pont-lekérés hiba', e); } catch (_) {}
