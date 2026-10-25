@@ -2104,6 +2104,7 @@
     'cs.ol.mTrack':    { hu: 'Követő-link', ro: 'Link urmărire' },
     'cs.ol.mTplMail':  { hu: 'Sablonból e-mail', ro: 'E-mail din șablon' },
     'cs.ol.mOrderMail':{ hu: 'Email a fuvarról', ro: 'E-mail despre cursă' },
+    'cs.ol.mRouteMap':{ hu: 'Útvonal a térképen', ro: 'Traseu pe hartă' },
     'cs.ol.mAssignment': { hu: 'Megbízás (PDF)', ro: 'Comandă de Transport' },
     // Alvállalkozó űrlap — ANAF gomb + új mezők (Reg.Com. + Adresa)
     'cs.ca.regCom':       { hu: 'Nr. Reg. Com.', ro: 'Nr. Reg. Com.' },

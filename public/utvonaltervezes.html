@@ -280,6 +280,30 @@
     @media (max-width: 640px) {
       #topPanel.half { max-height: 68vh; }
     }
+    /* ── 📦 Fuvar betöltése ── */
+    .ord-box { margin-bottom:10px; }
+    .ord-search-wrap { position:relative; }
+    #ordSearch { width:100%; }
+    .ord-ac-item .s { font-size:11.5px; color:#64748b; margin-top:2px; }
+    .ord-ac-item .st { display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:99px; background:#eef2ff; color:#3730a3; margin-left:4px; }
+    .ord-card { margin-top:8px; padding:10px 12px; border-radius:10px; background:linear-gradient(135deg,#eef2ff,#f5f3ff); border:1.5px solid #c7d2fe; font-size:12.5px; color:#1e1b4b; }
+    .ord-card .h { display:flex; align-items:center; gap:8px; font-weight:800; font-size:13.5px; }
+    .ord-card .h .x { margin-left:auto; border:1px solid #c7d2fe; background:#fff; color:#3730a3; border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px; font-weight:700; }
+    .ord-card .m { margin-top:4px; color:#4338ca; font-weight:600; }
+    .ord-card label { display:flex; align-items:center; gap:6px; margin-top:8px; font-weight:700; cursor:pointer; }
+    .wp-sub { font-size:11px; color:#64748b; margin:2px 0 0 4px; font-weight:600; }
+    .wp-kind { display:inline-block; font-size:10px; font-weight:800; padding:1px 6px; border-radius:99px; margin-right:4px; text-transform:uppercase; letter-spacing:0.04em; }
+    .wp-kind.pickup { background:#dcfce7; color:#166534; }
+    .wp-kind.delivery { background:#fee2e2; color:#991b1b; }
+    .wp-kind.via { background:#fef3c7; color:#92400e; }
+    .wp-kind.gps { background:#e0f2fe; color:#075985; }
+    .rp-num { width:26px; height:26px; border-radius:50%; color:#fff; font-weight:800; font-size:12px; display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow:0 2px 6px rgba(15,23,42,0.35); transform:translate(-13px,-13px); font-family:'Inter',system-ui,sans-serif; }
+    .legs-box { margin:0 0 12px; }
+    .legs-box .eco { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 8px; }
+    .legs-box .eco span { padding:5px 10px; border-radius:99px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:12px; font-weight:700; color:#0f172a; }
+    .legs-box .eco span.warn { background:#fef3c7; border-color:#fcd34d; color:#78350f; }
+    .legs-box .save-row { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .legs-box .save-row .hint { font-size:11.5px; color:#64748b; }
     /* Fogantyús húzás közben ne animáljon */
     #topPanel.dragging { transition: none !important; }
   </style>
@@ -303,6 +327,14 @@
     <div class="tp-head">
       <div class="brand">vallor<span class="soft">Soft</span></div>
       <a href="/admin" class="back">← Înapoi</a>
+    </div>
+
+    <div class="ord-box">
+      <div class="ord-search-wrap">
+        <input id="ordSearch" class="wp-input" placeholder="📦 Încarcă o cursă (nr. cursă, client, oraș)…" autocomplete="off">
+        <div id="ordAc" class="wp-ac"></div>
+      </div>
+      <div id="ordCard" class="ord-card" style="display:none;"></div>
     </div>
 
     <div id="wpList" class="wp-list"></div>
@@ -356,6 +388,7 @@
       <div class="kpi"><div class="k">Combustibil</div><div class="v" id="kpiFuel">—</div><div class="k" id="kpiFuelSub" style="font-size:11px;font-weight:600;margin-top:2px;color:#64748b;">—</div></div>
       <div class="kpi" style="background:linear-gradient(135deg,#eef2ff,#f5f3ff);border-color:#c7d2fe;"><div class="k" style="color:#4338ca;">TOTAL (EUR)</div><div class="v" id="kpiTotal" style="color:#3730a3;">—</div><div class="k" id="kpiTotalRon" style="font-size:11px;font-weight:700;margin-top:2px;color:#4338ca;">—</div></div>
     </div>
+    <div id="legsBox" class="legs-box" style="display:none;"></div>
     <!-- Kézi paraméter-sáv: BNR mindig; üzemanyag-kalkuláció opcionális, checkbox mögött -->
     <div class="param-box" style="margin-bottom:12px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;">
       <label style="display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:700;color:#334155;">
@@ -517,7 +550,7 @@ function shouldCollapse(){
 }
 
 function renderRow(w, i){
-  const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
+  const pin = wpPin(w, i);
   const canDel = waypoints.length > 2;
   const canUp = i > 0;
   const canDown = i < waypoints.length - 1;
@@ -527,6 +560,7 @@ function renderRow(w, i){
     + '<div class="wp-input-wrap">'
     +   '<input class="wp-input" id="in_'+w.id+'" placeholder="'+ph+'" value="'+esc(w.label||'')+'" autocomplete="off">'
     +   '<div class="wp-ac" id="ac_'+w.id+'"></div>'
+    +   wpSubLine(w)
     + '</div>'
     + '<div class="wp-side">'
     +   (canUp   ? '<button class="wp-btn" data-mv="up"   data-id="'+w.id+'" title="Sus">▲</button>'   : '<span class="wp-btn-x"></span>')
@@ -945,6 +979,7 @@ function removeWaypoint(id){
   drawMarkers();
 }
 function resetAll(){
+  _rpOrder = null; renderOrderCard(); const lb = document.getElementById('legsBox'); if (lb) { lb.style.display='none'; lb.innerHTML=''; }
   waypoints = [ { id: nid(), label:'', lat:null, lng:null }, { id: nid(), label:'', lat:null, lng:null } ];
   render();
   if (routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
@@ -956,12 +991,21 @@ function resetAll(){
 
 function drawMarkers(){
   markerLayer.clearLayers();
+  const anyKind = waypoints.some(w => w.kind);
   waypoints.forEach((w, i) => {
     if (w.lat == null || w.lng == null) return;
-    const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
-    L.marker([w.lat, w.lng], { title: w.label,
-      icon: L.divIcon({ className:'', html: '<div style="font-size:26px;line-height:26px;transform:translate(-13px,-24px);">'+pin+'</div>', iconSize:[26,26] })
-    }).addTo(markerLayer);
+    let icon;
+    if (anyKind) {
+      // Betöltött fuvar: számozott kör, színe a pont típusa szerint
+      const col = WP_COLORS[w.kind] || '#64748b';
+      icon = L.divIcon({ className:'', iconSize:[26,26],
+        html: '<div class="rp-num" style="background:'+col+';">'+(i+1)+'</div>' });
+    } else {
+      const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
+      icon = L.divIcon({ className:'', html: '<div style="font-size:26px;line-height:26px;transform:translate(-13px,-24px);">'+pin+'</div>', iconSize:[26,26] });
+    }
+    const tip = (w.kind ? (WP_KIND_LBL[w.kind] || '') + ' · ' : '') + (w.label || '') + (w.firma ? ' · ' + w.firma : '') + (w.date ? ' · ' + w.date : '');
+    L.marker([w.lat, w.lng], { title: tip, icon }).addTo(markerLayer).bindTooltip(esc(tip));
   });
 }
 
@@ -1054,7 +1098,217 @@ function applyVariant(v, allVariants, idx){
   }
   // Fuel + Toll + Total + RON — mind a recomputeAll-ban egy helyen
   recomputeAll();
+  _rpLastResult = v;
+  if (typeof renderLegs === 'function') renderLegs(v);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 📦 Fuvar betöltése — a fuvar ÖSSZES pontja a diszpécser sorrendjében
+// (getOrderRouteForPlanning), km/idő szakaszonként, opc. indulás a vontató
+// élő GPS-pozíciójából, és a km visszaírása a fuvarra (comUpdate).
+// ═══════════════════════════════════════════════════════════════
+const WP_COLORS  = { pickup:'#16a34a', delivery:'#dc2626', via:'#d97706', gps:'#0284c7' };
+const WP_KIND_LBL = { pickup:'Încărcare', delivery:'Descărcare', via:'Intermediar', gps:'Poziție GPS' };
+let _rpOrder = null;        // a betöltött fuvar metaadata
+let _rpLastResult = null;   // az utolsó (aktív) útvonal-változat
+let _rpGpsStart = false;    // indulás a vontató GPS-pozíciójából
+
+function wpPin(w, i){
+  if (w.kind === 'pickup') return '⬆️';
+  if (w.kind === 'delivery') return '⬇️';
+  if (w.kind === 'gps') return '🚚';
+  if (w.kind === 'via') return '🟡';
+  return i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
+}
+function wpSubLine(w){
+  if (!w.kind) return '';
+  const bits = [];
+  if (w.firma) bits.push('🏢 ' + esc(w.firma));
+  if (w.date) bits.push('📅 ' + esc(w.date));
+  if (w.done) bits.push('✅');
+  return '<div class="wp-sub"><span class="wp-kind ' + esc(w.kind) + '">' + esc(WP_KIND_LBL[w.kind] || '') + '</span>' + bits.join(' · ') + '</div>';
+}
+
+function renderOrderCard(){
+  const box = document.getElementById('ordCard');
+  if (!box) return;
+  const o = _rpOrder;
+  if (!o){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const meta = [];
+  if (o.client) meta.push('🏢 ' + esc(o.client));
+  if (o.tractor_rendszam) meta.push('🚚 ' + esc(o.tractor_rendszam) + (o.trailer_rendszam ? ' / ' + esc(o.trailer_rendszam) : ''));
+  if (o.nume_sofer) meta.push('👤 ' + esc(o.nume_sofer));
+  const meta2 = [];
+  meta2.push(esc(o.status || ''));
+  if (o.km != null) meta2.push('km în cursă: ' + o.km);
+  if (o.pret != null) meta2.push('preț: ' + o.pret.toFixed(2) + ' EUR');
+  box.innerHTML = '<div class="h">📦 ' + esc(o.fuvar_no || o.id)
+    + '<button class="x" onclick="unloadOrder()" title="Închide cursa">✕</button></div>'
+    + '<div class="m">' + meta.join(' · ') + '</div>'
+    + '<div class="m" style="color:#64748b;">' + meta2.join(' · ') + (_rpOrder._fromSaved ? ' · 🗺️ traseu salvat' : '') + '</div>'
+    + (o.tractor_id ? '<label><input type="checkbox" id="ordGpsStart"' + (_rpGpsStart ? ' checked' : '') + ' onchange="toggleGpsStart(this.checked)" style="accent-color:#0284c7;"> 🛰️ Pornire din poziția GPS a camionului (km gol până la încărcare)</label>' : '');
+  box.style.display = '';
+}
+
+function unloadOrder(){
+  _rpOrder = null; _rpGpsStart = false;
+  try { const u = new URL(location.href); u.searchParams.delete('order'); history.replaceState(null, '', u.toString()); } catch(_) {}
+  resetAll();
+}
+
+async function loadOrderRoute(orderId){
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('spin').classList.add('on');
+  try {
+    const r = await gas('getOrderRouteForPlanning', { orderId });
+    if (!r.ok){ showErr(r.err || 'Cursa nu poate fi încărcată.'); return; }
+    _rpOrder = Object.assign({}, r.order, { _fromSaved: !!r.fromSavedRoute });
+    _rpGpsStart = false;
+    waypoints = (r.points || []).map(p => ({
+      id: nid(), label: p.label || '', lat: p.lat, lng: p.lng,
+      kind: p.kind, firma: p.firma || null, date: p.date || null, done: !!p.done,
+    }));
+    intermediatesCollapsed = false; // a fuvar minden pontja látszódjon
+    if (r.order && r.order.fuel_per_100km){ const fc = document.getElementById('fuelCons'); if (fc) fc.value = r.order.fuel_per_100km; }
+    try { const u = new URL(location.href); u.searchParams.set('order', orderId); history.replaceState(null, '', u.toString()); } catch(_) {}
+    renderOrderCard();
+    render();
+    drawMarkers();
+    if (r.truncated) showErr('Cursa are peste 25 de puncte — au fost încărcate primele 25.');
+    document.getElementById('spin').classList.remove('on');
+    await window.planRoute();
+  } catch (e) {
+    showErr(e.message || 'Eroare');
+  } finally {
+    document.getElementById('spin').classList.remove('on');
+  }
+}
+
+async function toggleGpsStart(on){
+  _rpGpsStart = !!on;
+  waypoints = waypoints.filter(w => w.kind !== 'gps');
+  if (on && _rpOrder && _rpOrder.tractor_id){
+    const r = await gas('getVehicleGpsPosition', { vehicleId: _rpOrder.tractor_id });
+    if (!r.ok){
+      _rpGpsStart = false; renderOrderCard();
+      showErr(r.message || 'Poziția GPS nu este disponibilă.');
+      render(); drawMarkers();
+      return;
+    }
+    waypoints.unshift({ id: nid(), label: 'GPS ' + (r.rendszam || '') + ' (' + Number(r.lat).toFixed(4) + ', ' + Number(r.lng).toFixed(4) + ')',
+      lat: r.lat, lng: r.lng, kind: 'gps', firma: null, date: r.updated_at ? String(r.updated_at).slice(0,16).replace('T',' ') : null });
+  }
+  render(); drawMarkers();
+  if (waypoints.length >= 2) window.planRoute();
+}
+
+function renderLegs(v){
+  const box = document.getElementById('legsBox');
+  if (!box) return;
+  const legs = (v && Array.isArray(v.legs)) ? v.legs : [];
+  if (!_rpOrder && legs.length < 2){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  const short = (s) => { const t = String(s || '').split(',')[0].trim(); return t.length > 34 ? t.slice(0,33) + '…' : t; };
+  let html = '';
+  if (_rpOrder){
+    const km = v ? (v.totalKm || 0) : 0;
+    const gpsLeg = (waypoints[0] && waypoints[0].kind === 'gps' && legs[0]) ? legs[0].km : 0;
+    const eco = [];
+    eco.push('<span>📦 ' + esc(_rpOrder.fuvar_no || _rpOrder.id) + '</span>');
+    if (gpsLeg) eco.push('<span>🚚 km gol: ' + gpsLeg.toFixed(1) + '</span>');
+    if (_rpOrder.pret != null && km > 0){
+      const loadedKm = Math.max(0.1, km - gpsLeg);
+      eco.push('<span>💶 ' + (_rpOrder.pret / loadedKm).toFixed(2) + ' EUR/km</span>');
+    }
+    if (_rpOrder.km != null && km > 0){
+      const diff = Math.round((km - gpsLeg) - _rpOrder.km);
+      eco.push('<span class="' + (Math.abs(diff) > 20 ? 'warn' : '') + '">km în cursă: ' + _rpOrder.km + (diff ? ' (' + (diff > 0 ? '+' : '') + diff + ')' : ' ✓') + '</span>');
+    }
+    html += '<div class="eco">' + eco.join('') + '</div>';
+  }
+  if (legs.length){
+    html += '<table class="cc-table"><thead><tr><th>#</th><th>Etapă</th><th style="text-align:right;">Km</th><th style="text-align:right;">Timp</th></tr></thead><tbody>'
+      + legs.map((l, i) => {
+          const a = waypoints[i], b = waypoints[i + 1];
+          const fmtT = (min) => { const h = Math.floor((min||0)/60), m = (min||0)%60; return (h ? h + ' h ' : '') + m + ' min'; };
+          const lbl = (w) => w ? (wpPin(w, waypoints.indexOf(w)) + ' ' + esc(short(w.label))) : '—';
+          return '<tr><td>' + (i + 1) + '</td><td>' + lbl(a) + ' → ' + lbl(b) + '</td><td style="text-align:right;">' + (l.km || 0).toFixed(1) + '</td><td style="text-align:right;">' + fmtT(l.durationMin) + '</td></tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+  if (_rpOrder){
+    html += '<div class="save-row"><button class="btn primary" id="saveOrderKmBtn" onclick="saveOrderKm()" style="flex:0 0 auto;">💾 Salvează km în cursă</button>'
+      + '<span class="hint">Se salvează distanța (fără km gol GPS) și traseul pe cursă.</span></div>';
+  }
+  box.innerHTML = html;
+  box.style.display = html ? '' : 'none';
+}
+
+async function saveOrderKm(){
+  if (!_rpOrder || !_rpLastResult) return;
+  const legs = Array.isArray(_rpLastResult.legs) ? _rpLastResult.legs : [];
+  const hasGps = waypoints[0] && waypoints[0].kind === 'gps';
+  const gpsKm = (hasGps && legs[0]) ? (legs[0].km || 0) : 0;
+  const km = Math.round((_rpLastResult.totalKm || 0) - gpsKm);
+  if (!(km > 0)){ showErr('Nu există distanță calculată.'); return; }
+  if (!confirm('Salvezi ' + km + ' km pe cursa ' + (_rpOrder.fuvar_no || _rpOrder.id) + '?')) return;
+  // A route_geo legfeljebb 9 pontot tárol — ennél hosszabb fuvarnál csak a km mentődik.
+  const pts = waypoints.filter(w => w.kind !== 'gps');
+  const payload = { km };
+  if (pts.length <= 9){
+    const durMin = (_rpLastResult.durationMin || 0) - ((hasGps && legs[0]) ? (legs[0].durationMin || 0) : 0);
+    payload.route_geo = {
+      waypoints: pts.map(w => ({
+        type: w.kind === 'pickup' ? 'loading' : (w.kind === 'delivery' ? 'unloading' : 'waypoint'),
+        address: w.label || null, lat: w.lat, lng: w.lng,
+      })),
+      km, durationSeconds: Math.max(0, Math.round(durMin * 60)),
+    };
+  }
+  const btn = document.getElementById('saveOrderKmBtn'); if (btn) btn.disabled = true;
+  try {
+    const r = await gas('comUpdate', [_rpOrder.id, payload]);
+    if (r && (r.ok || r.success)){
+      _rpOrder.km = km;
+      renderLegs(_rpLastResult);
+      alert('✅ Km salvați pe cursă: ' + km + ' km');
+    } else {
+      showErr((r && (r.err || r.message)) || 'Eroare la salvare');
+    }
+  } catch (e) { showErr(e.message || 'Eroare la salvare'); }
+  finally { const b = document.getElementById('saveOrderKmBtn'); if (b) b.disabled = false; }
+}
+
+// Fuvar-kereső (gépelésre szűr; fókuszra a legutóbbi fuvarok)
+(function initOrderSearch(){
+  const inp = document.getElementById('ordSearch');
+  const dd = document.getElementById('ordAc');
+  if (!inp || !dd) return;
+  let seq = 0;
+  async function search(){
+    const my = ++seq;
+    const r = await gas('getOrdersForRoutePlanning', { q: inp.value.trim() });
+    if (my !== seq) return;
+    const list = (r && r.ok && r.orders) || [];
+    if (!list.length){ dd.innerHTML = '<div class="wp-ac-item" style="cursor:default;color:#64748b;">Nicio cursă găsită</div>'; dd.classList.add('open'); return; }
+    dd._items = list;
+    dd.innerHTML = list.map((o, i) => '<div class="wp-ac-item ord-ac-item" data-idx="' + i + '">'
+      + '<div class="t">' + esc(o.fuvar_no || o.id) + '<span class="st">' + esc(o.status || '') + '</span>' + (o.client ? ' · ' + esc(o.client) : '') + '</div>'
+      + '<div class="s">⬆️ ' + esc(o.loc_incarcare || '—') + ' → ⬇️ ' + esc(o.loc_descarcare || '—')
+      + (o.data_incarcare ? ' · 📅 ' + esc(String(o.data_incarcare).slice(0,10)) : '')
+      + (o.tractor_rendszam ? ' · 🚚 ' + esc(o.tractor_rendszam) : '') + '</div></div>').join('');
+    dd.classList.add('open');
+  }
+  const deb = debounce(search, 220);
+  inp.addEventListener('input', deb);
+  inp.addEventListener('focus', search);
+  inp.addEventListener('blur', () => setTimeout(() => dd.classList.remove('open'), 200));
+  dd.addEventListener('mousedown', (e) => {
+    const el = e.target.closest('.ord-ac-item'); if (!el) return;
+    const o = (dd._items || [])[Number(el.getAttribute('data-idx'))]; if (!o) return;
+    dd.classList.remove('open'); inp.value = ''; inp.blur();
+    loadOrderRoute(o.id);
+  });
+})();
 
 async function planRoute(){
   document.getElementById('err').style.display = 'none';
@@ -1087,6 +1341,8 @@ async function planRoute(){
     renderVarChips(variants);
     // Első (recomandată) alkalmazása a térképre + KPI-kre
     applyVariant(variants[0], variants);
+    _rpLastResult = variants[0];
+    renderLegs(variants[0]);
 
     const note = document.getElementById('infoNote');
     if (r.noHereKey){
@@ -1264,6 +1520,14 @@ window.planRoute = async function patchedPlan(){
   } catch(_) {}
   if (IS_MOBILE()) setSheet('peek');
 };
+
+// Közvetlen belépés a fuvarból: /utvonaltervezes?order=<id>
+(function autoLoadOrder(){
+  try {
+    const id = new URL(location.href).searchParams.get('order');
+    if (id) loadOrderRoute(id);
+  } catch(_) {}
+})();
 
 </script>
 </body>
