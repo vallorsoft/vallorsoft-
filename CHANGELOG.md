@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-25 — 🧮 Költség-kalkulátor: a fuvarból számolt kalkuláció javítva (PR #571)
+## 2026-10-25 — 🧮 Költség-kalkulátor: fuvarból számolt kalkuláció javítva + fuvarok összevonása (PR #571)
 - **Hibás bevétel:** a fuvar ára (nettó EUR) a „Vallorsoft-fuvar" módban **bruttó LEI**-ként ment át → kb. 6× kisebb bevétel, hamis veszteség a profit-sorban. Most nettó EUR (mint a chat `vcalc.order_cost` útján).
 - **Dátum-csúszás:** a `data_incarcare`/`data_descarcare` JS `Date`-ként jött (UTC-re csúszva egy nappal korábban) → a kezdő dátum és a napok száma is elcsúszhatott. A szerver most `YYYY-MM-DD` szöveget ad (`to_char`), a napokat UTC-éjfélből számolja.
 - **Fuvar-váltáskor ott ragadt adat:** új fuvar választásakor a jármű/pótkocsi/sofőr/útdíj/bevétel ürül, ha az új fuvarból nem derül ki; manuális módra váltva a fuvar-kötés is törlődik.
@@ -22,6 +22,10 @@
 - **Aktív vontatók** száma eddig a pótkocsikat is beszámolta (cég-költség szétosztás) → csak `tip='Vontato'`, aktív. **BNR-alapérték** a cég árfolyamából / élő BNR-ből (eddig nem létező mezőt olvasott → mindig 5.0).
 - Fuvar-összegző sáv a kalkulátorban (fuvar-szám, útvonal, dátum, ár + figyelmeztetések: nincs km / nincs vontató / nincs ár / Extern fuvar alvállalkozói díjjal). A fuvar-választó fuvar-számot + dátumot mutat.
 - Fuvar ⋯ menü új **„🧮 Költség-kalkuláció"** pontja → a kalkulátor az adott fuvarral előtöltve nyílik (`vcalcOpenForOrder`). Cache-bust `?v=20261025vcalc`. Valós Postgres 16-on verifikálva; 1917 Jest zöld.
+- **Fuvarok összevonása egy kalkulációba** (pl. 2 fuvar egy hét alatt): a fuvar-választóval (kereshető) több fuvar is felvehető, chipként törölhető. Új `vcalcPrefillFromOrders` — km/útdíj/bevétel összeadva, időszak = legkorábbi felrakás → legkésőbbi lerakás; figyelmeztetés, ha eltérő vontatók vitték. Új **időszak** mezők (kezdet/vége → napok száma, átírható).
+- **Km:** ha a felhasználó beírja, azzal számol; üresen a fuvarok km-összegével (fuvar km, különben `route_geo.km`) — a szerver is így számol (`vcalcCalculate`).
+- **Útdíj:** „🛣️ Útdíj számítása a fuvarokból" gomb + „🎯 Pontos (HERE)" váltó → új `vcalcEstimateTolls` fuvaronként az útvonalból (HERE, ha a cégnek van kulcsa; különben ingyenes becslés), a fuvart nem módosítja; kézi sor továbbra is felvehető. A számítási mag közös lett: `lib/orderToll.js` (`computeOrderToll`), a fuvar-szerkesztő 🛣️ becslése is ezt használja.
+- Mentés: `db/zz-cost-calc-multi-order.sql` → `cost_calculations.order_ids` (JSONB) + `period_from`/`period_to`; a régi `order_id` az első fuvar. A Mentett lista fuvar-számot és időszakot mutat, fuvarra szűrve a csoportos kalkulációt is megtalálja. Cache-bust `?v=20261025vcalc2`; 1918 Jest zöld + headless Chromium UI-próba.
 
 ## 2026-10-25 — 🗺️ Útvonaltervező: fuvar betöltése — minden pont, km és szakasz a térképen (PR #570)
 - **Új „📦 Încarcă o cursă" kereső** az útvonaltervező (`/utvonaltervezes`) tetején: fuvar-szám / ügyfél / város szerint keres (`getOrdersForRoutePlanning` kibővítve `q` kereséssel, a lezárt fuvar is betölthető). Választáskor a fuvar ÖSSZES pontja a diszpécser sorrendjében a pontlistába kerül (új `getOrderRouteForPlanning`, `order_stops` `seq_index` szerint; régi fuvarnál felrakó+lerakó), és az útvonal azonnal kiszámolódik.

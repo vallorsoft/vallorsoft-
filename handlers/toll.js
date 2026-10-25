@@ -4,11 +4,9 @@
 //  RPC: estimateToll / getTollRates / saveTollRates.
 // ============================================================
 const pool = require('../db');
-const { estimateFromPolyline, getRates, DEFAULT_RATES, COUNTRY_NAME } = require('../lib/tollEstimate');
-const { estimateRoute } = require('../lib/routeEstimate');
+const { getRates, DEFAULT_RATES, COUNTRY_NAME } = require('../lib/tollEstimate');
 const { featureEnabled } = require('../lib/featureEnabled');
-const tollProvider = require('../lib/tollProvider');
-const maps = require('../lib/mapsProvider');
+const { computeOrderToll } = require('../lib/orderToll');
 
 const handlers = {};
 
@@ -28,48 +26,16 @@ handlers.estimateToll = async function (req, res, args) {
     if (!r.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
     const o = r.rows[0];
 
-    // útvonal: a mentett route_geo waypointjaiból (ha van), különben felrakó→lerakó
-    let rg = o.route_geo;
-    if (typeof rg === 'string') { try { rg = JSON.parse(rg); } catch (_) { rg = null; } }
-    let waypoints;
-    if (rg && Array.isArray(rg.waypoints) && rg.waypoints.length >= 2) {
-      waypoints = rg.waypoints.map((w) => ({ type: w.type, address: w.address, lat: w.lat, lng: w.lng }));
-    } else {
-      if (!o.loc_incarcare || !o.loc_descarcare) {
-        return res.json({ result: { ok: false, err: 'Introdu adresa de incarcare si descarcare (sau calculeaza km pe harta) pentru estimarea taxei de drum.' } });
-      }
-      waypoints = [{ type: 'loading', address: o.loc_incarcare }, { type: 'unloading', address: o.loc_descarcare }];
-    }
-
-    let est;
-    try { est = await estimateRoute(waypoints, cid); }
-    catch (e) { return res.json({ result: { ok: false, err: 'Ruta nu poate fi calculata: ' + (e.message || '') } }); }
-
-    // ── „Pontos" mód (HERE): csak ha a kliens kérte ÉS van HERE-kulcs.
-    //    Bármilyen hiba/kulcs-hiány esetén visszaesünk az ingyenes becslésre.
+    // Közös mag (lib/orderToll.js): útvonal → HERE („Pontos", ha kérték és van
+    // kulcs) vagy ingyenes ország-km becslés. A mentés itt marad.
     const precise = !!(args && args[1] && args[1].precise);
-    let preciseError = null;
-    if (precise) {
-      try {
-        const cfg = await maps.getConfig(cid);
-        if (cfg.vendor === 'here' && cfg.key) {
-          const ht = await tollProvider.hereToll(est.waypoints, cfg.key);
-          maps.bump(cid, 'here');
-          await pool.query('UPDATE orders SET toll_cost = $1, toll_geo = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4',
-            [ht.total, JSON.stringify(ht), orderId, cid]).catch((e) => console.error('toll mentés hiba:', e));
-          return res.json({ result: { ok: true, toll: ht, km: est.km, source: 'here' } });
-        }
-        preciseError = 'no-here-key';
-      } catch (e) {
-        preciseError = (e && e.message) || 'here-error';
-      }
-    }
-
-    const toll = await estimateFromPolyline(cid, est.polyline);
+    let out;
+    try { out = await computeOrderToll(cid, o, { precise }); }
+    catch (e) { return res.json({ result: { ok: false, err: e.message } }); }
     await pool.query('UPDATE orders SET toll_cost = $1, toll_geo = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4',
-      [toll.total, JSON.stringify(toll), orderId, cid]).catch((e) => console.error('toll mentés hiba:', e));
-
-    return res.json({ result: { ok: true, toll, km: est.km, source: 'estimate', preciseRequested: precise, preciseError } });
+      [out.toll.total, JSON.stringify(out.toll), orderId, cid]).catch((e) => console.error('toll mentés hiba:', e));
+    if (out.source === 'here') return res.json({ result: { ok: true, toll: out.toll, km: out.km, source: 'here' } });
+    return res.json({ result: { ok: true, toll: out.toll, km: out.km, source: 'estimate', preciseRequested: precise, preciseError: out.preciseError } });
   } catch (err) {
     console.error('estimateToll hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
