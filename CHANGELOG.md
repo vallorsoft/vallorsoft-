@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-10-25 — 🗺️ Útvonaltervező: fuvar betöltése — minden pont, km és szakasz a térképen (PR #570)
+- **Új „📦 Încarcă o cursă" kereső** az útvonaltervező (`/utvonaltervezes`) tetején: fuvar-szám / ügyfél / város szerint keres (`getOrdersForRoutePlanning` kibővítve `q` kereséssel, a lezárt fuvar is betölthető). Választáskor a fuvar ÖSSZES pontja a diszpécser sorrendjében a pontlistába kerül (új `getOrderRouteForPlanning`, `order_stops` `seq_index` szerint; régi fuvarnál felrakó+lerakó), és az útvonal azonnal kiszámolódik.
+- Ha a fuvarnak van mentett útvonala (`route_geo`), a koordináták és a térképes köztespontok is átjönnek → ugyanaz a km, mint a fuvar-kiírásnál.
+- Pontok: típus-jelölés (⬆️ felrakás / ⬇️ lerakás / 🟡 köztes), cég + dátum, a térképen számozott, típus-színes jelölők. Fuvar-kártya (ügyfél, vontató/pótkocsi, sofőr, ár, km).
+- **Szakaszonkénti km + idő** táblázat (`rpPlanRoute` → `legs`: OSRM `route.legs`, HERE section-ök), **€/km**, eltérés a fuvarba írt km-től.
+- Opcionális **🛰️ indulás a vontató élő GPS-pozíciójából** (üres km a felrakóig, a meglévő `getVehicleGpsPosition`-nel).
+- **💾 Km mentése a fuvarra** (`comUpdate` km + `route_geo`; a GPS-üres km nélkül; 9 pontnál hosszabb fuvarnál csak a km).
+- Fuvar ⋯ menü új „🗺️ Útvonal a térképen" pontja → `/utvonaltervezes?order=<id>` (új lapon, magától betölt; elrejtve, ha az `utvonaltervezes` funkció ki van kapcsolva). Cache-bust `?v=20261025rpord`. Teszt +9 (`tests/unit/route-order-load.test.js`).
+- **CI-fix (a #568 óta piros main):** a `gpsTrackRange` háttér-letöltése a teszt vége után is futott, és a már visszaállított DB-mockot hívta → „Cannot log after tests are done", a Jest 1-es kóddal lépett ki (minden teszt zöld volt, de a CI piros → a #568/#569 nem élesedett Fly-on). `handlers/gpsTrack.js` a futó háttér-feladatokat Promise-ként tartja (`_bgIdle()` nem-RPC teszt-segéd), a `tests/integration/gps-track.test.js` megvárja őket.
+
 ## 2026-10-18 — 🗺️ GPS útvonal: a 2 éves előzmény magától töltődik le (PR #569)
 - `services/scheduler.js` `startGpsTrackHistoryScheduler`: külön előzmény-letöltő kör (`backfillRound`, percenként, járművenként 10 nap/kör, saját futás-őr) — a hiányzó múltbeli napokat a legfrissebbtől visszafelé folyamatosan letölti, az oldal megnyitása nélkül. Eddig a 15 perces körben 6 nap/jármű ment (~30 óra/jármű a 2 évhez). Ha minden nap megvan, egy kör csak egy olcsó lekérdezés járművenként.
 - Állítható: `GPS_TRACK_BACKFILL_INTERVAL_MIN` (alap 1), `GPS_TRACK_BACKFILL_PER_ROUND` (alap 10, max 60).

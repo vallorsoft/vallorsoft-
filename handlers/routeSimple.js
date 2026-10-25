@@ -463,8 +463,16 @@ async function planHere(waypoints, key, truck) {
       tollCost: Math.round((tollByCountry[cc] || 0) * 100) / 100,
     }));
     const bounds = computeBounds(allPoints);
+    // Szakaszonkénti km/idő — HERE-nél minden `via` új section-t nyit,
+    // így pontpáronként egy section (ha nem egyezik a darabszám, üres marad).
+    const secs = route.sections || [];
+    const legs = (secs.length === waypoints.length - 1) ? secs.map((sec) => ({
+      km: Math.round((Number((sec.summary && sec.summary.length) || 0) / 1000) * 10) / 10,
+      durationMin: Math.round(Number((sec.summary && sec.summary.duration) || 0) / 60),
+    })) : [];
     return {
       polyline: allPoints,
+      legs,
       totalKm: Math.round((totalMeters / 1000) * 10) / 10,
       durationMin: Math.round(totalDurationSec / 60),
       byCountry,
@@ -564,8 +572,15 @@ async function planOsrm(waypoints, companyId) {
     tollTotal = est.total || 0;
   } catch (_) { /* ha a reverse-geokód nem elérhető, üres marad */ }
 
+  // Szakaszonkénti km/idő (pontpáronként) — az útvonaltervező szakasz-listájához
+  const legs = (route.legs || []).map((l) => ({
+    km: Math.round(((l.distance || 0) / 1000) * 10) / 10,
+    durationMin: Math.round((l.duration || 0) / 60),
+  }));
+
   return {
     polyline: points,
+    legs,
     totalKm: Math.round(((route.distance || 0) / 1000) * 10) / 10,
     durationMin: Math.round((route.duration || 0) / 60),
     byCountry,

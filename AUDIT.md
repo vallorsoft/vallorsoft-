@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 58. lépés — Útvonaltervező: fuvar betöltése (2026-10-25, PR #570) ✅ KÉSZ
+- Új `getOrderRouteForPlanning` RPC: csak Admin/Manager, az `utvonaltervezes` funkció-kapcsoló mögött, a fuvar és a stopok `company_id`-szűrt paraméteres SQL-lel (idegen fuvar → „nem található"). A `getOrdersForRoutePlanning` keresése paraméteres `LIKE` (max. 80 karakter). A km-mentés a meglévő `comUpdate`-en megy (szerep + cég + `sanitizeRouteGeo`). Új tárolt adat nincs; a GPS-indulás a meglévő `getVehicleGpsPosition`-t hívja.
+
 ### 57. lépés — GPS útvonal-előzmény 2 éves megőrzés + visszatöltés (2026-10-18, PR #567) ✅ KÉSZ
 - **Megőrzés-változás (felhasználói kérésre):** a `gps_track_days` alap megőrzése 100 nap → **730 nap (2 év)**, és a CargoTrackből visszamenőleg 2 évig töltődik vissza (`GPS_TRACK_RETENTION_DAYS` / `GPS_TRACK_HISTORY_DAYS`, egy forrás: `lib/gpsTrack.js`). A napi takarító továbbra is törli a megőrzésnél régebbi napokat. **GDPR-teendő:** a jogi oldalakon a sofőr GPS-adatának megőrzési idejét ehhez kell igazítani (jelenleg „foglalkoztatás + 1 év").
 - Izoláció változatlan: a visszatöltés csak a cég saját párosított járműveire fut, `company_id`-szűrt paraméteres SQL; a végleges szolgáltató-hiba (400/404/422) üres napként jelölődik, átmeneti hiba (5xx/timeout) újrapróbálódik.

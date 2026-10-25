@@ -5918,6 +5918,12 @@ function renderFilteredOrders(list) {
         '<span class="vs-act-ico">🔎</span><span class="vs-act-lbl">'+t('ed.details')+'</span></button>'+
         '<div class="vs-act-sep"></div>';
     }
+    // 🗺️ Útvonal a térképen — a fuvar összes pontja az útvonaltervezőben (új lapon)
+    if (!window._vsFeatures || window._vsFeatures['utvonaltervezes'] !== false) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mRouteMap')+'" '+
+        'onclick="window.open(\'/utvonaltervezes?order='+encodeURIComponent(c.id)+'\',\'_blank\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🗺️</span><span class="vs-act-lbl">'+t('cs.ol.mRouteMap')+'</span></button>';
+    }
     // 📎 Dokumentumok (mindig) — jobb szélén a POD-fotó jelző
     var podBadge = (parseInt(c.pod_count, 10) > 0)
       ? '<span class="vs-act-ind" style="color:var(--status-ok);" title="'+c.pod_count+t('cs.ol.podAttached')+'">📷'+c.pod_count+'</span>' : '';
