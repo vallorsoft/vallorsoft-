@@ -22,7 +22,7 @@ const ONDEMAND_BACKFILL_DAYS = 6;         // kérésenként ennyi hiányzó múl
 const HISTORY_DAYS = gt.HISTORY_DAYS;
 const ONDEMAND_MATCH_DAYS = 2;            // kérésenként ennyi még nem illesztett napot illeszt azonnal
 const _liveRefresh = new Map();           // `${cid}|${plate}` -> utolsó élő frissítés ideje
-const _bgJobs = new Set();                 // `${cid}|${plate}` -> futó háttér-letöltés
+const _bgJobs = new Map();                 // `${cid}|${plate}` -> futó háttér-letöltés (Promise)
 const _upgradeTried = new Map();          // `${cid}|${plate}|${day}` -> utolsó formátum-frissítés ideje
 
 // Hely-név (indulás/érkezés) — Nominatim reverse, memória-cache, rövid timeout
@@ -123,8 +123,7 @@ handlers.gpsTrackRange = async function (req, res, args) {
       bgRunning = _bgJobs.has(bk);
       if (!bgRunning) {
         bgRunning = true;
-        _bgJobs.add(bk);
-        (async () => {
+        _bgJobs.set(bk, (async () => {
           try {
             const apiKey = await getKey();
             if (!apiKey) return;
@@ -142,7 +141,7 @@ handlers.gpsTrackRange = async function (req, res, args) {
             if (missing > 0) await gt.backfillDays(cid, apiKey, plate, map.object_id, bFrom, to, ONDEMAND_BACKFILL_DAYS);
           } catch (e) { if (!(e && e.code === '42P01')) console.warn('[GpsTrack] háttér-letöltés hiba', plate, e.message); }
           finally { _bgJobs.delete(bk); }
-        })();
+        })());
       }
     }
 
@@ -297,3 +296,6 @@ handlers.gpsTrackPoint = async function (req, res, args) {
 };
 
 module.exports = handlers;
+// Teszt-segéd — NEM RPC (nem-enumerable): megvárja a futó háttér-letöltéseket,
+// hogy a teszt ne érjen véget, mielőtt a háttér-feladat a mockolt DB-t hívja.
+Object.defineProperty(module.exports, '_bgIdle', { value: () => Promise.all([..._bgJobs.values()]), enumerable: false });

@@ -22,6 +22,7 @@
 - Opcionális **🛰️ indulás a vontató élő GPS-pozíciójából** (üres km a felrakóig, a meglévő `getVehicleGpsPosition`-nel).
 - **💾 Km mentése a fuvarra** (`comUpdate` km + `route_geo`; a GPS-üres km nélkül; 9 pontnál hosszabb fuvarnál csak a km).
 - Fuvar ⋯ menü új „🗺️ Útvonal a térképen" pontja → `/utvonaltervezes?order=<id>` (új lapon, magától betölt; elrejtve, ha az `utvonaltervezes` funkció ki van kapcsolva). Cache-bust `?v=20261025rpord`. Teszt +9 (`tests/unit/route-order-load.test.js`).
+- **CI-fix (a #568 óta piros main):** a `gpsTrackRange` háttér-letöltése a teszt vége után is futott, és a már visszaállított DB-mockot hívta → „Cannot log after tests are done", a Jest 1-es kóddal lépett ki (minden teszt zöld volt, de a CI piros → a #568/#569 nem élesedett Fly-on). `handlers/gpsTrack.js` a futó háttér-feladatokat Promise-ként tartja (`_bgIdle()` nem-RPC teszt-segéd), a `tests/integration/gps-track.test.js` megvárja őket.
 
 ## 2026-10-18 — 🗺️ GPS útvonal: a 2 éves előzmény magától töltődik le (PR #569)
 - `services/scheduler.js` `startGpsTrackHistoryScheduler`: külön előzmény-letöltő kör (`backfillRound`, percenként, járművenként 10 nap/kör, saját futás-őr) — a hiányzó múltbeli napokat a legfrissebbtől visszafelé folyamatosan letölti, az oldal megnyitása nélkül. Eddig a 15 perces körben 6 nap/jármű ment (~30 óra/jármű a 2 évhez). Ha minden nap megvan, egy kör csak egy olcsó lekérdezés járművenként.

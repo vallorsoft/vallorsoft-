@@ -21,6 +21,8 @@ const CID = 1;
 const ADMIN = { ...fixtures.admin, company_id: CID };
 const SOFER = { ...fixtures.sofer, company_id: CID };
 
+afterEach(async () => { await require('../../handlers/gpsTrack')._bgIdle(); });
+
 beforeEach(() => {
   reset();
   global.fetch = jest.fn(async () => { throw new Error('offline'); });   // reverse geocode → null
@@ -109,6 +111,8 @@ describe('gpsTrackRange — előzmény-visszatöltés', () => {
     const ups = pool.query.mock.calls.filter((c) => /INSERT INTO gps_track_days/.test(c[0]));
     expect(ups.length).toBeGreaterThan(0);
     expect(ups.every((c) => c[1][7] === true && c[1][0] === CID)).toBe(true);
+    // a háttér-letöltés végét megvárjuk, mielőtt a mockot visszaállítjuk
+    await require('../../handlers/gpsTrack')._bgIdle();
     featureEnabled.mockReset();
   }, 15000);
 });
