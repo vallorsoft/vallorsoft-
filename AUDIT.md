@@ -9,7 +9,7 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
-### 58. lépés — Útvonaltervező: fuvar betöltése (2026-10-25, PR #PRNUM) ✅ KÉSZ
+### 58. lépés — Útvonaltervező: fuvar betöltése (2026-10-25, PR #570) ✅ KÉSZ
 - Új `getOrderRouteForPlanning` RPC: csak Admin/Manager, az `utvonaltervezes` funkció-kapcsoló mögött, a fuvar és a stopok `company_id`-szűrt paraméteres SQL-lel (idegen fuvar → „nem található"). A `getOrdersForRoutePlanning` keresése paraméteres `LIKE` (max. 80 karakter). A km-mentés a meglévő `comUpdate`-en megy (szerep + cég + `sanitizeRouteGeo`). Új tárolt adat nincs; a GPS-indulás a meglévő `getVehicleGpsPosition`-t hívja.
 
 ### 57. lépés — GPS útvonal-előzmény 2 éves megőrzés + visszatöltés (2026-10-18, PR #567) ✅ KÉSZ

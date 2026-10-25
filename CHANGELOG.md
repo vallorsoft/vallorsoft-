@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-25 — 🗺️ Útvonaltervező: fuvar betöltése — minden pont, km és szakasz a térképen (PR #PRNUM)
+## 2026-10-25 — 🗺️ Útvonaltervező: fuvar betöltése — minden pont, km és szakasz a térképen (PR #570)
 - **Új „📦 Încarcă o cursă" kereső** az útvonaltervező (`/utvonaltervezes`) tetején: fuvar-szám / ügyfél / város szerint keres (`getOrdersForRoutePlanning` kibővítve `q` kereséssel, a lezárt fuvar is betölthető). Választáskor a fuvar ÖSSZES pontja a diszpécser sorrendjében a pontlistába kerül (új `getOrderRouteForPlanning`, `order_stops` `seq_index` szerint; régi fuvarnál felrakó+lerakó), és az útvonal azonnal kiszámolódik.
 - Ha a fuvarnak van mentett útvonala (`route_geo`), a koordináták és a térképes köztespontok is átjönnek → ugyanaz a km, mint a fuvar-kiírásnál.
 - Pontok: típus-jelölés (⬆️ felrakás / ⬇️ lerakás / 🟡 köztes), cég + dátum, a térképen számozott, típus-színes jelölők. Fuvar-kártya (ügyfél, vontató/pótkocsi, sofőr, ár, km).
