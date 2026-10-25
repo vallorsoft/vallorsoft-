@@ -365,7 +365,7 @@
 
     // Alapállapot
     Object.assign(F, {
-      source_mode: 'manual', order_id: '',
+      source_mode: 'manual', order_id: '', order_info: null,
       truck_vehicle_id: '', trailer_vehicle_id: '', driver_ids: [],
       start_date: new Date().toISOString().slice(0, 10),
       trip_days: 5, trip_km: '',
@@ -373,7 +373,8 @@
       fuel_total_gross: '',
       excisa_applied: false, fuel_discount_applied: false,
       tolls: [],
-      active_trucks: Math.max(1, refs.vehicles.filter(v => (v.tip || '').toLowerCase().indexOf('remorc') === -1).length || 1),
+      // Csak az aktív VONTATÓK (tip='Vontato') — a pótkocsi ('Potkocsi') nem osztja a cég-költséget.
+      active_trucks: Math.max(1, refs.vehicles.filter(v => v.tip === 'Vontato' && v.activ !== false).length || 1),
       freight_revenue_input: '', freight_revenue_currency: 'lei', freight_revenue_is_gross: true,
       bnr_eur_lei: Number(settings.eur_ron_rate) || 5.0, name: '',
     });
@@ -397,6 +398,40 @@
     document.getElementById('vcOrderPicker').onchange = onOrderPicked;
     renderCalcBody();
     if (window.I18N && window.I18N.apply) window.I18N.apply();
+
+    // Fuvar ⋯ menüből érkeztünk („🧮 Költség-kalkuláció") → azonnal fuvar-módba
+    // váltunk és betöltjük a kiválasztott fuvart.
+    if (STATE.pendingOrderId) {
+      const oid = STATE.pendingOrderId; STATE.pendingOrderId = null;
+      const radio = box.querySelector('input[name="vcSrc"][value="vallorsoft"]');
+      if (radio) radio.checked = true;
+      await onSourceModeChange({ target: { value: 'vallorsoft' } });
+      const sel = document.getElementById('vcOrderPicker');
+      if (sel) {
+        if (![...sel.options].some(op => op.value === oid)) {
+          const op = document.createElement('option'); op.value = oid; op.textContent = oid; sel.appendChild(op);
+        }
+        sel.value = oid;
+      }
+      await onOrderPicked({ target: { value: oid } });
+    }
+  }
+
+  // Fuvar ⋯ menü → Költség-kalkuláció az adott fuvarra
+  window.vcalcOpenForOrder = function (orderId) {
+    if (!orderId) return;
+    STATE.pendingOrderId = String(orderId);
+    STATE.orders = null; // friss fuvar-lista (az új fuvar is legyen benne)
+    if (typeof window.activateTab === 'function') window.activateTab('vcalc-run');
+    else renderCalcForm();
+  };
+
+  function _orderLabel(o) {
+    const no = o.fuvar_no || o.id;
+    const km = Number(o.km) > 0 ? Number(o.km) : (Number(o.route_km) > 0 ? Number(o.route_km) : null);
+    return [no, o.data_incarcare || '', o.client || '',
+      (o.loc_incarcare || '') + ' → ' + (o.loc_descarcare || ''),
+      km ? fmt(km, 0) + ' km' : t('vcalc.run.noKm', 'nincs km')].filter(Boolean).join(' · ');
   }
 
   async function onSourceModeChange(e) {
@@ -410,37 +445,50 @@
       }
       const sel = document.getElementById('vcOrderPicker');
       sel.innerHTML = `<option value="">${t('vcalc.run.pickOrder', '— Válassz fuvart —')}</option>` +
-        STATE.orders.map(o => `<option value="${o.id}">${esc(o.id)} · ${esc(o.client || '')} · ${esc(o.loc_incarcare || '')} → ${esc(o.loc_descarcare || '')} · ${fmt(o.km, 0)} km</option>`).join('');
+        STATE.orders.map(o => `<option value="${esc(o.id)}"${String(F.order_id) === String(o.id) ? ' selected' : ''}>${esc(_orderLabel(o))}</option>`).join('');
     } else {
       pickerBox.style.display = 'none';
+      // Manuális módban a kalkuláció nem kötődik fuvarhoz.
+      F.order_id = ''; F.order_info = null;
+      const sel = document.getElementById('vcOrderPicker'); if (sel) sel.value = '';
+      renderCalcBody();
     }
   }
 
   async function onOrderPicked(e) {
     const orderId = e.target.value;
-    if (!orderId) return;
+    if (!orderId) { F.order_id = ''; F.order_info = null; renderCalcBody(); return; }
     const r = await gas('vcalcPrefillFromOrder', [{ order_id: orderId }]);
     if (!r || !r.ok) { alert(r && r.err || 'Hiba a fuvar betöltésekor'); return; }
-    // Auto-fill — meglévő manuális értéket felülír (a felhasználó szólt, hogy fuvarból akar dolgozni)
+    const o = r.order || {};
+    // Auto-fill — a fuvar adatai felülírják az űrlapot. Ami a fuvarból NEM
+    // derül ki (jármű/sofőr/útdíj/bevétel), azt ÜRÍTJÜK, hogy egy korábban
+    // kiválasztott fuvar adatai ne maradjanak benne (eddig ott ragadtak).
     F.order_id = orderId;
-    F.trip_km = r.order.km || '';
+    F.order_info = o;
+    F.trip_km = o.km || '';
     F.trip_days = r.trip_days || 1;
-    F.start_date = r.order.data_incarcare ? String(r.order.data_incarcare).slice(0, 10) : F.start_date;
-    if (r.truck) { F.truck_vehicle_id = r.truck.id; if (r.truck.fuel_per_100km) F.fuel_l_per_100km = r.truck.fuel_per_100km; }
-    if (r.trailer) F.trailer_vehicle_id = r.trailer.id;
-    if (r.driver) F.driver_ids = [r.driver.id];
+    F.start_date = o.data_incarcare || F.start_date;
+    F.truck_vehicle_id = r.truck ? r.truck.id : '';
+    F.trailer_vehicle_id = r.trailer ? r.trailer.id : '';
+    F.driver_ids = r.driver ? [r.driver.id] : [];
+    if (r.truck && Number(r.truck.fuel_per_100km) > 0) F.fuel_l_per_100km = Number(r.truck.fuel_per_100km);
+    if (r.fuel_price_gross && !F.fuel_price_gross) F.fuel_price_gross = r.fuel_price_gross;
     F.active_trucks = r.active_trucks || F.active_trucks;
     F.bnr_eur_lei = r.bnr_eur_lei || F.bnr_eur_lei;
-    if (r.order.toll_cost_eur) F.tolls = [{ description: 'Útdíj (fuvar becslés)', amount: r.order.toll_cost_eur, input_currency: 'eur' }];
-    if (r.order.pret != null) { F.freight_revenue_input = r.order.pret; F.freight_revenue_currency = 'lei'; F.freight_revenue_is_gross = true; }
-    F.name = (r.order.ref ? r.order.ref + ' — ' : '') + orderId;
+    F.tolls = o.toll_cost_eur ? [{ description: t('vcalc.run.tollFromOrder', 'Útdíj (fuvar becslés)'), amount: o.toll_cost_eur, input_currency: 'eur' }] : [];
+    // A fuvar ára a rendszerben NETTÓ EUR — eddig tévesen bruttó LEI-ként ment át
+    // (≈ 5× kisebb bevétel → hamis veszteség a profit-sorban).
+    if (o.pret != null) { F.freight_revenue_input = o.pret; F.freight_revenue_currency = 'eur'; F.freight_revenue_is_gross = false; }
+    else { F.freight_revenue_input = ''; F.freight_revenue_currency = 'eur'; F.freight_revenue_is_gross = false; }
+    F.name = (o.fuvar_no || orderId) + (o.ref ? ' — ' + o.ref : '');
     renderCalcBody();
   }
 
   function renderCalcBody() {
     const body = document.getElementById('vcFormBody'); if (!body) return;
     const refs = STATE.refs || { vehicles: [], drivers: [] };
-    body.innerHTML = `
+    body.innerHTML = `${_orderInfoHtml()}
       <div class="glass-soft" style="padding:14px;margin:12px 0">
         <b data-i18n="vcalc.run.bnrLabel">BNR EUR/LEI árfolyam</b>
         <input id="vcBnr" class="input" type="number" step="0.0001" value="${F.bnr_eur_lei}" style="width:140px;display:inline-block;margin-left:8px">
@@ -540,6 +588,26 @@
     if (window.I18N && window.I18N.apply) window.I18N.apply();
   }
 
+  // A betöltött fuvar összegzése + figyelmeztetések (hiányzó km/jármű, Extern fuvar)
+  function _orderInfoHtml() {
+    const o = F.order_info;
+    if (!o || !F.order_id) return '';
+    const warn = [];
+    if (!o.km) warn.push(t('vcalc.run.warnNoKm', 'A fuvarnak nincs km-értéke — írd be kézzel.'));
+    else if (o.km_source === 'route') warn.push(t('vcalc.run.kmFromRoute', 'A km a térképes útvonal-becslésből jön (a fuvaron nincs km).'));
+    if (!F.truck_vehicle_id && !o.is_extern) warn.push(t('vcalc.run.warnNoTruck', 'A fuvar vontatója nincs a járművek között — válaszd ki kézzel.'));
+    if (o.pret == null) warn.push(t('vcalc.run.warnNoPrice', 'A fuvarnak nincs ára — a profit csak bevétel megadásával számolható.'));
+    if (o.is_extern) warn.push(t('vcalc.run.warnExtern', 'Extern (alvállalkozós) fuvar — a saját jármű-költség nem releváns.') +
+      (o.carrier_cost_eur ? ' ' + t('vcalc.run.carrierCost', 'Alvállalkozói díj') + ': <b>' + fmt(o.carrier_cost_eur) + ' EUR</b>' : ''));
+    return `<div class="glass-soft" style="padding:12px 14px;margin:12px 0;border-left:4px solid var(--status-info,#3b82f6)">
+      <div style="font-weight:700">🚚 ${esc(o.fuvar_no || o.id)}${o.client ? ' · ' + esc(o.client) : ''}</div>
+      <div class="text-muted" style="font-size:13px;margin-top:2px">${esc(o.loc_incarcare || '—')} → ${esc(o.loc_descarcare || '—')}
+        ${o.data_incarcare ? ' · 📅 ' + esc(o.data_incarcare) + (o.data_descarcare && o.data_descarcare !== o.data_incarcare ? ' → ' + esc(o.data_descarcare) : '') : ''}
+        ${o.pret != null ? ' · 💶 ' + fmt(o.pret) + ' EUR ' + t('vcalc.f.net', 'Nettó').toLowerCase() : ''}</div>
+      ${warn.map(w => `<div style="font-size:12.5px;margin-top:6px;color:var(--status-warn,#b45309)">⚠️ ${w}</div>`).join('')}
+    </div>`;
+  }
+
   function renderFuelBody() {
     const el = document.getElementById('vcFuelBody'); if (!el) return;
     if (F.fuel_method === 'per_liter') {
@@ -587,8 +655,11 @@
   }
 
   async function runCalc(save) {
-    if (!F.trip_km) { alert(t('vcalc.run.errKm', 'Kilométer kötelező')); return; }
+    if (!(Number(F.trip_km) > 0)) { alert(t('vcalc.run.errKm', 'Kilométer kötelező')); return; }
+    if (F.fuel_method === 'per_liter' && !(Number(F.fuel_price_gross) > 0) &&
+        !confirm(t('vcalc.run.confirmNoFuel', 'Nincs megadva gázolaj-ár — az üzemanyag 0-val számolódik. Folytatod?'))) return;
     const payload = { ...F, save };
+    delete payload.order_info;
     const r = await gas('vcalcCalculate', [payload]);
     if (!r || !r.ok) { alert(r && r.err || 'Hiba'); return; }
     renderResult(r.result, r.serial_no);

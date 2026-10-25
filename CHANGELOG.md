@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-10-25 — 🧮 Költség-kalkulátor: a fuvarból számolt kalkuláció javítva (PR #571)
+- **Hibás bevétel:** a fuvar ára (nettó EUR) a „Vallorsoft-fuvar" módban **bruttó LEI**-ként ment át → kb. 6× kisebb bevétel, hamis veszteség a profit-sorban. Most nettó EUR (mint a chat `vcalc.order_cost` útján).
+- **Dátum-csúszás:** a `data_incarcare`/`data_descarcare` JS `Date`-ként jött (UTC-re csúszva egy nappal korábban) → a kezdő dátum és a napok száma is elcsúszhatott. A szerver most `YYYY-MM-DD` szöveget ad (`to_char`), a napokat UTC-éjfélből számolja.
+- **Fuvar-váltáskor ott ragadt adat:** új fuvar választásakor a jármű/pótkocsi/sofőr/útdíj/bevétel ürül, ha az új fuvarból nem derül ki; manuális módra váltva a fuvar-kötés is törlődik.
+- **Km-fallback:** ha a fuvaron 0/üres a km, a térképes útvonal-becslés (`route_geo.km`) jön (jelölve). **Gázolaj-ár javaslat** az utolsó 90 nap menetlevél-tankolásaiból (RON, AdBlue nélkül); ár nélkül figyelmeztetés a kalkuláció előtt.
+- **Aktív vontatók** száma eddig a pótkocsikat is beszámolta (cég-költség szétosztás) → csak `tip='Vontato'`, aktív. **BNR-alapérték** a cég árfolyamából / élő BNR-ből (eddig nem létező mezőt olvasott → mindig 5.0).
+- Fuvar-összegző sáv a kalkulátorban (fuvar-szám, útvonal, dátum, ár + figyelmeztetések: nincs km / nincs vontató / nincs ár / Extern fuvar alvállalkozói díjjal). A fuvar-választó fuvar-számot + dátumot mutat.
+- Fuvar ⋯ menü új **„🧮 Költség-kalkuláció"** pontja → a kalkulátor az adott fuvarral előtöltve nyílik (`vcalcOpenForOrder`). Cache-bust `?v=20261025vcalc`. Valós Postgres 16-on verifikálva; 1917 Jest zöld.
+
 ## 2026-10-25 — 🗺️ Útvonaltervező: fuvar betöltése — minden pont, km és szakasz a térképen (PR #570)
 - **Új „📦 Încarcă o cursă" kereső** az útvonaltervező (`/utvonaltervezes`) tetején: fuvar-szám / ügyfél / város szerint keres (`getOrdersForRoutePlanning` kibővítve `q` kereséssel, a lezárt fuvar is betölthető). Választáskor a fuvar ÖSSZES pontja a diszpécser sorrendjében a pontlistába kerül (új `getOrderRouteForPlanning`, `order_stops` `seq_index` szerint; régi fuvarnál felrakó+lerakó), és az útvonal azonnal kiszámolódik.
 - Ha a fuvarnak van mentett útvonala (`route_geo`), a koordináták és a térképes köztespontok is átjönnek → ugyanaz a km, mint a fuvar-kiírásnál.

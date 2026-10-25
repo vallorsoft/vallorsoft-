@@ -391,8 +391,17 @@ async function _loadSettings(cid) {
 handlers.vcalcSettingsGet = async function (req, res) {
   try {
     if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
-    const s = await _loadSettings(_cid(req));
-    return res.json({ result: { ok: true, settings: s } });
+    const cid = _cid(req);
+    const s = await _loadSettings(cid);
+    // A kalkulátor BNR-alapértéke: a cég rögzített árfolyama (companies.eur_ron_rate),
+    // ha nincs, az élő BNR. (A kliens eddig egy nem létező mezőt olvasott → mindig 5.0.)
+    let bnr = null;
+    try {
+      const cr = await pool.query('SELECT eur_ron_rate FROM companies WHERE id=$1', [cid]);
+      if (cr.rows[0] && cr.rows[0].eur_ron_rate) bnr = Number(cr.rows[0].eur_ron_rate);
+    } catch {}
+    if (!bnr) { try { bnr = await fetchBnrEurRon(); } catch {} }
+    return res.json({ result: { ok: true, settings: Object.assign({}, s, { eur_ron_rate: bnr && Number.isFinite(Number(bnr)) ? Number(bnr) : null }) } });
   } catch (err) { console.error('vcalcSettingsGet:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
@@ -454,6 +463,32 @@ async function _driverByEmail(cid, email) {
   return r.rows[0] || null;
 }
 
+// Az utolsó 90 nap menetleveleinek gázolaj-tankolásaiból számolt átlagos
+// BRUTTÓ ár (RON/liter) — a kalkulátor üzemanyag-ár mezőjének javaslata.
+// Csak RON/LEI pénznemű (vagy pénznem nélküli), Motorină / típus nélküli
+// sorok; az AdBlue kimarad. Best-effort: hiba vagy adat-hiány → null.
+async function _avgFuelPriceRon(cid) {
+  try {
+    const r = await pool.query(
+      `SELECT SUM(NULLIF(a->>'suma','')::numeric) AS suma, SUM(NULLIF(a->>'litru','')::numeric) AS litru
+       FROM fuvarlevelek f, jsonb_array_elements(COALESCE(f.alimentari, '[]'::jsonb)) a
+       WHERE f.company_id = $1
+         AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= NOW() - INTERVAL '90 days'
+         AND jsonb_typeof(f.alimentari) = 'array'
+         AND COALESCE(a->>'tip', '') NOT ILIKE '%adblue%'
+         AND UPPER(COALESCE(NULLIF(a->>'valuta',''), 'RON')) IN ('RON', 'LEI')
+         AND COALESCE(a->>'litru','') ~ '^[0-9]+([.][0-9]+)?$'
+         AND COALESCE(a->>'suma','') ~ '^[0-9]+([.][0-9]+)?$'`, [cid]
+    );
+    const row = r.rows[0] || {};
+    const suma = Number(row.suma), litru = Number(row.litru);
+    if (!(litru > 0) || !(suma > 0)) return null;
+    const p = suma / litru;
+    // Józan-ész sáv — ennél kisebb/nagyobb érték elírásra utal.
+    return (p >= 3 && p <= 20) ? Math.round(p * 100) / 100 : null;
+  } catch (e) { console.warn('vcalc _avgFuelPriceRon:', e.message); return null; }
+}
+
 // args: [{ order_id }]
 handlers.vcalcPrefillFromOrder = async function (req, res, args) {
   try {
@@ -461,12 +496,20 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
     const cid = _cid(req);
     const orderId = _str((args && args[0] || {}).order_id, 20);
     if (!orderId) return res.json({ result: { ok: false, err: 'ID cursă lipsă' } });
-    // FIGYELEM: `toll_cost` opcionális oszlop (db/order-toll.sql migráció) — `to_jsonb(o)`
-    // mintával olvassuk, így hiányzó oszlop → NULL (nem exception).
+    // FIGYELEM: az opcionális oszlopokat (toll_cost, route_geo, fuvar_no, carrier_*)
+    // `to_jsonb(o)` mintával olvassuk, így hiányzó oszlop → NULL (nem exception).
+    // A dátumokat SZÖVEGKÉNT adjuk vissza (YYYY-MM-DD) — a pg a DATE-et JS Date-ként
+    // (helyi éjfél) adná, ami JSON-ban UTC-re csúszva egy nappal korábbi dátumot mutatna.
     const o = await pool.query(
-      `SELECT id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-              pret, km, email_sofer, rendszam_camion, rendszam_remorca,
-              (to_jsonb(o) ->> 'toll_cost') AS toll_cost
+      `SELECT id, client, ref, loc_incarcare, loc_descarcare,
+              to_char(data_incarcare, 'YYYY-MM-DD') AS data_incarcare,
+              to_char(data_descarcare, 'YYYY-MM-DD') AS data_descarcare,
+              pret, km, email_sofer, rendszam_camion, rendszam_remorca, status, sofer_type,
+              (to_jsonb(o) ->> 'fuvar_no') AS fuvar_no,
+              (to_jsonb(o) ->> 'toll_cost') AS toll_cost,
+              (to_jsonb(o) -> 'route_geo' ->> 'km') AS route_km,
+              (to_jsonb(o) ->> 'carrier_cost') AS carrier_cost,
+              (to_jsonb(o) ->> 'carrier_id') AS carrier_id
        FROM orders o WHERE id=$1 AND company_id=$2`, [orderId, cid]
     );
     if (o.rowCount === 0) return res.json({ result: { ok: false, err: 'Cursă necunoscută' } });
@@ -478,13 +521,20 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
       _driverByEmail(cid, ord.email_sofer),
     ]);
 
-    // Trip-napok: data_descarcare - data_incarcare + 1 (min 1); ha hiányzik → 1
+    // Trip-napok: data_descarcare - data_incarcare + 1 (min 1); ha hiányzik → 1.
+    // A szöveges dátumokat UTC-éjfélként értelmezzük → nincs DST-/időzóna-csúszás.
     let tripDays = 1;
     if (ord.data_incarcare && ord.data_descarcare) {
-      const a = new Date(ord.data_incarcare), b = new Date(ord.data_descarcare);
-      const diff = Math.round((b - a) / (1000 * 60 * 60 * 24)) + 1;
+      const a = Date.parse(ord.data_incarcare + 'T00:00:00Z'), b = Date.parse(ord.data_descarcare + 'T00:00:00Z');
+      const diff = Math.round((b - a) / 86400000) + 1;
       if (Number.isFinite(diff) && diff > 0) tripDays = diff;
     }
+
+    // Km: a fuvar km-e; ha 0/üres, a térképes útvonal-becslés (route_geo.km).
+    const orderKm = Number(ord.km) > 0 ? Number(ord.km) : null;
+    const routeKm = Number(ord.route_km) > 0 ? Number(ord.route_km) : null;
+    const km = orderKm || routeKm;
+    const kmSource = orderKm ? 'order' : (routeKm ? 'route' : null);
 
     // Aktív VONTATÓK számlálása (a cég-költség szétosztásához).
     // FIGYELEM: az oszlop neve `activ` (RO), NEM `active` — a régi kód `active`-ot használt,
@@ -508,15 +558,24 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
     if (!bnr) { try { bnr = await fetchBnrEurRon(); } catch {} }
     if (!bnr || !Number.isFinite(Number(bnr))) bnr = 5.0;
 
+    // Extern (alvállalkozós) fuvar — a saját jármű-költség nem releváns,
+    // a kliens jelzi és az alvállalkozói díjat mutatja.
+    const isExtern = ord.status === 'Extern' || ord.sofer_type === 'Extern';
+    const fuelPrice = await _avgFuelPriceRon(cid);
+
     return res.json({ result: {
       ok: true,
       order: {
-        id: ord.id, client: ord.client, ref: ord.ref,
+        id: ord.id, fuvar_no: ord.fuvar_no || null, client: ord.client, ref: ord.ref,
+        status: ord.status,
         loc_incarcare: ord.loc_incarcare, loc_descarcare: ord.loc_descarcare,
         data_incarcare: ord.data_incarcare, data_descarcare: ord.data_descarcare,
-        km: ord.km ? Number(ord.km) : null,
-        pret: ord.pret ? Number(ord.pret) : null,
-        toll_cost_eur: ord.toll_cost != null ? Number(ord.toll_cost) : null,
+        km, km_source: kmSource,
+        // A fuvar ára NETTÓ EUR (a teljes rendszerben így tároljuk).
+        pret: ord.pret != null && Number(ord.pret) > 0 ? Number(ord.pret) : null,
+        toll_cost_eur: ord.toll_cost != null && Number(ord.toll_cost) > 0 ? Number(ord.toll_cost) : null,
+        is_extern: isExtern,
+        carrier_cost_eur: ord.carrier_cost != null && Number(ord.carrier_cost) > 0 ? Number(ord.carrier_cost) : null,
       },
       trip_days: tripDays,
       truck: truck,           // {id, rendszam, marca, tip, fuel_per_100km} vagy null
@@ -524,6 +583,7 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
       driver: driver,         // {id, nume, email} vagy null
       active_trucks: activeTrucks,
       bnr_eur_lei: Number(bnr),
+      fuel_price_gross: fuelPrice, // RON/l bruttó javaslat (menetlevelek tankolásaiból) vagy null
     } });
   } catch (err) { console.error('vcalcPrefillFromOrder:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
@@ -755,10 +815,14 @@ handlers.vcalcOrderPicker = async function (req, res) {
     const cid = _cid(req);
     const r = await pool.query(
       `SELECT id, client, ref, loc_incarcare, loc_descarcare,
-              data_incarcare, data_descarcare, km, pret, status, rendszam_camion
-       FROM orders
+              to_char(data_incarcare, 'YYYY-MM-DD') AS data_incarcare,
+              to_char(data_descarcare, 'YYYY-MM-DD') AS data_descarcare,
+              km, pret, status, rendszam_camion,
+              (to_jsonb(o) ->> 'fuvar_no') AS fuvar_no,
+              (to_jsonb(o) -> 'route_geo' ->> 'km') AS route_km
+       FROM orders o
        WHERE company_id=$1 AND status <> 'Anulat'
-       ORDER BY COALESCE(data_incarcare, created_at) DESC LIMIT 200`, [cid]
+       ORDER BY COALESCE(data_incarcare, created_at::date) DESC, created_at DESC LIMIT 300`, [cid]
     );
     return res.json({ result: { ok: true, orders: r.rows } });
   } catch (err) { console.error('vcalcOrderPicker:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
@@ -773,7 +837,7 @@ handlers.vcalcRefLists = async function (req, res) {
     if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = _cid(req);
     const [vehR, drvR] = await Promise.all([
-      pool.query('SELECT id, rendszam, marca, tip, fuel_per_100km, assigned_driver_email, default_trailer_id FROM vehicles WHERE company_id=$1 ORDER BY rendszam', [cid]),
+      pool.query('SELECT id, rendszam, marca, tip, activ, fuel_per_100km, assigned_driver_email, default_trailer_id FROM vehicles WHERE company_id=$1 ORDER BY rendszam', [cid]),
       pool.query("SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume", [cid]),
     ]);
     return res.json({ result: { ok: true, vehicles: vehR.rows, drivers: drvR.rows } });
