@@ -7,8 +7,8 @@
 //  a fuvar ⋯ menüből: OrderDocs.openUpload(orderId) / OrderDocs.showForOrder(orderId).
 // ============================================================
 window.OrderDocs = (function () {
-  var TYPES = ['invoice', 'cmr', 'pod', 'order', 'contract', 'customs', 'receipt', 'other'];
-  var ICO = { invoice: '🧾', cmr: '📄', pod: '📷', order: '📑', contract: '📝', customs: '🛃', receipt: '🧾', other: '📎' };
+  var TYPES = ['invoice', 'cmr', 'pod', 'order', 'contract', 'customs', 'receipt', 'order_doc', 'gps_route', 'assignment', 'other'];
+  var ICO = { invoice: '🧾', cmr: '📄', pod: '📷', order: '📑', contract: '📝', customs: '🛃', receipt: '🧾', order_doc: '🚚', gps_route: '🗺️', assignment: '📑', other: '📎' };
   var st = { q: '', type: '', from: '', to: '', order_id: '', order_label: '', rows: [], boxId: null };
   var _qTimer = null;
 
@@ -131,11 +131,13 @@ window.OrderDocs = (function () {
           '<td><span class="odoc-ord" onclick="OrderDocs.showForOrder(\'' + esc(d.order_id) + '\')">' + esc(d.fuvar_no || d.order_id) + '</span>' +
             '<div class="odoc-sub">' + esc([d.client, [d.loc_incarcare, d.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → ')].filter(Boolean).join(' · ')) + '</div></td>' +
           '<td class="odoc-sub">' + esc(d.uploaded_by || '') + '<br>' + esc(dateStr(d.created_at)) + '</td>' +
-          '<td><div class="odoc-act">' +
-            '<button class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" onclick="OrderDocs.download(' + d.id + ',\'original\')">⬇️</button>' +
+          '<td><div class="odoc-act">' + (d.src === 'drv'
+            ? '<a class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" href="/api/doc-download/' + encodeURIComponent(d.id) + '" target="_blank" rel="noopener">⬇️</a>' +
+              '<span class="odoc-sub" title="' + esc(tt('odoc.fromDriver', 'Încărcat de șofer')) + '">📷 ' + esc(tt('odoc.driver', 'șofer')) + '</span>'
+            : '<button class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" onclick="OrderDocs.download(' + d.id + ',\'original\')">⬇️</button>' +
             (d.has_signed ? '<button class="btn" title="✍️" onclick="OrderDocs.download(' + d.id + ',\'signed\')">✍️⬇️</button>' : '') +
             '<button class="btn" title="' + esc(tt('odoc.edit', 'Editează')) + '" onclick="OrderDocs.openEdit(' + d.id + ')">✏️</button>' +
-            '<button class="btn danger" title="' + esc(tt('odoc.delete', 'Șterge')) + '" onclick="OrderDocs.del(' + d.id + ')">🗑</button>' +
+            '<button class="btn danger" title="' + esc(tt('odoc.delete', 'Șterge')) + '" onclick="OrderDocs.del(' + d.id + ')">🗑</button>') +
           '</div></td></tr>';
       });
       el.innerHTML = html + '</tbody></table></div>';
@@ -169,7 +171,7 @@ window.OrderDocs = (function () {
   }
 
   function del(id) {
-    var d = st.rows.filter(function (r) { return r.id === id; })[0];
+    var d = st.rows.filter(function (r) { return r.id === id && r.src !== 'drv'; })[0];
     if (!confirm(tt('odoc.delConfirm', 'Ștergi definitiv documentul „{f}"?', { f: d ? d.file_name : id }))) return;
     gas('orderDocDelete', [{ id: id }]).then(function (r) {
       if (r && r.ok) { toast(tt('odoc.deleted', 'Document șters'), 'ok'); load(); }
@@ -366,7 +368,7 @@ window.OrderDocs = (function () {
   }
 
   function openEdit(id) {
-    var d = st.rows.filter(function (r) { return r.id === id; })[0]; if (!d) return;
+    var d = st.rows.filter(function (r) { return r.id === id && r.src !== 'drv'; })[0]; if (!d) return;
     ensureStyle(); closeModal();
     _pick = { id: d.order_id, label: orderLabel(d) };
     var ov = document.createElement('div');

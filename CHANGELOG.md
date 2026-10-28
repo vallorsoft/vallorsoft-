@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-28 — 📎 Dokumentumok egy helyen: menetlevél ↔ fuvar ↔ sofőr-feltöltés összekötve, duplikáció nélkül (PR #574)
+- A menetlevél-dokumentumok a fuvar-dokumentumokkal **egy tárolóba** kerültek (`order_documents` + új `waybill_id`, `order_id` mostantól lehet üres) — a #573 külön `waybill_documents` táblája megszűnt, a sorai átköltöztek (`db/zz-waybill-docs-unify.sql`).
+- Menetlevélnél feltöltéskor **minden** fájlhoz kiválasztható, melyik fuvarhoz tartozik → a fuvar dokumentumai közt is megjelenik. Fuvar nélkül csak a menetlevélnél él.
+- A fuvarhoz (fuvar ⋯ / Fuvar-dokumentumok oldal) feltöltött irat automatikusan megjelenik a fuvart tartalmazó menetlevélnél is.
+- A **sofőr** fuvarhoz feltöltött fotója/irata (`documents.order_id`) a fuvar-dokumentumok közt és a menetlevélnél is látszik (📷 sofőr jelzéssel, csak olvasható, a PDF-be is befűzhető).
+- Egy irat egyszer tárolódik; a menetlevélnél törölt fuvar-irat a fuvarnál is törlődik (megerősítéssel). Menetlevél törlésekor csak a fuvar nélküli iratai törlődnek. Az összefűzött PDF-be az aláírt/pecsételt változat kerül, ha van.
+- `handlers/waybillDocs.js` átírva, `orderDocSearch` + sofőr-iratok, `getFuvarlevelek` `doc_count` egyesítve, `fuvarlevelDelete` takarítás, új típusok a fuvar-oldalon is (Fuvar-dokumentum / GPS útvonal / Megbízás). +6 teszt; valós Postgres 16-tal 1929 Jest zöld, a migráció átköltöztetése és idempotenciája kipróbálva.
+
 ## 2026-10-28 — 📎 Menetlevél-dokumentumok: csoportos feltöltés típussal + kezelés + egy PDF-be fűzött letöltés (PR #573)
 - A FUVARLEVELEK listán minden menetlevél mellett **📎 Feltöltés** és **🗂️ Kezelés** gomb (a kezelés gombján a csatolt dokumentumok száma).
 - **Feltöltés:** több fájl egyszerre (választó vagy ráhúzás); fájlonként típus: **Fuvar-dokumentum** (a menetlevél melyik fuvarjához — legördülő a menetlevél fuvarjaiból), **Számla**, **GPS útvonal**, **Megbízás**, **Egyéb**; „Típus mindegyikre" gyors-beállítás, a típus a fájlnévből előre tippelve. Fájlonként küldve (max. 15 MB/fájl).

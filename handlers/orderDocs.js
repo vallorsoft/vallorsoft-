@@ -12,7 +12,8 @@ const { parseInvoiceText, normName, digits } = require('../lib/invoiceText');
 
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
-const DOC_TYPES = ['invoice', 'cmr', 'pod', 'order', 'contract', 'customs', 'receipt', 'other'];
+const DOC_TYPES = ['invoice', 'cmr', 'pod', 'order', 'contract', 'customs', 'receipt',
+  'order_doc', 'gps_route', 'assignment', 'other'];
 const MAX_B64 = 20 * 1024 * 1024; // ~15 MB fájl base64-ben
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Megengedett feltöltés: kép / PDF / gyakori irodai formátum (data URL).
@@ -60,7 +61,40 @@ handlers.orderDocSearch = async function (req, res, args) {
         WHERE ${where.join(' AND ')}
         ORDER BY COALESCE(od.doc_date, od.created_at::date) DESC, od.id DESC
         LIMIT ${lim}`, vals);
-    return res.json({ result: { ok: true, rows: r.rows, types: DOC_TYPES, truncated: r.rows.length >= lim } });
+    const out = r.rows.map((x) => Object.assign(x, { src: 'od' }));
+    // A sofőr fuvarhoz feltöltött iratai (documents.order_id) is itt látszanak —
+    // csak olvashatók (letöltés a /api/doc-download útvonalon), típusuk 'pod'.
+    if (!a.doc_type || a.doc_type === 'pod') {
+      try {
+        const dv = [req.session.user.company_id];
+        const dw = ['o.company_id = $1'];
+        const dadd = (sql, v) => { dv.push(v); dw.push(sql.replace('?', '$' + dv.length)); };
+        if (oid) dadd('d.order_id = ?', oid);
+        if (from) dadd('d.created_at::date >= ?::date', from);
+        if (to) dadd('d.created_at::date <= ?::date', to);
+        if (q) {
+          dv.push('%' + q.toLowerCase().replace(/[%_\\]/g, '\\$&') + '%');
+          const p = '$' + dv.length;
+          dw.push(`(LOWER(COALESCE(o.fuvar_no,'')) LIKE ${p} OR LOWER(o.id) LIKE ${p}
+            OR LOWER(COALESCE(o.client,'')) LIKE ${p} OR LOWER(COALESCE(d.file_name,'')) LIKE ${p})`);
+        }
+        const dr = await pool.query(
+          `SELECT d.id, d.order_id, d.file_name, d.tip, d.nume_sofer, d.email_sofer, d.created_at,
+                  to_char(d.created_at::date, 'YYYY-MM-DD') AS doc_date,
+                  o.fuvar_no, o.client, o.loc_incarcare, o.loc_descarcare, o.status,
+                  o.data_incarcare, o.data_descarcare
+             FROM documents d JOIN orders o ON o.id = d.order_id
+            WHERE ${dw.join(' AND ')}
+            ORDER BY d.created_at DESC, d.id DESC LIMIT ${lim}`, dv);
+        dr.rows.forEach((x) => out.push(Object.assign(x, {
+          src: 'drv', doc_type: 'pod', note: x.tip || null, ref_no: null, file_size: null,
+          uploaded_by: x.nume_sofer || x.email_sofer, has_signed: false,
+        })));
+        out.sort((p1, p2) => String(p2.doc_date).localeCompare(String(p1.doc_date))
+          || new Date(p2.created_at) - new Date(p1.created_at));
+      } catch (e) { console.error('orderDocSearch sofőr-dokumentumok (folytatjuk):', e.message); }
+    }
+    return res.json({ result: { ok: true, rows: out.slice(0, lim), types: DOC_TYPES, truncated: out.length >= lim } });
   } catch (err) {
     console.error('orderDocSearch hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });

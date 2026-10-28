@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 61. lépés — Dokumentumok egy tárolóban (2026-10-28, PR #574) ✅ KÉSZ
+- `order_documents` most fuvar nélküli (csak menetlevélhez kötött) sort is tárolhat; minden menetlevél-művelet a menetlevél cég-tulajdonát ÉS a dokumentum hozzá-tartozását (`waybill_id` vagy a menetlevél saját fuvarja, `od.company_id`/`o.company_id`) ellenőrzi; a meglévő fuvar-oldali handlerek `JOIN orders` cégszűrése érintetlen (fuvar nélküli sort nem érnek el). A sofőr-iratok (`documents`) csak a cég fuvarjain át (`o.company_id`) olvashatók, nem módosíthatók.
+
 ### 60. lépés — Menetlevél-dokumentumok (2026-10-28, PR #573) ✅ KÉSZ
 - Új `waybill_documents` tábla + `handlers/waybillDocs.js`: csak Admin/Manager; a menetlevél tulajdona `company_id` (fallback a cég felhasználóinak e-mailje) szerint ellenőrizve minden művelet előtt; letöltés/módosítás/törlés `company_id`-szűrt; a `order_id` csak a menetlevél saját `order_ids`-ából fogadható el (idegen fuvar → NULL); MIME-fehérlista (SVG/HTML nem), 15 MB/fájl, max. 20 fájl/kérés, előbb validálás, utána tranzakciós írás. Audit minden íráson (fájltartalom nélkül).
 

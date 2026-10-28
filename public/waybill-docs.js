@@ -8,8 +8,11 @@
 //  WaybillDocs.openUpload(id) / WaybillDocs.openManage(id).
 // ============================================================
 window.WaybillDocs = (function () {
+  // A feltöltő típusai; a fuvar-oldalról jövő további típusok (CMR, POD…) is megjelennek.
   var TYPES = ['order_doc', 'invoice', 'gps_route', 'assignment', 'other'];
-  var ICO = { order_doc: '🚚', invoice: '🧾', gps_route: '🗺️', assignment: '📑', other: '📎' };
+  var ALL_TYPES = TYPES.concat(['cmr', 'pod', 'order', 'contract', 'customs', 'receipt']);
+  var ICO = { order_doc: '🚚', invoice: '🧾', gps_route: '🗺️', assignment: '📑', other: '📎',
+    cmr: '📄', pod: '📷', order: '📑', contract: '📝', customs: '🛃', receipt: '🧾' };
   var FB = {
     order_doc: 'Documente cursă', invoice: 'Factură', gps_route: 'Traseu GPS',
     assignment: 'Comandă de transport', other: 'Altele'
@@ -29,7 +32,7 @@ window.WaybillDocs = (function () {
     });
   }
   function note(msg, kind) { try { toast(msg, kind || ''); } catch (e) { alert(msg); } }
-  function typeLabel(k) { return (ICO[k] || '📎') + ' ' + tt('wbd.t.' + k, FB[k] || k); }
+  function typeLabel(k) { return (ICO[k] || '📎') + ' ' + (FB[k] ? tt('wbd.t.' + k, FB[k]) : tt('odoc.t.' + k, k)); }
   function fmtSize(n) { n = Number(n) || 0; if (!n) return ''; return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
   function orderLabel(o) {
     var route = [o.loc_incarcare, o.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → ');
@@ -82,7 +85,8 @@ window.WaybillDocs = (function () {
   function close() { var o = document.getElementById('wbdOv'); if (o) o.remove(); }
 
   function typeSelect(cur, attrs) {
-    return '<select ' + (attrs || '') + '>' + TYPES.map(function (k) {
+    var list = (cur && TYPES.indexOf(cur) < 0) ? TYPES.concat([cur]) : TYPES;
+    return '<select ' + (attrs || '') + '>' + list.map(function (k) {
       return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + esc(typeLabel(k)) + '</option>';
     }).join('') + '</select>';
   }
@@ -120,7 +124,7 @@ window.WaybillDocs = (function () {
         '<div class="wbd-name">' + esc(f.file.name) + '</div><div class="wbd-meta">' + esc(fmtSize(f.file.size)) +
         (f.file.size > MAX_FILE ? ' · <b style="color:#b91c1c;">' + esc(tt('wbd.tooBig', 'prea mare (max. 15 MB)')) + '</b>' : '') + '</div>' +
         '<div class="wbd-sels">' + typeSelect(f.type, 'onchange="WaybillDocs._stType(' + i + ',this.value)"') +
-        (f.type === 'order_doc' && hasOrders ? orderSelect(f.order_id, 'onchange="WaybillDocs._stOrder(' + i + ',this.value)"') : '') +
+        (hasOrders ? orderSelect(f.order_id, 'onchange="WaybillDocs._stOrder(' + i + ',this.value)"') : '') +
         '</div></div><button class="wbd-x" title="✕" onclick="WaybillDocs._stDel(' + i + ')">✕</button></div>';
     }).join('');
     overlay(head(tt('wbd.uploadTitle', '📎 Încarcă documente la foaia de parcurs')) +
@@ -188,7 +192,7 @@ window.WaybillDocs = (function () {
       var f = list[i];
       readDataUrl(f.file).then(function (data) {
         return gas('waybillDocUpload', [{ waybill_id: st.wid, files: [{
-          file_name: f.file.name, data: data, doc_type: f.type, order_id: f.type === 'order_doc' ? f.order_id : ''
+          file_name: f.file.name, data: data, doc_type: f.type, order_id: f.order_id || ''
         }] }]);
       }).then(function (r) {
         if (r && r.ok) done++; else failed.push(f.file.name + (r && r.err ? ' (' + r.err + ')' : ''));
@@ -209,19 +213,23 @@ window.WaybillDocs = (function () {
     if (!docs.length) {
       body = '<div class="wbd-empty">' + esc(tt('wbd.noDocs', 'Nu există încă documente la această foaie de parcurs.')) + '</div>';
     } else {
-      TYPES.forEach(function (k) {
-        var g = docs.filter(function (d) { return (d.doc_type || 'other') === k; });
+      ALL_TYPES.forEach(function (k) {
+        var g = docs.filter(function (d) { return (ALL_TYPES.indexOf(d.doc_type) >= 0 ? d.doc_type : 'other') === k; });
         if (!g.length) return;
         body += '<div class="wbd-grp">' + esc(typeLabel(k)) + ' (' + g.length + ')</div>';
         body += g.map(function (d) {
-          return '<div class="wbd-row"><input type="checkbox" class="wbd-chk wbd-sel" value="' + d.id + '" checked>' +
-            '<div><div class="wbd-name">' + esc(d.file_name) + (d.fuvar_no ? '<span class="wbd-badge">🚚 ' + esc(d.fuvar_no) + '</span>' : '') + '</div>' +
+          var key = (d.src || 'od') + ':' + d.id;
+          var drv = d.src === 'drv';
+          return '<div class="wbd-row"><input type="checkbox" class="wbd-chk wbd-sel" value="' + esc(key) + '" checked>' +
+            '<div><div class="wbd-name">' + esc(d.file_name) + (d.has_signed ? ' ✍️' : '') +
+              (d.fuvar_no ? '<span class="wbd-badge">🚚 ' + esc(d.fuvar_no) + '</span>' : '') +
+              (drv ? '<span class="wbd-badge" style="background:#ecfdf5;color:#065f46;">📷 ' + esc(tt('wbd.fromDriver', 'încărcat de șofer')) + '</span>' : '') + '</div>' +
             '<div class="wbd-meta">' + esc(fmtSize(d.file_size)) + (d.created_at ? ' · ' + new Date(d.created_at).toLocaleDateString('ro-RO') : '') +
-            (d.uploaded_by ? ' · ' + esc(d.uploaded_by) : '') + '</div>' +
-            '<div class="wbd-sels">' + typeSelect(d.doc_type, 'onchange="WaybillDocs._upd(' + d.id + ',this.value,null)"') +
-            ((d.doc_type === 'order_doc' && hasOrders) ? orderSelect(d.order_id, 'onchange="WaybillDocs._upd(' + d.id + ',null,this.value)"') : '') +
-            '</div></div><div class="wbd-act"><button title="⬇️" onclick="WaybillDocs._dl(' + d.id + ')">⬇️</button>' +
-            '<button title="🗑" onclick="WaybillDocs._del(' + d.id + ')">🗑</button></div></div>';
+            (d.uploaded_by ? ' · ' + esc(d.uploaded_by) : '') + (d.note ? ' · ' + esc(d.note) : '') + '</div>' +
+            (drv ? '' : '<div class="wbd-sels">' + typeSelect(d.doc_type, 'onchange="WaybillDocs._upd(' + d.id + ',this.value,null)"') +
+              (hasOrders ? orderSelect(d.order_id, 'onchange="WaybillDocs._upd(' + d.id + ',null,this.value)"') : '') + '</div>') +
+            '</div><div class="wbd-act"><button title="⬇️" onclick="WaybillDocs._dl(\'' + esc(key) + '\')">⬇️</button>' +
+            (drv ? '' : '<button title="🗑" onclick="WaybillDocs._del(' + d.id + ')">🗑</button>') + '</div></div>';
         }).join('');
       });
     }
@@ -236,25 +244,27 @@ window.WaybillDocs = (function () {
   }
   function _selAll(on) { document.querySelectorAll('#wbdOv .wbd-sel').forEach(function (c) { c.checked = on; }); }
   function _upd(id, type, orderId) {
-    var d = ((st.info && st.info.docs) || []).filter(function (x) { return x.id === id; })[0];
+    var d = ((st.info && st.info.docs) || []).filter(function (x) { return x.id === id && x.src !== 'drv'; })[0];
     if (!d) return;
     if (type != null) d.doc_type = type;
     if (orderId != null) d.order_id = orderId;
-    gas('waybillDocUpdate', [{ id: id, doc_type: d.doc_type, order_id: d.order_id || '', note: d.note || '' }]).then(function (r) {
+    gas('waybillDocUpdate', [{ waybill_id: st.wid, id: id, doc_type: d.doc_type, order_id: d.order_id || '' }]).then(function (r) {
       if (!r || !r.ok) { note((r && r.err) || 'Eroare', 'err'); return; }
       openManage(st.wid);
     });
   }
   function _del(id) {
-    if (!confirm(tt('wbd.delConfirm', 'Ștergi definitiv acest document?'))) return;
-    gas('waybillDocDelete', [{ id: id }]).then(function (r) {
+    if (!confirm(tt('wbd.delConfirm', 'Ștergi definitiv acest document? Se șterge și de la cursă.'))) return;
+    gas('waybillDocDelete', [{ waybill_id: st.wid, id: id }]).then(function (r) {
       if (!r || !r.ok) { note((r && r.err) || 'Eroare', 'err'); return; }
       refreshList();
       openManage(st.wid);
     });
   }
-  function getDoc(id) {
-    return gas('waybillDocGet', [{ id: id }]).then(function (r) {
+  // key = 'od:<id>' (fuvar-/menetlevél-dokumentum) vagy 'drv:<id>' (sofőr-feltöltés)
+  function getDoc(key) {
+    var p = String(key).split(':');
+    return gas('waybillDocGet', [{ src: p[0], id: parseInt(p[1], 10) }]).then(function (r) {
       if (!r || !r.ok || !r.doc) throw new Error((r && r.err) || 'Eroare');
       return r.doc;
     });
@@ -271,9 +281,9 @@ window.WaybillDocs = (function () {
     for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
-  function _dl(id) {
-    getDoc(id).then(function (d) {
-      saveBlob(new Blob([dataToBytes(d.data)], { type: d.mime || 'application/octet-stream' }), d.file_name || ('document-' + id));
+  function _dl(key) {
+    getDoc(key).then(function (d) {
+      saveBlob(new Blob([dataToBytes(d.data)], { type: d.mime || 'application/octet-stream' }), d.file_name || ('document-' + d.id));
     }).catch(function (e) { note(e.message, 'err'); });
   }
   // Nem-JPEG/PNG kép (webp, heic ha a böngésző tudja) → JPEG canvas-szal.
@@ -295,7 +305,7 @@ window.WaybillDocs = (function () {
   // A kijelölt dokumentumok egy PDF-be, típus-csoportonként (a lista sorrendjében).
   function _pdf() {
     if (!window.PDFLib) { note(tt('wbd.noPdfLib', 'Biblioteca PDF nu este încărcată.'), 'err'); return; }
-    var ids = [].slice.call(document.querySelectorAll('#wbdOv .wbd-sel:checked')).map(function (c) { return parseInt(c.value, 10); });
+    var ids = [].slice.call(document.querySelectorAll('#wbdOv .wbd-sel:checked')).map(function (c) { return c.value; });
     if (!ids.length) { note(tt('wbd.selectSome', 'Selectează cel puțin un document.'), 'err'); return; }
     var btn = document.getElementById('wbdPdf');
     var P = window.PDFLib, skipped = [];
@@ -325,7 +335,7 @@ window.WaybillDocs = (function () {
             });
           }
           skipped.push(d.file_name);
-        }).catch(function () { skipped.push('#' + id); }).then(next);
+        }).catch(function () { skipped.push(id); }).then(next);
       };
       return next().then(function () {
         if (!out.getPageCount()) throw new Error(tt('wbd.nothingPdf', 'Niciun document nu poate fi pus în PDF (doar PDF și imagini).'));
