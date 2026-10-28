@@ -40,7 +40,7 @@ window.OrderDocs = (function () {
     s.id = 'odoc-style';
     s.textContent =
       '.odoc-tb{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}' +
-      '.odoc-fld{display:flex;flex-direction:column;gap:4px}.odoc-fld label{font-size:12px;color:var(--muted)}' +
+      '.odoc-fld{display:flex;flex-direction:column;gap:4px}.odoc-fld label{font-size:12px;color:var(--muted);font-weight:600}' +
       '.odoc-tb .odoc-q{min-width:240px;flex:1}' +
       '.odoc-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}' +
       '.odoc-chip{font-size:12px;padding:5px 11px;border-radius:999px;border:1.5px solid #cbd5e1;background:transparent;cursor:pointer;color:inherit}' +
@@ -49,10 +49,10 @@ window.OrderDocs = (function () {
       '.odoc-ofilter button{border:0;background:#c7d2fe;border-radius:999px;cursor:pointer;width:22px;height:22px}' +
       '.odoc-type{font-size:12px;font-weight:600;white-space:nowrap}' +
       '.odoc-ord{cursor:pointer;color:var(--brand-indigo,#4f46e5);font-weight:700}' +
-      '.odoc-sub{font-size:12px;color:var(--muted)}' +
+      '.odoc-sub{font-size:12px;color:var(--muted)}.odoc-mod .odoc-sub{color:#475569}' +
       '.odoc-act{display:flex;gap:6px}.odoc-act .btn{padding:4px 9px;font-size:13px}' +
       '.odoc-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px}' +
-      '.odoc-mod{background:var(--panel,#fff);color:var(--text-primary,#0f172a);border-radius:16px;padding:20px;width:100%;max-width:560px;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(15,23,42,.3)}' +
+      '.odoc-mod{background:#fff;color:#0f172a;border-radius:16px;padding:20px;width:100%;max-width:560px;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(15,23,42,.3)}' +
       '.odoc-mod h3{margin:0 0 14px}.odoc-mod .odoc-fld{margin-bottom:12px}.odoc-mod .input,.odoc-mod .select{width:100%;box-sizing:border-box}' +
       '.odoc-picklist{max-height:200px;overflow:auto;border:1.5px solid #cbd5e1;border-radius:10px;margin-top:6px}' +
       '.odoc-pick{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #e5e7eb}.odoc-pick:hover{background:#eef2ff}' +
@@ -248,7 +248,7 @@ window.OrderDocs = (function () {
     var ov = document.createElement('div');
     ov.className = 'odoc-ov'; ov.id = 'odocOv';
     ov.onclick = function (e) { if (e.target === ov) closeModal(); };
-    ov.innerHTML = '<div class="odoc-mod"><h3>' + esc(tt('odoc.upload', '➕ Încarcă document')) + '</h3>' +
+    ov.innerHTML = '<div class="odoc-mod vs-light-surface"><h3>' + esc(tt('odoc.upload', '➕ Încarcă document')) + '</h3>' +
       pickerHtml() +
       '<div class="odoc-fld"><label>' + esc(tt('odoc.files', 'Fișier(e)')) + ' *</label>' +
         '<input type="file" class="input" id="odocFiles" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.xml,.txt,.csv,.zip" onchange="OrderDocs._inspect()"></div>' +
@@ -374,7 +374,7 @@ window.OrderDocs = (function () {
     var ov = document.createElement('div');
     ov.className = 'odoc-ov'; ov.id = 'odocOv';
     ov.onclick = function (e) { if (e.target === ov) closeModal(); };
-    ov.innerHTML = '<div class="odoc-mod"><h3>✏️ ' + esc(d.file_name) + '</h3>' + pickerHtml() + metaFields(d) +
+    ov.innerHTML = '<div class="odoc-mod vs-light-surface"><h3>✏️ ' + esc(d.file_name) + '</h3>' + pickerHtml() + metaFields(d) +
       '<div class="odoc-foot"><button class="btn ghost" onclick="OrderDocs.closeModal()">' + esc(tt('common.cancel', 'Anulează')) + '</button>' +
       '<button class="btn primary" onclick="OrderDocs.doEdit(' + id + ')">' + esc(tt('odoc.save', '💾 Salvează')) + '</button></div></div>';
     document.body.appendChild(ov);

@@ -54,20 +54,20 @@ window.WaybillDocs = (function () {
     s.textContent =
       '.wbd-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px}' +
       '.wbd-mod{background:#fff;color:#0f172a;border-radius:16px;padding:20px;width:100%;max-width:760px;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(15,23,42,.3);box-sizing:border-box}' +
-      '.wbd-mod h3{margin:0 0 4px;font-size:18px}.wbd-sub{font-size:12px;color:#64748b;margin-bottom:14px}' +
+      '.wbd-mod h3{margin:0 0 4px;font-size:18px;color:#0f172a}.wbd-sub{font-size:12px;color:#475569;margin-bottom:14px}' +
       '.wbd-drop{border:2px dashed #94a3b8;border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:#f8fafc;font-weight:600;color:#334155}' +
       '.wbd-drop.on{border-color:#2563eb;background:#eff6ff}' +
       '.wbd-list{display:flex;flex-direction:column;gap:8px;margin:14px 0}' +
       '.wbd-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;background:#fff}' +
-      '.wbd-row .wbd-name{font-weight:700;font-size:13px;word-break:break-word}.wbd-row .wbd-meta{font-size:11.5px;color:#64748b}' +
-      '.wbd-sels{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.wbd-sels select{padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;color:#0f172a;max-width:100%}' +
+      '.wbd-row .wbd-name{font-weight:700;font-size:13px;word-break:break-word;color:#0f172a}.wbd-row .wbd-meta{font-size:11.5px;color:#475569}' +
+      '.wbd-sels{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.wbd-sels select{padding:6px 8px;border:1.5px solid #94a3b8;border-radius:8px;font-size:13px;background:#fff;color:#0f172a;max-width:100%}' +
       '.wbd-x{border:0;background:#fee2e2;color:#b91c1c;border-radius:8px;width:30px;height:30px;cursor:pointer;font-weight:800}' +
-      '.wbd-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.wbd-act button{padding:6px 10px;border-radius:8px;border:1.5px solid #cbd5e1;background:#fff;cursor:pointer;font-size:13px}' +
+      '.wbd-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.wbd-act button{padding:6px 10px;border-radius:8px;border:1.5px solid #64748b;background:#fff;color:#0f172a;cursor:pointer;font-size:13px}.wbd-act button:hover{background:#f1f5f9}' +
       '.wbd-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px;position:sticky;bottom:-20px;background:#fff;padding:10px 0 0}' +
       '.wbd-foot .btn{padding:9px 16px}.wbd-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}' +
       '.wbd-bar select{padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;color:#0f172a}' +
       '.wbd-grp{font-size:12px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px}' +
-      '.wbd-empty{padding:22px;text-align:center;color:#64748b}' +
+      '.wbd-empty{padding:22px;text-align:center;color:#475569}' +
       '.wbd-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;margin-left:6px}' +
       '@media(max-width:560px){.wbd-row{grid-template-columns:1fr auto}.wbd-row .wbd-chk{display:none}}';
     document.head.appendChild(s);
@@ -77,7 +77,7 @@ window.WaybillDocs = (function () {
     ensureStyle();
     var ov = document.createElement('div');
     ov.className = 'wbd-ov'; ov.id = 'wbdOv';
-    ov.innerHTML = '<div class="wbd-mod">' + html + '</div>';
+    ov.innerHTML = '<div class="wbd-mod vs-light-surface">' + html + '</div>';
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     document.body.appendChild(ov);
     return ov;
@@ -209,9 +209,15 @@ window.WaybillDocs = (function () {
   function renderManage() {
     var docs = (st.info && st.info.docs) || [];
     var hasOrders = ((st.info && st.info.orders) || []).length > 0;
-    var body = '';
+    var w = (st.info && st.info.waybill) || {};
+    // Maga a menetlevél is kijelölhető → a csoportos PDF elejére kerül.
+    var body = '<div class="wbd-grp">' + esc(tt('wbd.waybillItself', '📋 Foaia de parcurs')) + '</div>' +
+      '<div class="wbd-row"><input type="checkbox" class="wbd-chk wbd-sel" value="wb:' + esc(st.wid) + '" checked>' +
+      '<div><div class="wbd-name">' + esc(w.numar_fisa || w.file_name || st.wid) + '</div>' +
+      '<div class="wbd-meta">' + esc(tt('wbd.waybillHint', 'Foaia de parcurs completă — inclusă la începutul PDF-ului')) + '</div></div>' +
+      '<div class="wbd-act"><button title="⬇️" onclick="WaybillDocs._dl(\'wb:' + esc(st.wid) + '\')">⬇️</button></div></div>';
     if (!docs.length) {
-      body = '<div class="wbd-empty">' + esc(tt('wbd.noDocs', 'Nu există încă documente la această foaie de parcurs.')) + '</div>';
+      body += '<div class="wbd-empty">' + esc(tt('wbd.noDocs', 'Nu există încă documente la această foaie de parcurs.')) + '</div>';
     } else {
       ALL_TYPES.forEach(function (k) {
         var g = docs.filter(function (d) { return (ALL_TYPES.indexOf(d.doc_type) >= 0 ? d.doc_type : 'other') === k; });
@@ -234,12 +240,12 @@ window.WaybillDocs = (function () {
       });
     }
     overlay(head(tt('wbd.manageTitle', '🗂️ Documentele foii de parcurs')) +
-      (docs.length ? '<div class="wbd-bar"><button class="btn ghost" style="padding:6px 10px;" onclick="WaybillDocs._selAll(true)">' + esc(tt('wbd.selAll', 'Toate')) + '</button>' +
-        '<button class="btn ghost" style="padding:6px 10px;" onclick="WaybillDocs._selAll(false)">' + esc(tt('wbd.selNone', 'Niciunul')) + '</button></div>' : '') +
+      '<div class="wbd-bar"><button class="btn ghost" style="padding:6px 10px;" onclick="WaybillDocs._selAll(true)">' + esc(tt('wbd.selAll', 'Toate')) + '</button>' +
+        '<button class="btn ghost" style="padding:6px 10px;" onclick="WaybillDocs._selAll(false)">' + esc(tt('wbd.selNone', 'Niciunul')) + '</button></div>' +
       '<div class="wbd-list">' + body + '</div>' +
       '<div class="wbd-foot"><button class="btn ghost" onclick="WaybillDocs.close()">' + esc(tt('common.close', 'Închide')) + '</button>' +
       '<button class="btn ghost" onclick="WaybillDocs.openUpload(\'' + esc(st.wid) + '\')">' + esc(tt('wbd.upload', '📎 Încarcă')) + '</button>' +
-      (docs.length ? '<button class="btn primary" id="wbdPdf" onclick="WaybillDocs._pdf()">' + esc(tt('wbd.pdfBtn', '📄 Descarcă selecția într-un PDF')) + '</button>' : '') +
+      '<button class="btn primary" id="wbdPdf" onclick="WaybillDocs._pdf()">' + esc(tt('wbd.pdfBtn', '📄 Descarcă selecția într-un PDF')) + '</button>' +
       '</div>');
   }
   function _selAll(on) { document.querySelectorAll('#wbdOv .wbd-sel').forEach(function (c) { c.checked = on; }); }
@@ -282,6 +288,10 @@ window.WaybillDocs = (function () {
     return out;
   }
   function _dl(key) {
+    if (String(key).indexOf('wb:') === 0) {   // a menetlevél nyomtatható lapja új lapon
+      window.open('/api/pdf-download/' + encodeURIComponent(String(key).slice(3)), '_blank', 'noopener');
+      return;
+    }
     getDoc(key).then(function (d) {
       saveBlob(new Blob([dataToBytes(d.data)], { type: d.mime || 'application/octet-stream' }), d.file_name || ('document-' + d.id));
     }).catch(function (e) { note(e.message, 'err'); });
@@ -302,6 +312,82 @@ window.WaybillDocs = (function () {
       img.src = dataUrl;
     });
   }
+  // ── A menetlevél (HTML nyomtatvány) → PDF-oldalak ────────────────────
+  // A /api/pdf-download/:id lapot egy rejtett, A4-szélességű iframe-be töltjük,
+  // html2canvas-szal (az iframe-en belül) képpé rendereljük, és A4 magasságú
+  // szeletekre vágjuk — a vágás egy táblázat-sor / blokk elejére esik, hogy
+  // szöveg ne törjön ketté. A kész oldalak a csoportos PDF elejére kerülnek.
+  var H2C_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  function renderWaybillInto(out, wid) {
+    var P = window.PDFLib;
+    var CSS_W = 794;                       // A4 szélesség CSS-pixelben (96 dpi)
+    var W = 595.28, H = 841.89, M = 22;    // pt
+    var k = (W - 2 * M) / CSS_W;           // pt / CSS-px
+    var pageCss = Math.floor((H - 2 * M) / k);
+    return new Promise(function (resolve, reject) {
+      var fr = document.createElement('iframe');
+      fr.setAttribute('aria-hidden', 'true');
+      fr.style.cssText = 'position:fixed;left:-12000px;top:0;width:' + CSS_W + 'px;height:1200px;border:0;';
+      var done = function (err, val) { try { fr.remove(); } catch (e) {} if (err) reject(err); else resolve(val); };
+      var timer = setTimeout(function () { done(new Error(tt('wbd.wbTimeout', 'Foaia de parcurs nu s-a putut genera.'))); }, 30000);
+      fr.onload = function () {
+        var win = fr.contentWindow, doc = fr.contentDocument;
+        if (!doc || !doc.body) { clearTimeout(timer); done(new Error('wb')); return; }
+        [].slice.call(doc.querySelectorAll('.no-print')).forEach(function (el) { el.style.display = 'none'; });
+        doc.documentElement.style.background = '#fff'; doc.body.style.background = '#fff';
+        doc.body.style.margin = '0'; doc.body.style.padding = '12px';
+        var sc = doc.createElement('script');
+        sc.src = H2C_SRC;
+        sc.onerror = function () { clearTimeout(timer); done(new Error(tt('wbd.wbTimeout', 'Foaia de parcurs nu s-a putut genera.'))); };
+        sc.onload = function () {
+          var imgs = [].slice.call(doc.images);
+          Promise.all(imgs.map(function (im) { return im.complete ? 0 : new Promise(function (r) { im.onload = im.onerror = r; }); }))
+            .then(function () {
+              var totalH = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+              // Biztonságos vágási pontok: sorok / blokkok teteje (CSS-px).
+              var cuts = [].slice.call(doc.querySelectorAll('tr, .keep, .card, .sec-title, .sign-tbl, .sum-block, h1, h2, h3, table'))
+                .map(function (el) { return Math.round(el.getBoundingClientRect().top + win.scrollY); })
+                .filter(function (y) { return y > 0; }).sort(function (a, b) { return a - b; });
+              return win.html2canvas(doc.body, { scale: 2, backgroundColor: '#ffffff', windowWidth: CSS_W, useCORS: true, logging: false })
+                .then(function (canvas) {
+                  var ratio = canvas.height / totalH;   // canvas-px / CSS-px
+                  var y = 0, chain = Promise.resolve();
+                  while (y < totalH - 4) {
+                    var end = y + pageCss;
+                    if (end < totalH) {
+                      var best = 0;
+                      cuts.forEach(function (c) { if (c > y + pageCss * 0.45 && c <= end) best = c; });
+                      if (best) end = best;
+                    } else end = totalH;
+                    (function (y0, y1) {
+                      chain = chain.then(function () {
+                        var sh = Math.max(1, Math.round((y1 - y0) * ratio));
+                        var part = document.createElement('canvas');
+                        part.width = canvas.width; part.height = sh;
+                        var cx = part.getContext('2d');
+                        cx.fillStyle = '#fff'; cx.fillRect(0, 0, part.width, sh);
+                        cx.drawImage(canvas, 0, Math.round(y0 * ratio), canvas.width, sh, 0, 0, canvas.width, sh);
+                        return out.embedJpg(dataToBytes(part.toDataURL('image/jpeg', 0.92))).then(function (img) {
+                          var hPt = (y1 - y0) * k;
+                          out.addPage([W, H]).drawImage(img, { x: M, y: H - M - hPt, width: W - 2 * M, height: hPt });
+                        });
+                      });
+                    })(y, end);
+                    y = end;
+                  }
+                  return chain;
+                });
+            })
+            .then(function () { clearTimeout(timer); done(null, true); },
+              function (e) { clearTimeout(timer); done(e); });
+        };
+        doc.head.appendChild(sc);
+      };
+      fr.src = '/api/pdf-download/' + encodeURIComponent(wid);
+      document.body.appendChild(fr);
+    });
+  }
+
   // A kijelölt dokumentumok egy PDF-be, típus-csoportonként (a lista sorrendjében).
   function _pdf() {
     if (!window.PDFLib) { note(tt('wbd.noPdfLib', 'Biblioteca PDF nu este încărcată.'), 'err'); return; }
@@ -315,6 +401,10 @@ window.WaybillDocs = (function () {
         if (i >= ids.length) return Promise.resolve();
         if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + (i + 1) + '/' + ids.length; }
         var id = ids[i++];
+        if (String(id).indexOf('wb:') === 0) {
+          return renderWaybillInto(out, String(id).slice(3))
+            .catch(function () { skipped.push(tt('wbd.waybillItself', '📋 Foaia de parcurs')); }).then(next);
+        }
         return getDoc(id).then(function (d) {
           var mime = String(d.mime || '').toLowerCase();
           if (mime === 'application/pdf') {

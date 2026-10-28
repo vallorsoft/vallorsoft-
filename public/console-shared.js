@@ -3630,15 +3630,16 @@ function quickStatusChange(id, sel) {
            newStatus==='Parkolt'?'park':
            newStatus==='Raktarban'?'wh':'info';
   var bgMap = {
-    'info': 'background:rgba(59,130,246,0.18);color:#2563eb;border-color:rgba(59,130,246,0.4);',
-    'warn': 'background:rgba(245,158,11,0.18);color:#d97706;border-color:rgba(245,158,11,0.45);',
-    'ok':   'background:rgba(34,197,94,0.18);color:#16a34a;border-color:rgba(34,197,94,0.4);',
-    'err':  'background:rgba(239,68,68,0.18);color:#dc2626;border-color:rgba(239,68,68,0.4);',
-    'park': 'background:rgba(20,184,166,0.18);color:#0f766e;border-color:rgba(20,184,166,0.4);',
-    'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
+    'info': 'background:rgba(59,130,246,0.18);color:#1d4ed8;border-color:rgba(59,130,246,0.4);',
+    'warn': 'background:rgba(245,158,11,0.18);color:#92400e;border-color:rgba(245,158,11,0.45);',
+    'ok':   'background:rgba(34,197,94,0.18);color:#15803d;border-color:rgba(34,197,94,0.4);',
+    'err':  'background:rgba(239,68,68,0.18);color:#b91c1c;border-color:rgba(239,68,68,0.4);',
+    'park': 'background:rgba(20,184,166,0.18);color:#115e59;border-color:rgba(20,184,166,0.4);',
+    'wh':   'background:rgba(249,115,22,0.18);color:#9a3412;border-color:rgba(249,115,22,0.45);'
   };
   var base = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
   sel.style.cssText = base + (bgMap[sc]||bgMap['info']);
+  sel.className = 'vsl-pill vsl-pill-' + (bgMap[sc] ? sc : 'info');
   fetch('/api/orders/' + encodeURIComponent(id) + '/quick-status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5102,7 +5103,7 @@ function elofRenderCancel(r) {
   } else if (r.can_cancel) {
     box.innerHTML =
       '<div style="margin-top:14px;">'
-      + '<button class="btn ghost" style="font-size:12px;color:#ef4444;border-color:rgba(239,68,68,0.4);" onclick="cancelSubscription()">Anulează abonamentul</button>'
+      + '<button class="btn ghost vs-danger-text" style="font-size:12px;" onclick="cancelSubscription()">Anulează abonamentul</button>'
       + '<div style="font-size:11px;color:var(--muted);margin-top:6px;">După anulare păstrați accesul până la sfârșitul perioadei plătite'
       + (paidStr ? ' (' + paidStr + ')' : '') + '. Veți primi un e-mail cu opțiunea de a vă răzgândi.</div>'
       + '</div>';
@@ -5820,12 +5821,12 @@ function renderFilteredOrders(list) {
     var selStyle = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;'+
       'border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
     var bgMap = {
-      'info': 'background:rgba(59,130,246,0.18);color:#2563eb;border-color:rgba(59,130,246,0.4);',
-      'warn': 'background:rgba(245,158,11,0.18);color:#d97706;border-color:rgba(245,158,11,0.45);',
-      'ok':   'background:rgba(34,197,94,0.18);color:#16a34a;border-color:rgba(34,197,94,0.4);',
-      'err':  'background:rgba(239,68,68,0.18);color:#dc2626;border-color:rgba(239,68,68,0.4);',
-      'park': 'background:rgba(20,184,166,0.18);color:#0f766e;border-color:rgba(20,184,166,0.4);',
-      'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
+      'info': 'background:rgba(59,130,246,0.18);color:#1d4ed8;border-color:rgba(59,130,246,0.4);',
+      'warn': 'background:rgba(245,158,11,0.18);color:#92400e;border-color:rgba(245,158,11,0.45);',
+      'ok':   'background:rgba(34,197,94,0.18);color:#15803d;border-color:rgba(34,197,94,0.4);',
+      'err':  'background:rgba(239,68,68,0.18);color:#b91c1c;border-color:rgba(239,68,68,0.4);',
+      'park': 'background:rgba(20,184,166,0.18);color:#115e59;border-color:rgba(20,184,166,0.4);',
+      'wh':   'background:rgba(249,115,22,0.18);color:#9a3412;border-color:rgba(249,115,22,0.45);'
     };
     // Anulált fuvarnál a dropdown letiltva (nem támasztható fel a felületről sem).
     var statusSel = '<select class="vsl-pill vsl-pill-'+sc+'" onchange="quickStatusChange(\''+c.id+'\',this)" '+
