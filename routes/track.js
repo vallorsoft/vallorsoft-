@@ -4,7 +4,8 @@
 //    GET /t/:token          -> public/track.html
 //    GET /api/track/:token  -> minimális fuvar-adat + élő GPS pozíció
 //  Biztonság: a token crypto-random (32 hex), az adat minimális
-//  (útvonal + státusz + rendszám) — ár, sofőr-elérhetőség NINCS kiadva.
+//  (útvonal + státusz + rendszám + pótkocsi + sofőr NEVE + pozíció-cím) —
+//  ár, sofőr-elérhetőség (e-mail/telefon) NINCS kiadva.
 // ============================================================
 const express = require('express');
 const path = require('path');
@@ -14,6 +15,7 @@ const ctSvc = require('../services/cargotrack');
 const { decrypt } = require('../lib/crypto');
 const { geocodeCached } = require('../lib/routeEstimate');
 const { featureEnabled } = require('../lib/featureEnabled');
+const { reverseGeocode } = require('../lib/reverseGeo');
 
 // Útvonal-végpont geokódolás cache tokenenként (a geo_cache tábla mögött is
 // cache-elt, de így a két címet egyszer oldjuk fel tokenenként).
@@ -39,8 +41,10 @@ router.get('/api/track/:token', async (req, res) => {
 
     const r = await pool.query(
       `SELECT o.id, o.loc_incarcare, o.loc_descarcare, o.data_incarcare, o.data_descarcare,
-              o.status, o.rendszam_camion, o.company_id, c.nev AS ceg_nev
+              o.status, o.rendszam_camion, o.rendszam_remorca, o.company_id, c.nev AS ceg_nev,
+              COALESCE(NULLIF(TRIM(o.nume_sofer), ''), u.nume) AS sofer_nev
        FROM orders o JOIN companies c ON c.id = o.company_id
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(o.email_sofer) AND u.company_id = o.company_id
        WHERE o.tracking_token = $1`,
       [token]
     );
@@ -107,6 +111,15 @@ router.get('/api/track/:token', async (req, res) => {
           } catch (e) { /* best-effort */ }
         }
 
+        // Pozíció-cím (reverse geocode) — hogy ne kelljen a térképen nagyítani.
+        // Best-effort; a reverseGeo rács-cache-elt, a _posCache 60 mp-ig őrzi.
+        if (position) {
+          try {
+            const rg = await reverseGeocode(position.lat, position.lng, 'ro');
+            if (rg && rg.address) position.address = rg.address;
+          } catch (_) { /* cím nélkül is megy */ }
+        }
+
         _posCache.set(token, { ts: Date.now(), pos: position, ext: externalUrl });
       }
     }
@@ -138,6 +151,8 @@ router.get('/api/track/:token', async (req, res) => {
         data_descarcare: o.data_descarcare,
         status: o.status,
         rendszam: o.rendszam_camion,
+        remorca: o.rendszam_remorca || null,
+        sofer: o.sofer_nev || null,
         ceg: o.ceg_nev,
       },
       position,

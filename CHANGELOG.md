@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-28 — 🌍 Követő-oldal: pozíció címe + sofőr neve + pótkocsi rendszáma (PR #572)
+- A publikus követő-oldalon (`/t/<token>`) a térkép fölött új „📍 Poziția actuală" kártya mutatja a jármű **jelenlegi címét** (reverse geocode — `lib/reverseGeo.js`, Photon → Nominatim, rács-cache + 60 mp-es pozíció-cache), így nem kell nagyítani; cím nélkül koordináta, plusz sebesség.
+- Az adat-kártyán új **Remorcă** (`orders.rendszam_remorca`) és **Șofer** (`orders.nume_sofer`, belső sofőrnél a `users.nume` cégre szűrt joinnal) mező — csak ha van érték. Sofőr-elérhetőség (e-mail/telefon) továbbra sem kerül ki.
+- `routes/track.js`, `public/track.html`, `public/i18n.js` (`trk.trailer`/`trk.driver`/`trk.curPos`, RO+HU); cache-bust `?v=20261028trkpos`. 1854 Jest zöld.
+
 ## 2026-10-25 — 🧮 Költség-kalkulátor: fuvarból számolt kalkuláció javítva + fuvarok összevonása (PR #571)
 - **Hibás bevétel:** a fuvar ára (nettó EUR) a „Vallorsoft-fuvar" módban **bruttó LEI**-ként ment át → kb. 6× kisebb bevétel, hamis veszteség a profit-sorban. Most nettó EUR (mint a chat `vcalc.order_cost` útján).
 - **Dátum-csúszás:** a `data_incarcare`/`data_descarcare` JS `Date`-ként jött (UTC-re csúszva egy nappal korábban) → a kezdő dátum és a napok száma is elcsúszhatott. A szerver most `YYYY-MM-DD` szöveget ad (`to_char`), a napokat UTC-éjfélből számolja.
