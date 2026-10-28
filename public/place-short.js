@@ -5,7 +5,8 @@
 //  (város/falu) marad, a cégnév levágva — hogy a választó ne tolja szét
 //  az ablakot. (Ugyanaz a szabály, mint a sofőr-felület _cityOf-ja.)
 //    vsCityOf('Strada X 5, 555400 Copșa Mică, Jud. Sibiu, România') → 'Copșa Mică'
-//    vsOrderShort({client, loc_incarcare, loc_descarcare}) → 'ALFA SRL · Cluj → Arad'
+//    vsOrderShort({client, loc_incarcare, data_incarcare, loc_descarcare, data_descarcare})
+//      → 'ALFA SRL · Cluj 22.09 → Arad 28.09'
 // ============================================================
 (function () {
   'use strict';
@@ -35,6 +36,15 @@
     }
     return countyFallback || parts[parts.length - 1] || s;
   }
+  // Dátum év nélkül: „2026-09-22" / ISO / Date → „22.09"; érvénytelen → ''
+  function dayMonth(v) {
+    if (!v) return '';
+    var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return m[3] + '.' + m[2];
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return '';
+    return ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2);
+  }
   function clip(s, n) {
     s = String(s || '').trim();
     return s.length > n ? s.slice(0, n - 1).trim() + '…' : s;
@@ -42,7 +52,12 @@
   // opts.withNo: a fuvarszámot is elé teszi (pl. ha két fuvar címkéje egyezne)
   function orderShort(o, opts) {
     o = o || {}; opts = opts || {};
-    var route = [cityOf(o.loc_incarcare), cityOf(o.loc_descarcare)].filter(Boolean).map(function (c) { return clip(c, 22); }).join(' → ');
+    // „Város 22.09 → Város 28.09" — a dátum a település után, év nélkül
+    function end(loc, date) {
+      var c = clip(cityOf(loc), 22), d = dayMonth(date);
+      return [c, d].filter(Boolean).join(' ');
+    }
+    var route = [end(o.loc_incarcare, o.data_incarcare), end(o.loc_descarcare, o.data_descarcare)].filter(Boolean).join(' → ');
     var parts = [];
     if (opts.withNo) parts.push(o.fuvar_no || o.order_id || o.id);
     if (o.client) parts.push(clip(o.client, 26));
@@ -67,4 +82,5 @@
   window.vsOrderShort = orderShort;
   window.vsOrderShortList = orderShortList;
   window.vsOrderTitle = orderTitle;
+  window.vsDayMonth = dayMonth;
 })();

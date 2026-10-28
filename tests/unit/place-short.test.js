@@ -31,6 +31,14 @@ describe('place-short', () => {
     expect(s).not.toContain('CMD-2026-0001');
   });
 
+  test('fel-/lerakó dátum év nélkül a település után', () => {
+    const s = w.vsOrderShort({ client: 'ALFA SRL', loc_incarcare: 'Cluj', data_incarcare: '2026-09-22',
+      loc_descarcare: 'Arad', data_descarcare: '2026-09-28' });
+    expect(s).toBe('ALFA SRL · Cluj 22.09 → Arad 28.09');
+    expect(w.vsDayMonth('')).toBe('');
+    expect(w.vsDayMonth('nu')).toBe('');
+  });
+
   test('egyező címkéknél a fuvarszám is bekerül, a többinél nem', () => {
     const l = w.vsOrderShortList([
       { fuvar_no: 'CMD-1', client: 'ALFA SRL', loc_incarcare: 'Cluj', loc_descarcare: 'Arad' },

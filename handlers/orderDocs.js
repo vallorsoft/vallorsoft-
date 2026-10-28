@@ -116,7 +116,9 @@ handlers.orderDocOrderPick = async function (req, res, args) {
               OR LOWER(COALESCE(loc_incarcare,'')) LIKE $2 OR LOWER(COALESCE(loc_descarcare,'')) LIKE $2)`;
     }
     const r = await pool.query(
-      `SELECT id, fuvar_no, client, loc_incarcare, loc_descarcare, data_incarcare, status
+      `SELECT id, fuvar_no, client, loc_incarcare, loc_descarcare, status,
+              to_char(data_incarcare, 'YYYY-MM-DD') AS data_incarcare,
+              to_char(data_descarcare, 'YYYY-MM-DD') AS data_descarcare
          FROM orders WHERE company_id = $1 AND status <> 'Anulat' ${cond}
         ORDER BY created_at DESC LIMIT 25`, vals);
     return res.json({ result: { ok: true, rows: r.rows } });
