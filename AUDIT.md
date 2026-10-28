@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 59. lépés — Publikus követő-oldal: pozíció-cím + sofőr neve + pótkocsi (2026-10-28, PR #572) ✅ KÉSZ
+- A tokenes `/api/track/:token` (login nélkül) új mezői: `position.address` (reverse geocode, külső szolgáltatónak csak a koordináta megy), `transport.remorca`, `transport.sofer` (CSAK név). A sofőr-név join `users.company_id = orders.company_id`-re szűrt (nincs cross-tenant névszivárgás); e-mail/telefon nem kerül ki. Minden érték `esc()`-elve renderelődik.
+
 ### 58. lépés — Útvonaltervező: fuvar betöltése (2026-10-25, PR #570) ✅ KÉSZ
 - Új `getOrderRouteForPlanning` RPC: csak Admin/Manager, az `utvonaltervezes` funkció-kapcsoló mögött, a fuvar és a stopok `company_id`-szűrt paraméteres SQL-lel (idegen fuvar → „nem található"). A `getOrdersForRoutePlanning` keresése paraméteres `LIKE` (max. 80 karakter). A km-mentés a meglévő `comUpdate`-en megy (szerep + cég + `sanitizeRouteGeo`). Új tárolt adat nincs; a GPS-indulás a meglévő `getVehicleGpsPosition`-t hívja.
 
