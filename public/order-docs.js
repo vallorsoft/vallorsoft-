@@ -132,9 +132,12 @@ window.OrderDocs = (function () {
             '<div class="odoc-sub">' + esc([d.client, [d.loc_incarcare, d.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → ')].filter(Boolean).join(' · ')) + '</div></td>' +
           '<td class="odoc-sub">' + esc(d.uploaded_by || '') + '<br>' + esc(dateStr(d.created_at)) + '</td>' +
           '<td><div class="odoc-act">' + (d.src === 'drv'
-            ? '<a class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" href="/api/doc-download/' + encodeURIComponent(d.id) + '" target="_blank" rel="noopener">⬇️</a>' +
+            ? '<button class="btn" title="' + esc(tt('dpv.preview', 'Previzualizare')) + '" onclick="OrderDocs.view(' + d.id + ',\'drv\')">👁</button>' +
+              '<a class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" href="/api/doc-download/' + encodeURIComponent(d.id) + '" download>⬇️</a>' +
               '<span class="odoc-sub" title="' + esc(tt('odoc.fromDriver', 'Încărcat de șofer')) + '">📷 ' + esc(tt('odoc.driver', 'șofer')) + '</span>'
-            : '<button class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" onclick="OrderDocs.download(' + d.id + ',\'original\')">⬇️</button>' +
+            : '<button class="btn" title="' + esc(tt('dpv.preview', 'Previzualizare')) + '" onclick="OrderDocs.view(' + d.id + ',\'original\')">👁</button>' +
+              '<button class="btn" title="' + esc(tt('odoc.download', 'Descarcă')) + '" onclick="OrderDocs.download(' + d.id + ',\'original\')">⬇️</button>' +
+            (d.has_signed ? '<button class="btn" title="✍️ ' + esc(tt('dpv.preview', 'Previzualizare')) + '" onclick="OrderDocs.view(' + d.id + ',\'signed\')">✍️👁</button>' : '') +
             (d.has_signed ? '<button class="btn" title="✍️" onclick="OrderDocs.download(' + d.id + ',\'signed\')">✍️⬇️</button>' : '') +
             '<button class="btn" title="' + esc(tt('odoc.edit', 'Editează')) + '" onclick="OrderDocs.openEdit(' + d.id + ')">✏️</button>' +
             '<button class="btn danger" title="' + esc(tt('odoc.delete', 'Șterge')) + '" onclick="OrderDocs.del(' + d.id + ')">🗑</button>') +
@@ -167,6 +170,23 @@ window.OrderDocs = (function () {
       a.href = r.base64;
       a.download = (which === 'signed' ? 'semnat_' : '') + (r.fileName || 'document');
       document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+
+  // Helyben megnyitás (közös DocPreview ablak). which: 'original' | 'signed' | 'drv' (sofőr-feltöltés)
+  function view(id, which) {
+    var d = st.rows.filter(function (r) { return r.id === id && (which === 'drv' ? r.src === 'drv' : r.src !== 'drv'); })[0] || {};
+    if (!window.DocPreview) { which === 'drv' ? window.open('/api/doc-download/' + id, '_blank') : download(id, which); return; }
+    var name = (which === 'signed' ? 'semnat_' : '') + (d.file_name || 'document');
+    if (which === 'drv') { DocPreview.open({ name: name, size: d.file_size, url: '/api/doc-download/' + encodeURIComponent(id) }); return; }
+    DocPreview.open({
+      name: name, size: which === 'signed' ? null : d.file_size,
+      load: function () {
+        return gas('orderDocGet', [id, which || 'original']).then(function (r) {
+          if (!r || !r.ok || !r.base64) throw new Error((r && r.err) || 'Eroare');
+          return { dataUrl: r.base64, name: (which === 'signed' ? 'semnat_' : '') + (r.fileName || name) };
+        });
+      }
     });
   }
 
@@ -390,7 +410,7 @@ window.OrderDocs = (function () {
 
   return {
     mount: mount, preset: preset, set: set, onQ: onQ, clearOrder: clearOrder, showForOrder: showForOrder,
-    download: download, del: del, openUpload: openUpload, doUpload: doUpload, openEdit: openEdit, doEdit: doEdit,
+    download: download, view: view, del: del, openUpload: openUpload, doUpload: doUpload, openEdit: openEdit, doEdit: doEdit,
     closeModal: closeModal, _inspect: _inspect, _pickSearch: _pickSearch, _pickSet: _pickSet, _pickClear: _pickClear
   };
 })();

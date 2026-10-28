@@ -3830,13 +3830,20 @@ function renderDocGroups() {
         +'<span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
       html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+esc(d.file_name||'—')+'</div>';
       html += '<div style="display:flex;gap:6px;">';
-      html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">'+t('cs.view')+'</a>';
+      html += '<button type="button" class="btn primary" style="flex:1;padding:8px 6px;font-size:12px;" onclick="vsPreviewDriverDoc('+Number(d.id)+',this)" data-name="'+esc(d.file_name||'')+'">👁 '+t('cs.view')+'</button>';
       html += '<a href="/api/doc-download/'+d.id+'" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">'+t('cs.download')+'</a>';
       html += '</div></div>';
     });
     html += '</div></div>';
   });
   container.innerHTML = html;
+}
+
+// Sofőr-feltöltés helyben megnyitása (közös DocPreview ablak, telefonon is).
+function vsPreviewDriverDoc(id, btn){
+  var url='/api/doc-download/'+encodeURIComponent(id);
+  if(!window.DocPreview){ window.open(url,'_blank'); return; }
+  DocPreview.open({ name:(btn&&btn.getAttribute('data-name'))||('document-'+id), url:url });
 }
 
 function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.manualDriver')+'</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}

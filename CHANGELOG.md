@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-28 — 👁 Dokumentum-előnézet helyben (telefonon és gépen), a letöltés mellett (PR #576)
+- Új közös `public/doc-preview.js` (`DocPreview.open`): teljes képernyős ablak a **teljes fájlnévvel**, mérettel/típussal, ⬇️ letöltés és ✕ bezárás gombbal (Esc is). Kép → a képernyőhöz igazítva; PDF → pdf.js-sel oldalanként (a telefonos böngészők iframe-ben nem mutatják a PDF-et); egyéb formátum → „nincs előnézet" + letöltés.
+- 👁 gomb a ⬇️ mellett: menetlevél-dokumentumok (🗂️ Kezelés), Fuvar-dokumentumok oldal (eredeti + ✍️ aláírt változat + sofőr-feltöltés), Feltöltött iratok & CMR (a „Megtekintés" már nem új lapon nyit). Nincs új szerver-út — a meglévő `waybillDocGet` / `orderDocGet` / `/api/doc-download/:id` (cég-szűrt) adja a fájlt. 9 `dpv.*` i18n (RO+HU), cache-bust `?v=20261028dpv`.
+
 ## 2026-10-28 — 🎨 Kontraszt-szabály (WCAG AA ≥ 4,5:1) az egész konzolon + a menetlevél maga is az összefűzött PDF-be (PR #575)
 - **Kontraszt:** új `scripts/contrast-audit.js` (Playwright) — bejelentkezik, végigmegy az admin konzol mind a 60 menüpontján világos ÉS sötét témában, és kilistázza a 4,5:1 alatti gombokat/címkéket/jelvényeket. Kiinduláskor **518** gyenge elem, javítás után **0**.
 - Gyökérok: a `:root` alap-változók (`--text`, `--muted`, `--bg-2`, `--bg-3`, `--border`) sötét témára vannak hangolva, és a világos téma ezeket nem állította át → halvány szürke szöveg krém háttéren, fehér-a-fehéren gombok, sötét kártyák a világos oldalon (pl. Feltöltött iratok). Most a világos téma ezeket is felülírja (`style.css` végi „KONTRASZT-SZABÁLY" blokk).
