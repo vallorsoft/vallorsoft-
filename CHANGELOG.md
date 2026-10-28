@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-28 — 📎 Menetlevél-dokumentumok: csoportos feltöltés típussal + kezelés + egy PDF-be fűzött letöltés (PR #573)
+- A FUVARLEVELEK listán minden menetlevél mellett **📎 Feltöltés** és **🗂️ Kezelés** gomb (a kezelés gombján a csatolt dokumentumok száma).
+- **Feltöltés:** több fájl egyszerre (választó vagy ráhúzás); fájlonként típus: **Fuvar-dokumentum** (a menetlevél melyik fuvarjához — legördülő a menetlevél fuvarjaiból), **Számla**, **GPS útvonal**, **Megbízás**, **Egyéb**; „Típus mindegyikre" gyors-beállítás, a típus a fájlnévből előre tippelve. Fájlonként küldve (max. 15 MB/fájl).
+- **Kezelés:** típus szerint csoportosított lista, típus/fuvar utólag módosítható, egyenkénti letöltés, törlés, és a kijelöltek **egy PDF-be fűzve** (pdf-lib, kliens-oldal: PDF oldalak + képek A4-re; más formátum kimarad, jelezve).
+- Új `db/waybill-documents.sql` (`waybill_documents`), `handlers/waybillDocs.js` (list/upload/update/get/delete — Admin/Manager, `company_id`-szűrt, a fuvar-kötés csak a menetlevél saját fuvarjaihoz, formátum-fehérlista, audit), `getFuvarlevelek` `doc_count`, `public/waybill-docs.js`, 30 `wbd.*` i18n (RO+HU). Cache-bust `?v=20261028wbdoc`. +7 teszt; valós Postgres 16-tal 1926 Jest zöld.
+
 ## 2026-10-28 — 🌍 Követő-oldal: pozíció címe + sofőr neve + pótkocsi rendszáma (PR #572)
 - A publikus követő-oldalon (`/t/<token>`) a térkép fölött új „📍 Poziția actuală" kártya mutatja a jármű **jelenlegi címét** (reverse geocode — `lib/reverseGeo.js`, Photon → Nominatim, rács-cache + 60 mp-es pozíció-cache), így nem kell nagyítani; cím nélkül koordináta, plusz sebesség.
 - Az adat-kártyán új **Remorcă** (`orders.rendszam_remorca`) és **Șofer** (`orders.nume_sofer`, belső sofőrnél a `users.nume` cégre szűrt joinnal) mező — csak ha van érték. Sofőr-elérhetőség (e-mail/telefon) továbbra sem kerül ki.

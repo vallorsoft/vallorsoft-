@@ -2976,6 +2976,8 @@ function loadReceivedFuvarlevelek(){
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
         +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">${t('cs.editLong')}</button>`
+        +`<button class="btn ghost" style="padding:5px 10px;" onclick="WaybillDocs.openUpload('${f.id}')">${t('wbd.upload')}</button>`
+        +`<button class="btn ghost" style="padding:5px 10px;" onclick="WaybillDocs.openManage('${f.id}')">${t('wbd.manage')}${f.doc_count?' <span style="display:inline-block;min-width:18px;padding:1px 6px;border-radius:999px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+f.doc_count+'</span>':''}</button>`
       +`</td></tr>`).join('');
   });
 }
