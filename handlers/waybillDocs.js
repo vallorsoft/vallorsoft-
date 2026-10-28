@@ -56,7 +56,8 @@ async function _waybillOrders(cid, ids) {
   if (!ids.length) return [];
   const r = await pool.query(
     `SELECT id, fuvar_no, client, loc_incarcare, loc_descarcare,
-            to_char(data_incarcare, 'YYYY-MM-DD') AS data_incarcare
+            to_char(data_incarcare, 'YYYY-MM-DD') AS data_incarcare,
+            to_char(data_descarcare, 'YYYY-MM-DD') AS data_descarcare
        FROM orders WHERE company_id = $1 AND id = ANY($2::varchar[])`, [cid, ids]);
   const byId = {};
   r.rows.forEach((o) => { byId[o.id] = o; });

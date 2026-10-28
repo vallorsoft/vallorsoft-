@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-28 — 🚚 Fuvar-választó: fel-/lerakó dátum év nélkül a település után (PR #578)
+- A fuvar-választó címkéje: `Megbízó · Felrakó település 22.09 → Lerakó település 28.09` (nap.hónap, év nélkül). Közös `vsDayMonth` a `public/place-short.js`-ben; a menetlevél-dokumentumok fuvar-listája és a Fuvar-dokumentumok kereső (`orderDocOrderPick`) a lerakó dátumát is visszaadja, `YYYY-MM-DD` szövegként (nincs időzóna-csúszás). +1 unit teszt; cache-bust `?v=20261028pickdt`.
+
 ## 2026-10-28 — 🚚 Fuvar-választó: rövid címke (megbízó · város → város), nem tolja szét az ablakot (PR #577)
 - A dokumentum-feltöltés/-kezelés fuvar-választóiban (menetlevél-dokumentumok legördülője, Fuvar-dokumentumok kereső-lista + kiválasztott fuvar) a teljes cím helyett csak **a megbízó cég neve (26 karakterre vágva) · felrakó település → lerakó település** látszik. A teljes adat (fuvarszám, cég, teljes címek) a tooltipben. Ha két fuvar címkéje egyezne, a fuvarszám is elé kerül.
 - Új közös `public/place-short.js` (`vsCityOf` / `vsOrderShort` / `vsOrderShortList` / `vsOrderTitle`): a címből csak a település marad — utca (RO előtagos és HU/DE/EN utótagos), irányítószám, megye, ország kiszűrve; „Sat/Comuna/Municipiul X" → X (a régi szabály a „Sat" előtagot utcának vette). A dokumentum-lista útvonal-sora is ezt használja.
