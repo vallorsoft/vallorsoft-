@@ -5701,3 +5701,133 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .gtr-hit { cursor: pointer; }
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.loss .gtr-t, .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.loss .gtr-v, .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-loss-row { color: #fca5a5; }
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-it.refuel .gtr-v { color: #86efac; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   .vs-light-surface — KÖZÖS világos felület a body-hoz fűzött modálokhoz
+   ──────────────────────────────────────────────────────────────────────
+   A body közvetlen gyerekeként nyíló ablak NEM örökli a .main-content témáját,
+   ezért a .btn / .btn.ghost / .input / label a :root SÖTÉT-témás változóit kapja
+   (közel fehér szöveg) — fehér alapon olvashatatlan (≈1,2:1). Minden fehér
+   alapú, body-hoz fűzött modal kapja meg ezt az osztályt: itt a változók és a
+   gombok/mezők világos felületre vannak állítva, WCAG ≥ 4,5:1 kontraszttal.
+   ─────────────────────────────────────────────────────────────────────── */
+.vs-light-surface{
+  --text:#0f172a; --text-primary:#0f172a; --muted:#475569; --text-muted:#475569;
+  --soft:#334155; --border:#cbd5e1; --border-bright:#94a3b8; --panel:#ffffff;
+  background:#ffffff; color:#0f172a;
+}
+.vs-light-surface label{ color:#334155; }
+.vs-light-surface .btn{
+  background:#ffffff; color:#0f172a; border:1.5px solid #64748b;
+  box-shadow:none; font-weight:700;
+}
+.vs-light-surface .btn:hover:not(:disabled){ background:#f1f5f9; border-color:#334155; }
+.vs-light-surface .btn.ghost{ background:#ffffff; color:#0f172a; border:1.5px solid #64748b; }
+.vs-light-surface .btn.primary{
+  background:linear-gradient(180deg,#2563eb,#1d4ed8); color:#ffffff; border:1.5px solid #1e40af;
+}
+.vs-light-surface .btn.primary:hover:not(:disabled){ background:linear-gradient(180deg,#1d4ed8,#1e40af); }
+.vs-light-surface .btn.danger{ background:#b91c1c; color:#ffffff; border:1.5px solid #991b1b; }
+.vs-light-surface .btn:disabled{ background:#e2e8f0; color:#334155; border-color:#94a3b8; cursor:not-allowed; }
+.vs-light-surface .input, .vs-light-surface .select, .vs-light-surface select, .vs-light-surface textarea{
+  background:#ffffff; color:#0f172a; border:1.5px solid #94a3b8;
+}
+.vs-light-surface .input::placeholder, .vs-light-surface textarea::placeholder{ color:#64748b; }
+.vs-light-surface .input:focus, .vs-light-surface .select:focus, .vs-light-surface select:focus{
+  border-color:#1d4ed8; box-shadow:0 0 0 3px rgba(29,78,216,.18);
+}
+.vs-light-surface select option{ color:#0f172a; background:#ffffff; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KONTRASZT-SZABÁLY (WCAG AA ≥ 4,5:1) — elsődleges gombok
+   A korábbi világos napnyugta-gradiensen (#fb8c3a→#f6517b) a fehér felirat
+   csak ≈2,4:1 volt. Mélyebb árnyalat: #c2410c→#be123c (fehérrel 5,2–6,3:1),
+   a meleg arculat megmarad. Ellenőrzés: scripts/contrast-audit.js.
+   ─────────────────────────────────────────────────────────────────────── */
+.main-content .btn.primary{
+  background: linear-gradient(135deg, #c2410c, #be123c) !important;
+  border-color: #9a3412 !important;
+  color: #ffffff !important;
+}
+.main-content .btn.primary:hover{
+  background: linear-gradient(135deg, #9a3412, #9f1239) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   KONTRASZT-SZABÁLY (WCAG AA ≥ 4,5:1) — 2026-10-28
+   Minden szöveg/gomb/címke legalább 4,5:1 kontrasztú a saját háttere előtt,
+   világos ÉS sötét témában. Ellenőrzés: scripts/contrast-audit.js.
+   Ez a blokk a fájl VÉGÉN van, hogy felülírja a korábbi halvány színeket.
+   ════════════════════════════════════════════════════════════════════ */
+/* Világos téma: a halvány szürke „muted" szöveg sötétebb lett (krém háttéren is olvasható) */
+.main-content[data-theme="light"]{
+  --muted:#5f5246;
+  --text-muted:#5f5246;
+  /* A :root alap-változók sötét témára vannak hangolva (világos szöveg, sötét panel).
+     Világos témában ezeket is át kell állítani, különben a var(--text)/var(--bg-2)
+     elemek fehér-a-fehéren vagy sötét-kártya-a-krémen jelennek meg. */
+  --text:#2a2018;
+  --soft:#4a3f35;
+  --accent:#1e1812;
+  --bg-2:#fffdfa;
+  --bg-3:#f6efe6;
+  --bg-glass:rgba(255,253,250,0.9);
+  --border:#e3d8ca;
+  --border-bright:#cbbfb1;
+}
+.main-content[data-theme="light"] .text-muted,
+.main-content[data-theme="light"] .h-sub,
+.main-content[data-theme="light"] .table th,
+.main-content[data-theme="light"] .field label,
+.main-content[data-theme="light"] .chat-side .lst,
+.main-content[data-theme="light"] .stat-card .l{ color:#5f5246; }
+.vs-topbar .gs-trigger, .vs-topbar .gs-trigger *{ color:#5f5246; }
+
+/* Telt színes gombok: fehér felirat csak elég sötét háttéren */
+.main-content .btn.ok, .main-content .btn.success{
+  background:linear-gradient(180deg,#15803d,#166534) !important; border-color:#14532d !important; color:#fff !important;
+}
+.main-content .btn.danger{
+  background:linear-gradient(180deg,#b91c1c,#991b1b) !important; border-color:#7f1d1d !important; color:#fff !important;
+}
+.main-content .btn.warn, .main-content .btn.warning{
+  background:linear-gradient(180deg,#b45309,#92400e) !important; border-color:#78350f !important; color:#fff !important;
+}
+/* Aktív/kijelölt narancs chipek, fül-váltók: sötétebb napnyugta, hogy a fehér felirat olvasható legyen */
+.mbx-fold.active, #gpsDailyTrackBox .gtr-chip.on, .odoc-chip.on, .main-content button.on,
+.main-content .vs-chip.active, .ct-btn--primary{
+  background:linear-gradient(135deg,#c2410c,#be123c) !important; border-color:#9a3412 !important; color:#fff !important;
+}
+/* Jelvények (badge) — világos téma */
+.main-content[data-theme="light"] .badge.info{ color:#0f766e; }
+.main-content[data-theme="light"] .badge.ok{ color:#15803d; }
+.main-content[data-theme="light"] .badge.warn{ color:#92400e; }
+.main-content[data-theme="light"] .badge.err{ color:#b91c1c; }
+/* Jelvények — sötét téma */
+.main-content[data-theme="dark"] .badge.info{ color:#5eead4; }
+/* Státusz-pirula (fuvarlista) — világos téma */
+.main-content[data-theme="light"] .vsl-pill-ok{ color:#15803d; }
+/* Statisztika 2.0 aktív fül */
+.main-content[data-theme="light"] .sv2-tab.active{ color:#4338ca; }
+.main-content[data-theme="dark"] .sv2-tab.active{ color:#c7d2fe; }
+/* Szellem-gombok (ghost) — téma szerinti sötét/világos felirat */
+.main-content[data-theme="light"] .btn.ghost{ color:#2a2018; }
+.main-content[data-theme="light"] .btn.ghost#esDelete, .main-content[data-theme="light"] .btn.ghost.danger-text{ color:#b91c1c; }
+.main-content[data-theme="dark"] .btn.ghost#esDelete{ color:#fca5a5; }
+/* Nyelvváltó (HU/RO) inaktív gombja */
+.main-content[data-theme="light"] #langSwitch button:not(.active){ color:#5f5246 !important; border-color:#cbbfb1 !important; }
+/* Tiltott (disabled) legördülők is olvashatók */
+.main-content select:disabled{ color:#3f362d; background:#eee8e0; }
+.main-content[data-theme="dark"] select:disabled{ color:#cbd5e1; background:#2a2119; }
+/* Státusz-pirula sötét témában: a világos betűszín (az inline stílus a világos témára sötét) */
+.main-content[data-theme="dark"] select.vsl-pill-info{ color:#93c5fd !important; }
+.main-content[data-theme="dark"] select.vsl-pill-warn{ color:#fcd34d !important; }
+.main-content[data-theme="dark"] select.vsl-pill-ok{ color:#86efac !important; }
+.main-content[data-theme="dark"] select.vsl-pill-err{ color:#fca5a5 !important; }
+.main-content[data-theme="dark"] select.vsl-pill-park{ color:#5eead4 !important; }
+.main-content[data-theme="dark"] select.vsl-pill-wh{ color:#fdba74 !important; }
+/* Piros feliratú szellem-gomb (törlés, lemondás) */
+.main-content .btn.ghost.vs-danger-text{ color:#b91c1c !important; border-color:#dc2626 !important; }
+.main-content[data-theme="dark"] .btn.ghost.vs-danger-text{ color:#fca5a5 !important; border-color:#f87171 !important; }
+/* „Din șablon" gomb a fuvar-kiírás tetején (a varázsló fehér fejlécén ül) */
+#ordTplBtn{ background:#fff !important; color:#0f172a !important; border:1.5px solid #64748b !important; }

@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-28 — 🎨 Kontraszt-szabály (WCAG AA ≥ 4,5:1) az egész konzolon + a menetlevél maga is az összefűzött PDF-be (PR #575)
+- **Kontraszt:** új `scripts/contrast-audit.js` (Playwright) — bejelentkezik, végigmegy az admin konzol mind a 60 menüpontján világos ÉS sötét témában, és kilistázza a 4,5:1 alatti gombokat/címkéket/jelvényeket. Kiinduláskor **518** gyenge elem, javítás után **0**.
+- Gyökérok: a `:root` alap-változók (`--text`, `--muted`, `--bg-2`, `--bg-3`, `--border`) sötét témára vannak hangolva, és a világos téma ezeket nem állította át → halvány szürke szöveg krém háttéren, fehér-a-fehéren gombok, sötét kártyák a világos oldalon (pl. Feltöltött iratok). Most a világos téma ezeket is felülírja (`style.css` végi „KONTRASZT-SZABÁLY" blokk).
+- Sötétebb telt gombok (zöld/piros/borostyán), sötétebb napnyugta-gradiens a primary gombokon és az aktív chipeken/füleken, olvasható jelvények (badge) és fuvarlista-státuszpirulák mindkét témában, piros szellem-gombok (`.vs-danger-text`), olvasható nyelvváltó és tiltott legördülők. A `body`-hoz fűzött fehér modálok (menetlevél- és fuvar-dokumentumok) a `.vs-light-surface` osztályt kapják.
+- **Menetlevél a PDF-ben:** a 🗂️ Kezelés listájának tetején „📋 Foaia de parcurs" sor (alapból kijelölve, ⬇️ megnyitja) — az összefűzött PDF elejére maga a menetlevél is bekerül (rejtett iframe + html2canvas → A4 oldalak, a táblázat-sorok között vágva). Cache-bust `?v=20261028contrast`.
+
 ## 2026-10-28 — 📎 Dokumentumok egy helyen: menetlevél ↔ fuvar ↔ sofőr-feltöltés összekötve, duplikáció nélkül (PR #574)
 - A menetlevél-dokumentumok a fuvar-dokumentumokkal **egy tárolóba** kerültek (`order_documents` + új `waybill_id`, `order_id` mostantól lehet üres) — a #573 külön `waybill_documents` táblája megszűnt, a sorai átköltöztek (`db/zz-waybill-docs-unify.sql`).
 - Menetlevélnél feltöltéskor **minden** fájlhoz kiválasztható, melyik fuvarhoz tartozik → a fuvar dokumentumai közt is megjelenik. Fuvar nélkül csak a menetlevélnél él.

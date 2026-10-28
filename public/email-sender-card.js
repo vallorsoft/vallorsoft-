@@ -30,7 +30,7 @@ window.EmailSenderCard = (function () {
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">' +
           '<button class="btn primary" id="esSave">' + tt('es.save', '💾 Mentés') + '</button>' +
           '<button class="btn ghost" id="esTest">' + tt('es.test', '✉️ Teszt magamnak') + '</button>' +
-          '<button class="btn ghost" id="esDelete" style="color:var(--status-danger);">' + tt('es.delete', '🗑 Törlés') + '</button>' +
+          '<button class="btn ghost vs-danger-text" id="esDelete">' + tt('es.delete', '🗑 Törlés') + '</button>' +
           '<span id="esStatus" style="align-self:center;font-size:12px;color:var(--muted);"></span>' +
         '</div>' +
       '</div>';
