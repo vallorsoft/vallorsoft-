@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 60. lépés — Menetlevél-dokumentumok (2026-10-28, PR #573) ✅ KÉSZ
+- Új `waybill_documents` tábla + `handlers/waybillDocs.js`: csak Admin/Manager; a menetlevél tulajdona `company_id` (fallback a cég felhasználóinak e-mailje) szerint ellenőrizve minden művelet előtt; letöltés/módosítás/törlés `company_id`-szűrt; a `order_id` csak a menetlevél saját `order_ids`-ából fogadható el (idegen fuvar → NULL); MIME-fehérlista (SVG/HTML nem), 15 MB/fájl, max. 20 fájl/kérés, előbb validálás, utána tranzakciós írás. Audit minden íráson (fájltartalom nélkül).
+
 ### 59. lépés — Publikus követő-oldal: pozíció-cím + sofőr neve + pótkocsi (2026-10-28, PR #572) ✅ KÉSZ
 - A tokenes `/api/track/:token` (login nélkül) új mezői: `position.address` (reverse geocode, külső szolgáltatónak csak a koordináta megy), `transport.remorca`, `transport.sofer` (CSAK név). A sofőr-név join `users.company_id = orders.company_id`-re szűrt (nincs cross-tenant névszivárgás); e-mail/telefon nem kerül ki. Minden érték `esc()`-elve renderelődik.
 

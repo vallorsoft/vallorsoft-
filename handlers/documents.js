@@ -299,6 +299,19 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         } catch (anomErr) {
           console.error('consum anomália számítás hiba (a lista folytatódik):', anomErr.message);
         }
+        // Csatolt dokumentumok száma menetlevelenként (📎 jelzés a listán) —
+        // best-effort: migráció nélkül a lista ugyanúgy megy.
+        try {
+          const dc = await pool.query(
+            `SELECT waybill_id, COUNT(*)::int AS n FROM waybill_documents
+              WHERE company_id = $1 AND waybill_id = ANY($2::varchar[]) GROUP BY waybill_id`,
+            [cid, rows.map(f => f.id)]);
+          const cnt = {};
+          dc.rows.forEach(x => { cnt[x.waybill_id] = x.n; });
+          rows.forEach(f => { f.doc_count = cnt[f.id] || 0; });
+        } catch (dcErr) {
+          console.error('menetlevél-dokumentum számláló hiba (a lista folytatódik):', dcErr.message);
+        }
       }
       return res.json({ result: rows });
     } catch (err) {
