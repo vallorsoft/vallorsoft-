@@ -234,7 +234,8 @@ window.WaybillDocs = (function () {
             (d.uploaded_by ? ' · ' + esc(d.uploaded_by) : '') + (d.note ? ' · ' + esc(d.note) : '') + '</div>' +
             (drv ? '' : '<div class="wbd-sels">' + typeSelect(d.doc_type, 'onchange="WaybillDocs._upd(' + d.id + ',this.value,null)"') +
               (hasOrders ? orderSelect(d.order_id, 'onchange="WaybillDocs._upd(' + d.id + ',null,this.value)"') : '') + '</div>') +
-            '</div><div class="wbd-act"><button title="⬇️" onclick="WaybillDocs._dl(\'' + esc(key) + '\')">⬇️</button>' +
+            '</div><div class="wbd-act"><button title="' + esc(tt('dpv.preview', 'Previzualizare')) + '" onclick="WaybillDocs._view(\'' + esc(key) + '\')">👁</button>' +
+            '<button title="⬇️" onclick="WaybillDocs._dl(\'' + esc(key) + '\')">⬇️</button>' +
             (drv ? '' : '<button title="🗑" onclick="WaybillDocs._del(' + d.id + ')">🗑</button>') + '</div></div>';
         }).join('');
       });
@@ -295,6 +296,15 @@ window.WaybillDocs = (function () {
     getDoc(key).then(function (d) {
       saveBlob(new Blob([dataToBytes(d.data)], { type: d.mime || 'application/octet-stream' }), d.file_name || ('document-' + d.id));
     }).catch(function (e) { note(e.message, 'err'); });
+  }
+  // Helyben megnyitás (közös DocPreview ablak: kép / PDF, telefonon is).
+  function _view(key) {
+    var d0 = ((st.info && st.info.docs) || []).filter(function (x) { return (x.src || 'od') + ':' + x.id === key; })[0] || {};
+    if (!window.DocPreview) { _dl(key); return; }
+    DocPreview.open({
+      name: d0.file_name, size: d0.file_size,
+      load: function () { return getDoc(key).then(function (d) { return { dataUrl: d.data, name: d.file_name, mime: d.mime }; }); }
+    });
   }
   // Nem-JPEG/PNG kép (webp, heic ha a böngésző tudja) → JPEG canvas-szal.
   function toJpeg(dataUrl) {
@@ -447,6 +457,6 @@ window.WaybillDocs = (function () {
   return {
     openUpload: openUpload, openManage: openManage, close: close,
     _stAdd: _stAdd, _stType: _stType, _stAll: _stAll, _stOrder: _stOrder, _stDel: _stDel, _send: _send,
-    _selAll: _selAll, _upd: _upd, _del: _del, _dl: _dl, _pdf: _pdf
+    _selAll: _selAll, _upd: _upd, _del: _del, _dl: _dl, _view: _view, _pdf: _pdf
   };
 })();
