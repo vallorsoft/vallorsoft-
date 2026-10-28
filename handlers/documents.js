@@ -302,13 +302,25 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         // Csatolt dokumentumok száma menetlevelenként (📎 jelzés a listán) —
         // best-effort: migráció nélkül a lista ugyanúgy megy.
         try {
+          // A számláló = a menetlevélhez kötött + a menetlevél fuvarjaihoz kötött
+          // dokumentumok (fuvar-dok + sofőr-feltöltés), duplikáció nélkül.
+          const oidsOf = (f) => (Array.isArray(f.order_ids) ? f.order_ids : []).map(String).filter(Boolean);
+          const allOids = [...new Set(rows.flatMap(oidsOf))];
           const dc = await pool.query(
-            `SELECT waybill_id, COUNT(*)::int AS n FROM waybill_documents
-              WHERE company_id = $1 AND waybill_id = ANY($2::varchar[]) GROUP BY waybill_id`,
-            [cid, rows.map(f => f.id)]);
-          const cnt = {};
-          dc.rows.forEach(x => { cnt[x.waybill_id] = x.n; });
-          rows.forEach(f => { f.doc_count = cnt[f.id] || 0; });
+            `SELECT id, waybill_id, order_id FROM order_documents
+              WHERE company_id = $1 AND (waybill_id = ANY($2::varchar[]) OR order_id = ANY($3::varchar[]))`,
+            [cid, rows.map(f => f.id), allOids]);
+          let drv = { rows: [] };
+          try {
+            drv = await pool.query(
+              `SELECT d.id, d.order_id FROM documents d JOIN orders o ON o.id = d.order_id AND o.company_id = $1
+                WHERE d.order_id = ANY($2::varchar[])`, [cid, allOids]);
+          } catch (_) {}
+          rows.forEach(f => {
+            const own = new Set(oidsOf(f));
+            f.doc_count = dc.rows.filter(d => d.waybill_id === f.id || (d.order_id && own.has(d.order_id))).length
+              + drv.rows.filter(d => own.has(String(d.order_id))).length;
+          });
         } catch (dcErr) {
           console.error('menetlevél-dokumentum számláló hiba (a lista folytatódik):', dcErr.message);
         }
@@ -705,6 +717,13 @@ handlers.fuvarlevelDelete = async function (req, res, args) {
       if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit / acces interzis' } });
       const row = own.rows[0];
       const orderIds = Array.isArray(row.order_ids) ? row.order_ids.map(x => String(x)).filter(Boolean) : [];
+
+      // 0) A CSAK ehhez a menetlevélhez (fuvar nélkül) csatolt dokumentumok törlése;
+      //    a fuvarhoz is kötött dokumentum a fuvarnál marad (waybill_id → NULL az FK-n).
+      try {
+        await pool.query(
+          'DELETE FROM order_documents WHERE waybill_id = $1 AND order_id IS NULL AND company_id = $2', [id, cid]);
+      } catch (e) { console.error('menetlevél-dokumentum törlés hiba (folytatjuk):', e.message); }
 
       // 1) Menetlevél sor törlése (a fő művelet).
       const del = await pool.query(

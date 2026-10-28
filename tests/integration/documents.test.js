@@ -329,6 +329,8 @@ describe('fuvarlevelDelete', () => {
     pool.query
       // 1) ownership SELECT
       .mockResolvedValueOnce(rows([{ id: 'FUV-1', numar_fisa: 'MT-2026-0001', email_sofer: 'sofer@a.hu', order_ids: ['CMD-1'] }]))
+      // 1b) csak-menetlevél dokumentumok törlése (order_documents, fuvar nélkül)
+      .mockResolvedValueOnce({ rowCount: 0 })
       // 2) DELETE fuvarlevelek
       .mockResolvedValueOnce({ rowCount: 1 })
       // 3) "van-e másik menetlevél a CMD-1-re?" → nincs
@@ -343,7 +345,7 @@ describe('fuvarlevelDelete', () => {
     expect(res.body.result.stops_reset).toBe(3);
     expect(res.body.result.released_orders).toEqual(['CMD-1']);
     // Cascade query — UPDATE order_stops … waybilled_at = NULL
-    const [sqlUpd, paramsUpd] = pool.query.mock.calls[3];
+    const [sqlUpd, paramsUpd] = pool.query.mock.calls[4];
     expect(String(sqlUpd)).toMatch(/UPDATE order_stops[\s\S]+waybilled_at = NULL/i);
     expect(paramsUpd).toEqual(['CMD-1', ADMIN.company_id]);
   });
@@ -353,6 +355,8 @@ describe('fuvarlevelDelete', () => {
     pool.query
       // 1) ownership SELECT
       .mockResolvedValueOnce(rows([{ id: 'FUV-2', order_ids: ['CMD-9'] }]))
+      // 1b) csak-menetlevél dokumentumok törlése (order_documents, fuvar nélkül)
+      .mockResolvedValueOnce({ rowCount: 0 })
       // 2) DELETE fuvarlevelek
       .mockResolvedValueOnce({ rowCount: 1 })
       // 3) "van-e másik menetlevél a CMD-9-re?" → IGEN
@@ -372,14 +376,16 @@ describe('fuvarlevelDelete', () => {
     setUser(ADMIN);
     pool.query
       .mockResolvedValueOnce(rows([{ id: 'FUV-3', order_ids: [] }]))
+      // 1b) csak-menetlevél dokumentumok törlése (order_documents, fuvar nélkül)
+      .mockResolvedValueOnce({ rowCount: 0 })
       .mockResolvedValueOnce({ rowCount: 1 })
       // NINCS "másik menetlevél" lookup és NINCS UPDATE order_stops
       .mockResolvedValueOnce({ rowCount: 1 }); // audit
     const res = await call('fuvarlevelDelete', ['FUV-3']);
     expect(res.body.result.ok).toBe(true);
     expect(res.body.result.stops_reset).toBe(0);
-    // 3 query: SELECT + DELETE + audit
-    expect(pool.query).toHaveBeenCalledTimes(3);
+    // 4 query: SELECT + csak-menetlevél dok törlés + DELETE + audit
+    expect(pool.query).toHaveBeenCalledTimes(4);
   });
 
   test('cross-tenant: idegen cég menetlevele nem törölhető', async () => {
@@ -398,6 +404,8 @@ describe('fuvarlevelDelete', () => {
     setUser(ADMIN);
     pool.query
       .mockResolvedValueOnce(rows([{ id: 'FUV-4', order_ids: ['CMD-A'] }])) // ownership
+      // 1b) csak-menetlevél dokumentumok törlése (order_documents, fuvar nélkül)
+      .mockResolvedValueOnce({ rowCount: 0 })
       .mockResolvedValueOnce({ rowCount: 1 })                                // DELETE
       .mockRejectedValueOnce(new Error('boom'))                              // "másik menetlevél" lekérés hasal
       .mockResolvedValueOnce({ rowCount: 1 });                               // audit

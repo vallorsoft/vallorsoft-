@@ -91,3 +91,23 @@ test('törlés cégre szűrt', async () => {
   expect(r.body.result.ok).toBe(false);
   expect(pool.query.mock.calls[0][1]).toEqual([3, 7]);
 });
+
+test('keresés: a sofőr fuvarhoz feltöltött irata is megjelenik (csak olvasható, pod)', async () => {
+  setUser(ADMIN);
+  pool.query
+    .mockResolvedValueOnce(rows([{ id: 1, file_name: 'szamla.pdf', doc_date: '2026-10-01', created_at: '2026-10-01T08:00:00Z' }]))
+    .mockResolvedValueOnce(rows([{ id: 4, order_id: 'CMD-X', file_name: 'pod.jpg', nume_sofer: 'Ion', doc_date: '2026-10-02', created_at: '2026-10-02T08:00:00Z' }]));
+  const r = await call('orderDocSearch', [{ order_id: 'CMD-X' }]);
+  expect(r.body.result.rows.map(x => x.src)).toEqual(['drv', 'od']);
+  expect(r.body.result.rows[0]).toMatchObject({ doc_type: 'pod', uploaded_by: 'Ion' });
+  const [sql, vals] = pool.query.mock.calls[1];
+  expect(sql).toMatch(/FROM documents d JOIN orders o/);
+  expect(vals).toEqual([7, 'CMD-X']);
+});
+
+test('keresés: nem-pod típusszűrőnél nincs sofőr-lekérdezés', async () => {
+  setUser(ADMIN);
+  pool.query.mockResolvedValueOnce(rows([]));
+  await call('orderDocSearch', [{ doc_type: 'invoice' }]);
+  expect(pool.query).toHaveBeenCalledTimes(1);
+});
