@@ -34,9 +34,10 @@ window.WaybillDocs = (function () {
   function note(msg, kind) { try { toast(msg, kind || ''); } catch (e) { alert(msg); } }
   function typeLabel(k) { return (ICO[k] || '📎') + ' ' + (FB[k] ? tt('wbd.t.' + k, FB[k]) : tt('odoc.t.' + k, k)); }
   function fmtSize(n) { n = Number(n) || 0; if (!n) return ''; return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  // Rövid címke: „Megbízó · Város → Város" (public/place-short.js); a teljes adat a tooltipben.
   function orderLabel(o) {
-    var route = [o.loc_incarcare, o.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → ');
-    return (o.fuvar_no || o.id) + (route ? ' · ' + route : '') + (o.data_incarcare ? ' · ' + o.data_incarcare : '');
+    if (window.vsOrderShort) return vsOrderShort(o);
+    return (o.fuvar_no || o.id) + (o.client ? ' · ' + o.client : '');
   }
   // Típus-tipp a fájlnévből; egyébként fuvar-dokumentum (ha van fuvar) / egyéb.
   function guessType(name, hasOrders) {
@@ -58,9 +59,9 @@ window.WaybillDocs = (function () {
       '.wbd-drop{border:2px dashed #94a3b8;border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:#f8fafc;font-weight:600;color:#334155}' +
       '.wbd-drop.on{border-color:#2563eb;background:#eff6ff}' +
       '.wbd-list{display:flex;flex-direction:column;gap:8px;margin:14px 0}' +
-      '.wbd-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;background:#fff}' +
+      '.wbd-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;background:#fff}' +
       '.wbd-row .wbd-name{font-weight:700;font-size:13px;word-break:break-word;color:#0f172a}.wbd-row .wbd-meta{font-size:11.5px;color:#475569}' +
-      '.wbd-sels{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.wbd-sels select{padding:6px 8px;border:1.5px solid #94a3b8;border-radius:8px;font-size:13px;background:#fff;color:#0f172a;max-width:100%}' +
+      '.wbd-sels{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.wbd-sels select{padding:6px 8px;border:1.5px solid #94a3b8;border-radius:8px;font-size:13px;background:#fff;color:#0f172a;max-width:100%;min-width:0;text-overflow:ellipsis}.wbd-row>div{min-width:0}.wbd-sels select{flex:0 1 auto}' +
       '.wbd-x{border:0;background:#fee2e2;color:#b91c1c;border-radius:8px;width:30px;height:30px;cursor:pointer;font-weight:800}' +
       '.wbd-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.wbd-act button{padding:6px 10px;border-radius:8px;border:1.5px solid #64748b;background:#fff;color:#0f172a;cursor:pointer;font-size:13px}.wbd-act button:hover{background:#f1f5f9}' +
       '.wbd-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px;position:sticky;bottom:-20px;background:#fff;padding:10px 0 0}' +
@@ -92,9 +93,12 @@ window.WaybillDocs = (function () {
   }
   function orderSelect(cur, attrs) {
     var orders = (st.info && st.info.orders) || [];
+    // Ha két fuvar címkéje egyezne (ugyanaz a megbízó és útvonal), a fuvarszám is bekerül.
+    var labels = window.vsOrderShortList ? vsOrderShortList(orders) : orders.map(orderLabel);
     return '<select ' + (attrs || '') + '><option value="">' + esc(tt('wbd.noOrder', '— fără cursă —')) + '</option>' +
-      orders.map(function (o) {
-        return '<option value="' + esc(o.id) + '"' + (o.id === cur ? ' selected' : '') + '>' + esc(orderLabel(o)) + '</option>';
+      orders.map(function (o, i) {
+        var tip = window.vsOrderTitle ? vsOrderTitle(o) : '';
+        return '<option value="' + esc(o.id) + '"' + (o.id === cur ? ' selected' : '') + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(labels[i]) + '</option>';
       }).join('') + '</select>';
   }
   function head(title) {

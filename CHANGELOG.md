@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-28 — 🚚 Fuvar-választó: rövid címke (megbízó · város → város), nem tolja szét az ablakot (PR #577)
+- A dokumentum-feltöltés/-kezelés fuvar-választóiban (menetlevél-dokumentumok legördülője, Fuvar-dokumentumok kereső-lista + kiválasztott fuvar) a teljes cím helyett csak **a megbízó cég neve (26 karakterre vágva) · felrakó település → lerakó település** látszik. A teljes adat (fuvarszám, cég, teljes címek) a tooltipben. Ha két fuvar címkéje egyezne, a fuvarszám is elé kerül.
+- Új közös `public/place-short.js` (`vsCityOf` / `vsOrderShort` / `vsOrderShortList` / `vsOrderTitle`): a címből csak a település marad — utca (RO előtagos és HU/DE/EN utótagos), irányítószám, megye, ország kiszűrve; „Sat/Comuna/Municipiul X" → X (a régi szabály a „Sat" előtagot utcának vette). A dokumentum-lista útvonal-sora is ezt használja.
+- Telefonon a menetlevél-kezelő ablak többé nem lóg ki oldalra (a sor tartalma zsugorodik, a legördülő a sorban marad). +13 unit teszt; cache-bust `?v=20261028pick`.
+
 ## 2026-10-28 — 👁 Dokumentum-előnézet helyben (telefonon és gépen), a letöltés mellett (PR #576)
 - Új közös `public/doc-preview.js` (`DocPreview.open`): teljes képernyős ablak a **teljes fájlnévvel**, mérettel/típussal, ⬇️ letöltés és ✕ bezárás gombbal (Esc is). Kép → a képernyőhöz igazítva; PDF → pdf.js-sel oldalanként (a telefonos böngészők iframe-ben nem mutatják a PDF-et); egyéb formátum → „nincs előnézet" + letöltés.
 - 👁 gomb a ⬇️ mellett: menetlevél-dokumentumok (🗂️ Kezelés), Fuvar-dokumentumok oldal (eredeti + ✍️ aláírt változat + sofőr-feltöltés), Feltöltött iratok & CMR (a „Megtekintés" már nem új lapon nyit). Nincs új szerver-út — a meglévő `waybillDocGet` / `orderDocGet` / `/api/doc-download/:id` (cég-szűrt) adja a fájlt. 9 `dpv.*` i18n (RO+HU), cache-bust `?v=20261028dpv`.

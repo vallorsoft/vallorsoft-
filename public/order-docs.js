@@ -28,10 +28,14 @@ window.OrderDocs = (function () {
   function dateStr(v) { return v ? String(v).slice(0, 10) : '—'; }
   function typeLabel(k) { return (ICO[k] || '📎') + ' ' + tt('odoc.t.' + (k || 'other'), k || 'other'); }
   function fmtSize(n) { n = Number(n) || 0; if (!n) return ''; return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  // Rövid címke: „Megbízó · Város → Város" (public/place-short.js).
   function orderLabel(r) {
-    var no = r.fuvar_no || r.order_id || r.id;
-    var route = [r.loc_incarcare, r.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → ');
-    return no + (r.client ? ' · ' + r.client : '') + (route ? ' · ' + route : '');
+    if (window.vsOrderShort) return vsOrderShort(r);
+    return (r.fuvar_no || r.order_id || r.id) + (r.client ? ' · ' + r.client : '');
+  }
+  function routeShort(r) {
+    var c = window.vsCityOf || function (s) { return String(s || '').split(',')[0]; };
+    return [c(r.loc_incarcare), c(r.loc_descarcare)].filter(Boolean).join(' → ');
   }
 
   function ensureStyle() {
@@ -55,8 +59,8 @@ window.OrderDocs = (function () {
       '.odoc-mod{background:#fff;color:#0f172a;border-radius:16px;padding:20px;width:100%;max-width:560px;max-height:92vh;overflow:auto;box-shadow:0 24px 60px rgba(15,23,42,.3)}' +
       '.odoc-mod h3{margin:0 0 14px}.odoc-mod .odoc-fld{margin-bottom:12px}.odoc-mod .input,.odoc-mod .select{width:100%;box-sizing:border-box}' +
       '.odoc-picklist{max-height:200px;overflow:auto;border:1.5px solid #cbd5e1;border-radius:10px;margin-top:6px}' +
-      '.odoc-pick{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #e5e7eb}.odoc-pick:hover{background:#eef2ff}' +
-      '.odoc-picked{padding:8px 10px;border-radius:10px;background:#ecfdf5;color:#065f46;font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:center}' +
+      '.odoc-pick{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #e5e7eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.odoc-pick:hover{background:#eef2ff}' +
+      '.odoc-picked{padding:8px 10px;border-radius:10px;background:#ecfdf5;color:#065f46;font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:center}.odoc-picked span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
       '.odoc-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:520px){.odoc-grid2{grid-template-columns:1fr}}' +
       '.odoc-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}' +
       '.main-content[data-theme="dark"] .odoc-ofilter{background:rgba(99,102,241,.18);color:#c7d2fe}' +
@@ -129,7 +133,7 @@ window.OrderDocs = (function () {
           '<td><div style="font-weight:600;word-break:break-word">' + esc(d.file_name) + (d.has_signed ? ' <span title="✍️">✍️</span>' : '') + '</div>' +
             '<div class="odoc-sub">' + [d.ref_no ? '#' + esc(d.ref_no) : '', esc(fmtSize(d.file_size)), d.note ? esc(d.note) : ''].filter(Boolean).join(' · ') + '</div></td>' +
           '<td><span class="odoc-ord" onclick="OrderDocs.showForOrder(\'' + esc(d.order_id) + '\')">' + esc(d.fuvar_no || d.order_id) + '</span>' +
-            '<div class="odoc-sub">' + esc([d.client, [d.loc_incarcare, d.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → ')].filter(Boolean).join(' · ')) + '</div></td>' +
+            '<div class="odoc-sub">' + esc([d.client, routeShort(d)].filter(Boolean).join(' · ')) + '</div></td>' +
           '<td class="odoc-sub">' + esc(d.uploaded_by || '') + '<br>' + esc(dateStr(d.created_at)) + '</td>' +
           '<td><div class="odoc-act">' + (d.src === 'drv'
             ? '<button class="btn" title="' + esc(tt('dpv.preview', 'Previzualizare')) + '" onclick="OrderDocs.view(' + d.id + ',\'drv\')">👁</button>' +
@@ -156,7 +160,7 @@ window.OrderDocs = (function () {
 
   function showForOrder(orderId) {
     var row = st.rows.filter(function (r) { return r.order_id === orderId; })[0];
-    st.order_id = orderId; st.order_label = row ? orderLabel(row) : orderId;
+    st.order_id = orderId; st.order_label = row ? (window.vsOrderShort ? vsOrderShort(row, { withNo: true }) : orderLabel(row)) : orderId;
     st.from = ''; st.to = ''; st.preset = 'all'; st.q = '';
     var pane = document.querySelector('.pane[data-pane="order-docs"]');
     if (pane && pane.classList.contains('hidden') && typeof activateTab === 'function') { activateTab('order-docs'); return; }
@@ -226,16 +230,18 @@ window.OrderDocs = (function () {
         var l = document.getElementById('odocPickList'); if (!l) return;
         var rows = (r && r.rows) || [];
         window._odocPickRows = rows;
+        var labels = window.vsOrderShortList ? vsOrderShortList(rows) : rows.map(orderLabel);
+        window._odocPickLabels = labels;
         l.innerHTML = rows.length ? rows.map(function (o, i) {
-          return '<div class="odoc-pick" onclick="OrderDocs._pickSet(' + i + ')"><b>' + esc(o.fuvar_no || o.id) + '</b> · ' +
-            esc([o.client, [o.loc_incarcare, o.loc_descarcare].filter(Boolean).map(function (s) { return String(s).split(',')[0]; }).join(' → '), dateStr(o.data_incarcare)].filter(Boolean).join(' · ')) + '</div>';
+          return '<div class="odoc-pick" title="' + esc(window.vsOrderTitle ? vsOrderTitle(o) : '') + '" onclick="OrderDocs._pickSet(' + i + ')">' +
+            esc(labels[i]) + '</div>';
         }).join('') : '<div class="odoc-pick" style="cursor:default">' + esc(tt('odoc.noOrder', 'Nicio cursă găsită')) + '</div>';
       });
     }, 250);
   }
   function _pickSet(i) {
     var o = (window._odocPickRows || [])[i]; if (!o) return;
-    _pick = { id: o.id, label: orderLabel(o) }; _renderPicked();
+    _pick = { id: o.id, label: (window._odocPickLabels || [])[i] || orderLabel(o) }; _renderPicked();
     if (document.getElementById('odocCheck')) _inspect();
   }
   function _pickClear() { _pick = null; _renderPicked(); _pickSearch(''); if (document.getElementById('odocCheck')) _inspect(); }
