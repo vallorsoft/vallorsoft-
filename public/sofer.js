@@ -1042,6 +1042,7 @@ function goSec(id) {
 var _SOF_MODALS = [
   { id: 'trModal',            close: 'trClose', ext: 'sofer-translate.js' }, // 🌐 fordító — a záró-függvény abban a fájlban él
   { id: 'sofTimeModal',       close: 'sofTimeCancel' },
+  { id: 'bcEditModal',        close: 'bcEditCancel' },
   { id: 'sofConfirmModal',    close: 'sofConfirmCancel' },
   { id: 'sofChoiceModal',     close: 'sofChoiceCancel' },
   { id: 'orphRangeModal',     close: 'orphRangeCancel' },
@@ -1190,6 +1191,8 @@ function _sendBorderCrossGo(tip, tara, atIso) {
   }
 }
 
+var _bcLogCache = {};
+var _bcEditId = null;
 function loadBorderLog() {
   fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'getBorderLogs' }) })
@@ -1197,19 +1200,69 @@ function loadBorderLog() {
     var list = d.result || [];
     var el = document.getElementById('borderLogList');
     if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">' + t('sof.noCross') + '</div>'; return; }
+    // A szerver a (módosított) időpont szerint rendezve adja — legújabb elöl.
+    _bcLogCache = {};
     el.innerHTML = list.slice(0, 20).map(function(l) {
+      _bcLogCache[l.id] = l;
       var dt = l.created_at ? new Date(l.created_at).toLocaleString(t('sof.locale')) : '—';
       // A `locatie` DB-ből jön (a sofőr saját beküldése), ezért escape-elni
       // kell — különben egy rosszindulatú `/api/border-cross` hívás tárolt
       // XSS-t okozna a saját fuvarnaplójában (és bárkinél, aki a listát
       // megnyitja).
-      return '<div class="border-log-item">'
+      var badges = '';
+      if (l.edited_at) {
+        var orig = l.orig_created_at ? new Date(l.orig_created_at).toLocaleString(t('sof.locale')) : '';
+        badges += '<span class="bc-badge edited" title="' + esc(t('bce.origAt') + ' ' + orig) + '">✏️ ' + esc(t('bce.edited')) + '</span>';
+      }
+      if (l.seq_warn) badges += '<span class="bc-badge warn" title="' + esc(t('bce.seqWarnTip')) + '">⚠️ ' + esc(t('bce.seqWarn')) + '</span>';
+      var btn = l.can_edit
+        ? '<button type="button" class="bc-edit-btn" onclick="bcEditOpen(' + Number(l.id) + ')">✏️ ' + esc(t('bce.edit')) + '</button>'
+        : '';
+      return '<div class="border-log-item">' + btn
         + '<strong>' + (l.tip === 'Intrare' ? t('sof.crossIn') : t('sof.crossOut')) + '</strong>'
-        + ' — ' + esc(dt)
+        + ' — ' + esc(dt) + badges
         + (l.locatie ? '<br><span style="font-size:11px;color:var(--muted);">📍 ' + esc(l.locatie) + '</span>' : '')
         + '</div>';
     }).join('');
   });
+}
+
+function bcEditOpen(id) {
+  var l = _bcLogCache[id]; if (!l) return;
+  var m = document.getElementById('bcEditModal'); if (!m) return;
+  _bcEditId = id;
+  document.getElementById('bcEditTip').value = l.tip === 'Intrare' ? 'Intrare' : 'Iesire';
+  var inp = document.getElementById('bcEditAt');
+  var d = new Date(l.created_at);
+  inp.value = isNaN(d.getTime()) ? '' : _sofLocalDatetimeValue(d);
+  inp.max = _sofLocalDatetimeValue(new Date(Date.now() + 60 * 1000));
+  document.getElementById('bcEditLoc').value = l.locatie || '';
+  var ok = document.getElementById('bcEditOkBtn'); if (ok) ok.disabled = false;
+  m.style.display = 'flex';
+}
+function bcEditCancel() {
+  _bcEditId = null;
+  var m = document.getElementById('bcEditModal'); if (m) m.style.display = 'none';
+}
+function bcEditSave() {
+  if (!_bcEditId) return;
+  var at = document.getElementById('bcEditAt').value;
+  if (!at) { toast(t('bce.atRequired'), 'err'); return; }
+  var ok = document.getElementById('bcEditOkBtn'); if (ok) ok.disabled = true;
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'borderCrossingUpdate', arguments: [{
+      id: _bcEditId,
+      tip: document.getElementById('bcEditTip').value,
+      at: new Date(at).toISOString(),
+      locatie: document.getElementById('bcEditLoc').value
+    }] }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var res = d.result || {};
+    if (!res.ok) { if (ok) ok.disabled = false; toast(res.err || t('common.error'), 'err'); return; }
+    bcEditCancel();
+    toast(t('bce.saved'), 'ok');
+    loadBorderLog();
+  }).catch(function() { if (ok) ok.disabled = false; toast(t('common.error'), 'err'); });
 }
 
 // ============================================================
