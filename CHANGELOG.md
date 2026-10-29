@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-29 — 🛂 Határátlépést csak az iroda módosíthat (PR #580)
+- A sofőr többé nem javíthatja a saját határátlépését: `borderCrossingUpdate` csak Admin/Manager szerepre fut (a sofőr szerver-oldalon is elutasítást kap), `getBorderLogs` a sofőrnek `can_edit:false`-t ad.
+- Sofőr felület: a ✏️ gomb, a `#bcEditModal` és a `bcEdit*` függvények kivéve; a napló csak olvasható (a „✏️ módosítva" és „⚠️ azonos irány" jelvény megmarad). Cache-bust `?v=20261029bcadm`.
+- Az iroda továbbra is javít a Sofőr-aktivitásban és az AI-chat határátlépés-kártyáján. Teszt frissítve (a sofőr a sajátját sem módosíthatja).
+
 ## 2026-10-29 — 🛂 Határátlépés utólagos módosítása + időrendi lista (PR #579)
 - `borderCrossingUpdate` (`handlers/documents.js`): irány / dátum+idő / helyszín javítása — sofőr a sajátját 30 napig, admin/manager a cége sofőrjeiét; az eredeti időpont+irány megmarad (`db/border-crossings-edit.sql`: `orig_created_at`/`orig_tip`/`edited_at`/`edited_by`/`edit_count`), audit `border.update`.
 - `getBorderLogs` a (módosított) időpont szerint rendez, `seq_warn` két egymást követő azonos irányú átlépésnél; az érintett menetlevelek diurnája + átlépés-naplója újraszámolódik (csak ha nem volt kézzel felülírva).

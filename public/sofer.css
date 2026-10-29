@@ -3636,84 +3636,9 @@
   display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 .tr-round.on { background: #dc2626; color: #fff; border-color: #dc2626; }
 
-/* ── 🛂 Határátlépés módosítása — a ⏱️ idő-picker kártyájával azonos ── */
-#bcEditModal {
-  position: fixed; inset: 0; z-index: 1200;
-  align-items: center; justify-content: center;
-  padding: 20px;
-  background: rgba(15,23,42,0.62);
-  backdrop-filter: blur(6px);
-}
-#bcEditModal .sof-modal-card {
-  width: min(440px, 100%);
-  background: #fff;
-  border: 1.5px solid #cbd5e1;
-  border-radius: 20px;
-  padding: 24px 22px 20px;
-  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
-  text-align: center;
-}
-#bcEditModal .sof-cf-ico { font-size: 34px; line-height: 1; margin-bottom: 10px; }
-#bcEditModal .sof-cf-title {
-  margin: 0 0 8px; font-size: 18px; font-weight: 900; color: #0f172a;
-  letter-spacing: -0.01em;
-}
-#bcEditModal .sof-cf-msg {
-  margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; color: #475569;
-  font-weight: 600;
-}
-#bcEditModal .sof-time-row {
-  display: flex; align-items: center; gap: 8px; margin: 6px 0 8px;
-  flex-wrap: wrap;
-}
-#bcEditModal .sof-time-label {
-  font-size: 12.5px; font-weight: 700; color: #475569;
-  min-width: 68px; text-align: left;
-}
-#bcEditModal .sof-time-input {
-  flex: 1; min-width: 160px;
-  min-height: 46px; padding: 8px 12px;
-  font-size: 16px; font-weight: 700; color: #0f172a;
-  background: #f8fafc; border: 1.5px solid #94a3b8; border-radius: 10px;
-  font-family: inherit;
-}
-#bcEditModal .sof-time-input:focus {
-  outline: none; border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.20);
-}
-#bcEditModal .sof-time-now {
-  min-height: 46px; padding: 8px 14px;
-  border: 1.5px solid #0ea5e9; background: #e0f2fe; color: #0369a1;
-  border-radius: 10px; font-size: 13.5px; font-weight: 800; cursor: pointer;
-  font-family: inherit;
-}
-#bcEditModal .sof-time-now:active { transform: scale(0.98); }
-#bcEditModal .sof-time-hint {
-  margin: 4px 0 16px; font-size: 12px; color: #64748b; text-align: left;
-}
-#bcEditModal .sof-cf-btns { display: flex; gap: 10px; }
-#bcEditModal .sof-cf-btn {
-  min-height: 54px; padding: 14px 12px; border-radius: 14px;
-  font-size: 15px; font-weight: 800; cursor: pointer;
-  touch-action: manipulation; font-family: inherit;
-}
-#bcEditModal .sof-cf-btn.cancel {
-  flex: 1; border: 1.5px solid #94a3b8; background: #f1f5f9; color: #334155;
-}
-#bcEditModal .sof-cf-btn.ok {
-  flex: 1.6; border: 1.5px solid #15803d;
-  background: linear-gradient(135deg, #16a34a, #15803d); color: #fff;
-  box-shadow: 0 10px 22px rgba(22,163,74,0.36);
-}
-#bcEditModal .sof-cf-btn:active { transform: scale(0.98); }
+/* ── 🛂 Határátlépés-napló jelvényei (módosítani csak az iroda tud) ── */
 
-#bcEditModal select.sof-time-input { appearance: auto; }
 .border-log-item { position: relative; }
-.border-log-item .bc-edit-btn {
-  float: right; min-height: 40px; padding: 6px 12px; margin-left: 8px;
-  border: 1.5px solid #64748b; background: #fff; color: #0f172a;
-  border-radius: 10px; font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit;
-}
 .border-log-item .bc-badge {
   display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
   font-size: 11px; font-weight: 800; border: 1px solid;

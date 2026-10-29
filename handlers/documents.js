@@ -1033,7 +1033,6 @@ const BC_COLS = `bc.id, bc.email_sofer, bc.nume_sofer, bc.tip, bc.tara, bc.locat
                  to_jsonb(bc) ->> 'edited_at' AS edited_at,
                  to_jsonb(bc) ->> 'edited_by' AS edited_by,
                  COALESCE((to_jsonb(bc) ->> 'edit_count')::int, 0) AS edit_count`;
-const SOFER_EDIT_DAYS = 30;     // a sofőr ennyi napra visszamenőleg javíthat
 const ADMIN_EDIT_DAYS = 400;    // admin/manager (menetlevél-utólagos javítás)
 
 function _markSequence(rows) {
@@ -1058,12 +1057,7 @@ handlers.getBorderLogs = async function (req, res, args) {
         ? await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer) WHERE u.company_id = $1 ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [cid])
         : await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc WHERE LOWER(bc.email_sofer) = LOWER($1) ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [req.session.user.email]);
       const rows = _markSequence(r.rows);
-      const editDays = isAdmin ? ADMIN_EDIT_DAYS : SOFER_EDIT_DAYS;
-      const limit = Date.now() - editDays * 86400000;
-      for (const row of rows) {
-        const t = new Date(row.created_at).getTime();
-        row.can_edit = isAdmin || (Number.isFinite(t) && t >= limit);
-      }
+      for (const row of rows) row.can_edit = isAdmin;   // a sofőr nem módosíthat
       return res.json({ result: rows });
     } catch (err) {
       console.error('getBorderLogs hiba:', err);
@@ -1104,9 +1098,10 @@ handlers.borderCrossingUpdate = async function (req, res, args) {
     try {
       const me = req.session.user;
       if (!me) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      // Csak az iroda (Admin/Manager) módosíthat — a sofőr a saját
+      // rögzítését NEM javíthatja (a diurna ebből számol).
       const isAdmin = ['Admin', 'Manager'].includes(me.pozicio);
-      const isSofer = me.pozicio === 'Sofer';
-      if (!isAdmin && !isSofer) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      if (!isAdmin) return res.json({ result: { ok: false, err: 'Doar biroul poate modifica trecerile de frontieră' } });
 
       const a = (args && args[0]) || {};
       const id = parseInt(a.id, 10);
@@ -1118,13 +1113,12 @@ handlers.borderCrossingUpdate = async function (req, res, args) {
            LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
           WHERE bc.id = $1`, [id]);
       const row = cur.rows[0];
-      // Jogosultság: a sofőr CSAK a sajátját, az admin/manager a saját cége sofőrjeiét.
-      const own = row && String(row.email_sofer || '').toLowerCase() === String(me.email || '').toLowerCase();
-      if (!row || (isSofer && !own) || (isAdmin && String(row.company_id) !== String(me.company_id))) {
+      // Jogosultság: az admin/manager CSAK a saját cége sofőrjeiét.
+      if (!row || String(row.company_id) !== String(me.company_id)) {
         return res.json({ result: { ok: false, err: 'Trecerea nu a fost găsită' } });
       }
 
-      const editDays = isAdmin ? ADMIN_EDIT_DAYS : SOFER_EDIT_DAYS;
+      const editDays = ADMIN_EDIT_DAYS;
       const minT = Date.now() - editDays * 86400000;
       if (new Date(row.created_at).getTime() < minT) {
         return res.json({ result: { ok: false, err: `Trecerile mai vechi de ${editDays} zile nu mai pot fi modificate` } });
