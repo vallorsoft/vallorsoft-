@@ -5831,3 +5831,8 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] .btn.ghost.vs-danger-text{ color:#fca5a5 !important; border-color:#f87171 !important; }
 /* „Din șablon" gomb a fuvar-kiírás tetején (a varázsló fehér fejlécén ül) */
 #ordTplBtn{ background:#fff !important; color:#0f172a !important; border:1.5px solid #64748b !important; }
+
+/* ── Határátlépés módosítás jelzések (Sofőr-aktivitás) ── */
+#driverActivityBox .da-bc-badge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid}
+#driverActivityBox .da-bc-edited{background:#eff6ff;color:#1d4ed8;border-color:#93c5fd}
+#driverActivityBox .da-bc-warn{background:#fff7ed;color:#9a3412;border-color:#fdba74}

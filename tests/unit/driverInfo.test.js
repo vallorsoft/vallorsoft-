@@ -77,6 +77,21 @@ describe('answer', () => {
     expect(r.html).not.toMatch(/peto@x\.ro/);
   });
 
+  test('határátlépések: soronként ✏️ módosító gomb, a helyszín escape-elve', async () => {
+    mockRules.push({ match: /FROM border_crossings b/, rows: [
+      { id: 11, tip: 'Iesire', tara: 'RO', locatie: 'Nădlac "vama"', created_at: '2026-10-05T22:10:00Z', edited: true },
+      { id: 10, tip: 'Intrare', tara: 'RO', locatie: '', created_at: '2026-09-30T20:35:00Z', edited: false },
+    ] });
+    const r = await di.answer(7, 'Peto határátlépései', [], 'hu', NOW);
+    expect(r.html).toMatch(/vsEditBorderCrossing\(this\)/);
+    expect(r.html).toMatch(/data-bc-id="11"/);
+    expect(r.html).toMatch(/data-bc-id="10"/);
+    expect(r.html).toMatch(/data-bc-tip="Iesire"/);
+    expect(r.html).toMatch(/Nădlac &quot;vama&quot;/);
+    expect(r.html).not.toMatch(/"vama"/);
+    expect(r.html).toMatch(/Módosítás/);
+  });
+
   test('utókérdés: az alany az előzményből jön', async () => {
     mockRules.push({ match: /FROM orders o WHERE o.company_id = \$1 AND LOWER\(o.email_sofer\)/, rows: [] });
     const r = await di.answer(7, 'Megtudod mutatni hol tart?', ['Peto hol tart a fuvarjával?'], 'hu', NOW);

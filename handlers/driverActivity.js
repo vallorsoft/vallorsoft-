@@ -423,7 +423,10 @@ handlers.getDriverActivity = async function (req, res, args) {
     // E) Határátlépések (a sofőr GPS-alapján, cégen belül a sofőr-emailre szűrve)
     try {
       const bcR = await pool.query(
-        `SELECT bc.id, bc.tip, bc.tara, bc.locatie, bc.gps_lat, bc.gps_lng, bc.created_at
+        `SELECT bc.id, bc.tip, bc.tara, bc.locatie, bc.gps_lat, bc.gps_lng, bc.created_at,
+                to_jsonb(bc) ->> 'orig_created_at' AS orig_created_at,
+                to_jsonb(bc) ->> 'orig_tip' AS orig_tip,
+                to_jsonb(bc) ->> 'edited_at' AS edited_at
            FROM border_crossings bc
            JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer) AND u.company_id = $1
           WHERE LOWER(bc.email_sofer) = $2
@@ -432,13 +435,21 @@ handlers.getDriverActivity = async function (req, res, args) {
           LIMIT 200`,
         [cid, email, from, to]
       );
+      // Sorrend-jelzés: két egymást követő azonos irányú átlépés (időrendben)
+      const asc = bcR.rows.slice().reverse();
+      for (let i = 0; i < asc.length; i++) asc[i]._seqWarn = i > 0 && asc[i - 1].tip === asc[i].tip;
       for (const c of bcR.rows) {
         const isIn = /intr/i.test(c.tip || '');
         events.push({
           at: c.created_at, type: 'border', icon: '🛂',
           title: (isIn ? '🇷🇴 Belépés — ' : '🌍 Kilépés — ') + (c.tara || ''),
           subtitle: c.locatie || '',
-          meta: { lat: c.gps_lat, lng: c.gps_lng },
+          meta: {
+            lat: c.gps_lat, lng: c.gps_lng,
+            bc_id: c.id, tip: c.tip, locatie: c.locatie || '',
+            edited: !!c.edited_at, orig_created_at: c.orig_created_at || null,
+            orig_tip: c.orig_tip || null, seq_warn: !!c._seqWarn,
+          },
         });
       }
     } catch (_e) {}

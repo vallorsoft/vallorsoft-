@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-29 — 🛂 Határátlépés utólagos módosítása + időrendi lista (PR #579)
+- `borderCrossingUpdate` (`handlers/documents.js`): irány / dátum+idő / helyszín javítása — sofőr a sajátját 30 napig, admin/manager a cége sofőrjeiét; az eredeti időpont+irány megmarad (`db/border-crossings-edit.sql`: `orig_created_at`/`orig_tip`/`edited_at`/`edited_by`/`edit_count`), audit `border.update`.
+- `getBorderLogs` a (módosított) időpont szerint rendez, `seq_warn` két egymást követő azonos irányú átlépésnél; az érintett menetlevelek diurnája + átlépés-naplója újraszámolódik (csak ha nem volt kézzel felülírva).
+- ✏️ gomb: sofőr határátlépés-napló (`#bcEditModal`), Sofőr-aktivitás idővonal, AI-chat határátlépés-kártya (`vsEditBorderCrossing`, a sor frissül és újrarendeződik). +6 teszt; cache-bust `?v=20261028bcedit`.
+
 ## 2026-10-28 — 🚚 Fuvar-választó: fel-/lerakó dátum év nélkül a település után (PR #578)
 - A fuvar-választó címkéje: `Megbízó · Felrakó település 22.09 → Lerakó település 28.09` (nap.hónap, év nélkül). Közös `vsDayMonth` a `public/place-short.js`-ben; a menetlevél-dokumentumok fuvar-listája és a Fuvar-dokumentumok kereső (`orderDocOrderPick`) a lerakó dátumát is visszaadja, `YYYY-MM-DD` szövegként (nincs időzóna-csúszás). +1 unit teszt; cache-bust `?v=20261028pickdt`.
 

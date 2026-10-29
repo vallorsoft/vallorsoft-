@@ -1020,18 +1020,169 @@ handlers.getDriverDocs = async function (req, res, args) {
     }
   };
 
+// ─── Határátlépés-napló ────────────────────────────────────────────────
+// A lista MINDIG az esemény időpontja szerint rendezett (a módosított
+// időpont is ide számít, mert a módosítás a `created_at`-et írja át — az
+// eredeti a `orig_created_at`-ben marad). Sofőrönként jelöljük, ha két
+// egymást követő átlépés azonos irányú (`seq_warn`): ilyenkor valószínűleg
+// lemaradt vagy félrenyomott egy rögzítés, ami a diurnát is elrontja.
+const BC_COLS = `bc.id, bc.email_sofer, bc.nume_sofer, bc.tip, bc.tara, bc.locatie,
+                 bc.gps_lat, bc.gps_lng, bc.created_at,
+                 to_jsonb(bc) ->> 'orig_created_at' AS orig_created_at,
+                 to_jsonb(bc) ->> 'orig_tip' AS orig_tip,
+                 to_jsonb(bc) ->> 'edited_at' AS edited_at,
+                 to_jsonb(bc) ->> 'edited_by' AS edited_by,
+                 COALESCE((to_jsonb(bc) ->> 'edit_count')::int, 0) AS edit_count`;
+const SOFER_EDIT_DAYS = 30;     // a sofőr ennyi napra visszamenőleg javíthat
+const ADMIN_EDIT_DAYS = 400;    // admin/manager (menetlevél-utólagos javítás)
+
+function _markSequence(rows) {
+  // rows: időrendben CSÖKKENŐ (legújabb elöl) — sofőrönként a NÖVEKVŐ sorrendben vizsgáljuk
+  const byDriver = {};
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i];
+    const k = String(r.email_sofer || '').toLowerCase();
+    const prev = byDriver[k];
+    r.seq_warn = !!(prev && prev === r.tip);
+    byDriver[k] = r.tip;
+  }
+  return rows;
+}
+
 handlers.getBorderLogs = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: [] });
       const cid = req.session.user.company_id;
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
       const r = isAdmin
-        ? await pool.query('SELECT bc.* FROM border_crossings bc JOIN users u ON u.email = bc.email_sofer WHERE u.company_id = $1 ORDER BY bc.created_at DESC LIMIT 200', [cid])
-        : await pool.query('SELECT * FROM border_crossings WHERE email_sofer = $1 ORDER BY created_at DESC LIMIT 200', [req.session.user.email]);
-      return res.json({ result: r.rows });
+        ? await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer) WHERE u.company_id = $1 ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [cid])
+        : await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc WHERE LOWER(bc.email_sofer) = LOWER($1) ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [req.session.user.email]);
+      const rows = _markSequence(r.rows);
+      const editDays = isAdmin ? ADMIN_EDIT_DAYS : SOFER_EDIT_DAYS;
+      const limit = Date.now() - editDays * 86400000;
+      for (const row of rows) {
+        const t = new Date(row.created_at).getTime();
+        row.can_edit = isAdmin || (Number.isFinite(t) && t >= limit);
+      }
+      return res.json({ result: rows });
     } catch (err) {
       console.error('getBorderLogs hiba:', err);
       return res.json({ result: [] });
+    }
+  };
+
+// A sofőr menetleveleinek diurnája egy átlépés-módosítás után. Csak azokat
+// a menetleveleket számolja újra, amelyeknek a TÁROLT diurnája megegyezik a
+// módosítás ELŐTTI átlépésekből számolttal — vagyis amit senki nem írt át
+// kézzel. Így egy admin által szándékosan felülírt napidíj nem vész el.
+async function _waybillsForRecalc(email, sinceDate) {
+  const r = await pool.query(
+    `SELECT id, indulas_dt, erkezes_dt, diurna_externa, diurna_interna
+       FROM fuvarlevelek
+      WHERE LOWER(email_sofer) = LOWER($1)
+        AND indulas_dt IS NOT NULL AND erkezes_dt IS NOT NULL
+        AND erkezes_dt >= $2
+      ORDER BY indulas_dt ASC
+      LIMIT 50`,
+    [email, sinceDate]);
+  const out = [];
+  for (const w of r.rows) {
+    const dep = new Date(w.indulas_dt).toISOString();
+    const arr = new Date(w.erkezes_dt).toISOString();
+    try {
+      const tc = await fetchTripCrossings(pool, email, dep, arr);
+      const c = calculateDiurna(dep, arr, tc.forCalc);
+      if (Number(w.diurna_externa || 0) === c.externDays && Number(w.diurna_interna || 0) === c.internDays) {
+        out.push({ id: w.id, dep, arr });
+      }
+    } catch (_) {}
+  }
+  return out;
+}
+
+handlers.borderCrossingUpdate = async function (req, res, args) {
+    try {
+      const me = req.session.user;
+      if (!me) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const isAdmin = ['Admin', 'Manager'].includes(me.pozicio);
+      const isSofer = me.pozicio === 'Sofer';
+      if (!isAdmin && !isSofer) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+
+      const a = (args && args[0]) || {};
+      const id = parseInt(a.id, 10);
+      if (!id) return res.json({ result: { ok: false, err: 'ID invalid' } });
+
+      const cur = await pool.query(
+        `SELECT bc.id, bc.email_sofer, bc.tip, bc.locatie, bc.created_at, u.company_id
+           FROM border_crossings bc
+           LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
+          WHERE bc.id = $1`, [id]);
+      const row = cur.rows[0];
+      // Jogosultság: a sofőr CSAK a sajátját, az admin/manager a saját cége sofőrjeiét.
+      const own = row && String(row.email_sofer || '').toLowerCase() === String(me.email || '').toLowerCase();
+      if (!row || (isSofer && !own) || (isAdmin && String(row.company_id) !== String(me.company_id))) {
+        return res.json({ result: { ok: false, err: 'Trecerea nu a fost găsită' } });
+      }
+
+      const editDays = isAdmin ? ADMIN_EDIT_DAYS : SOFER_EDIT_DAYS;
+      const minT = Date.now() - editDays * 86400000;
+      if (new Date(row.created_at).getTime() < minT) {
+        return res.json({ result: { ok: false, err: `Trecerile mai vechi de ${editDays} zile nu mai pot fi modificate` } });
+      }
+
+      const tip = a.tip === undefined ? row.tip : a.tip;
+      if (tip !== 'Intrare' && tip !== 'Iesire') return res.json({ result: { ok: false, err: 'Direcție invalidă' } });
+
+      let at = row.created_at;
+      if (a.at !== undefined && a.at !== null && a.at !== '') {
+        const d = new Date(String(a.at));
+        if (isNaN(d.getTime())) return res.json({ result: { ok: false, err: 'Dată invalidă' } });
+        if (d.getTime() > Date.now() + 2 * 60 * 1000) return res.json({ result: { ok: false, err: 'Data nu poate fi în viitor' } });
+        if (d.getTime() < minT) return res.json({ result: { ok: false, err: `Data nu poate fi mai veche de ${editDays} zile` } });
+        at = d;
+      }
+      const locatie = a.locatie === undefined ? row.locatie : (String(a.locatie || '').trim().slice(0, 255) || null);
+
+      const oldT = new Date(row.created_at), newT = new Date(at);
+      const since = new Date(Math.min(oldT.getTime(), newT.getTime()));
+      since.setUTCHours(0, 0, 0, 0);
+      let recalc = [];
+      try { recalc = await _waybillsForRecalc(row.email_sofer, since); } catch (_) {}
+
+      await pool.query(
+        `UPDATE border_crossings SET
+           orig_created_at = COALESCE(orig_created_at, created_at),
+           orig_tip        = COALESCE(orig_tip, tip),
+           tip = $2, created_at = $3::timestamptz, locatie = $4,
+           edited_at = NOW(), edited_by = $5,
+           edit_count = COALESCE(edit_count, 0) + 1
+         WHERE id = $1`,
+        [id, tip, newT.toISOString(), locatie, me.email]);
+
+      // Az érintett (nem kézzel felülírt) menetlevelek diurnája az új sorrend szerint.
+      let updated = 0;
+      for (const w of recalc) {
+        try {
+          const tc = await fetchTripCrossings(pool, row.email_sofer, w.dep, w.arr);
+          const c = calculateDiurna(w.dep, w.arr, tc.forCalc);
+          const u = await pool.query(
+            `UPDATE fuvarlevelek SET diurna_externa = $2, diurna_interna = $3, hataratok = $4::jsonb
+              WHERE id = $1 AND (diurna_externa IS DISTINCT FROM $2 OR diurna_interna IS DISTINCT FROM $3
+                                 OR hataratok::text IS DISTINCT FROM $4::jsonb::text)`,
+            [w.id, c.externDays, c.internDays, JSON.stringify(tc.inWindow)]);
+          updated += u.rowCount || 0;
+        } catch (e) { console.error('diurna újraszámolás hiba:', e.message); }
+      }
+
+      audit.fromReq(req, 'border.update', 'border_crossing', id, {
+        from: { tip: row.tip, at: oldT.toISOString() },
+        to: { tip, at: newT.toISOString() },
+        waybills_recalc: updated,
+      });
+      return res.json({ result: { ok: true, waybills_recalc: updated } });
+    } catch (err) {
+      console.error('borderCrossingUpdate hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 

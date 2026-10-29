@@ -299,6 +299,7 @@
 
     // Timeline
     var events = (r.events || []).slice();
+    _daBorders = {};
     if (_typeFilter) events = events.filter(function (e) { return e.type === _typeFilter; });
     var timelineHtml;
     if (!events.length) {
@@ -326,6 +327,19 @@
             scanBadge = ' <span class="da-scan-badge da-scan-attached">' + esc(t('da.attached')) + '</span>';
           }
         }
+        // Határátlépés: ✏️ módosítás + „módosítva" / „sorrend?" jelzés
+        var bcHtml = '';
+        if (ev.type === 'border' && ev.meta && ev.meta.bc_id) {
+          _daBorders[ev.meta.bc_id] = { id: ev.meta.bc_id, tip: ev.meta.tip, at: ev.at, locatie: ev.meta.locatie || '' };
+          if (ev.meta.edited) {
+            var origTxt = ev.meta.orig_created_at ? _fmtDateTime(ev.meta.orig_created_at) : '';
+            scanBadge += ' <span class="da-bc-badge da-bc-edited" title="' + esc(t('bce.origAt') + ' ' + origTxt) + '">✏️ ' + esc(t('bce.edited')) + '</span>';
+          }
+          if (ev.meta.seq_warn) {
+            scanBadge += ' <span class="da-bc-badge da-bc-warn" title="' + esc(t('bce.seqWarnTip')) + '">⚠️ ' + esc(t('bce.seqWarn')) + '</span>';
+          }
+          bcHtml = ' <button type="button" class="btn ghost da-ev-photo-btn" onclick="DriverActivity.editBorder(' + Number(ev.meta.bc_id) + ')">✏️ ' + esc(t('bce.edit')) + '</button>';
+        }
         return '<div class="da-ev da-ev-' + esc(ev.type) + '">'
           + '<div class="da-ev-ico">' + (ev.icon || '•') + '</div>'
           + '<div class="da-ev-body">'
@@ -333,7 +347,7 @@
           +     '<div class="da-ev-title">' + esc(ev.title || '') + orderTag + scanBadge + '</div>'
           +     '<div class="da-ev-when" title="' + esc(_fmtDateTime(ev.at)) + '">' + esc(_fmtDateTime(ev.at)) + '</div>'
           +   '</div>'
-          +   subtitle + photoBtn
+          +   subtitle + photoBtn + bcHtml
           + '</div>'
           + '</div>';
       }).join('');
@@ -425,6 +439,71 @@
   }
 
   // ═════════════════════════════════════════════
+  //  HATÁRÁTLÉPÉS MÓDOSÍTÁSA (admin / manager)
+  // ═════════════════════════════════════════════
+  var _daBorders = {};
+  function _localDt(x) {
+    var d = new Date(x); if (isNaN(d.getTime())) return '';
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  var _bcDone = null;
+  function editBorder(id) {
+    var b = _daBorders[id]; if (!b) return;
+    openBorderEdit(b, function () { _loadDriverDetail(); });
+  }
+  // Közös módosító ablak: { id, tip, at, locatie } + mentés utáni callback.
+  function openBorderEdit(b, onDone) {
+    var id = b.id;
+    closeBorderEdit();
+    _bcDone = onDone || null;
+    var ov = document.createElement('div');
+    ov.id = 'daBcEdit';
+    ov.className = 'vs-light-surface';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:10040;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+    var lbl = 'display:block;font-size:13px;font-weight:700;color:#334155;margin:12px 0 4px;';
+    var inp = 'width:100%;box-sizing:border-box;min-height:44px;padding:8px 10px;border:1.5px solid #94a3b8;border-radius:10px;font-size:15px;color:#0f172a;background:#fff;font-family:inherit;';
+    ov.innerHTML = '<div style="width:min(420px,100%);background:#fff;color:#0f172a;border:1.5px solid #94a3b8;border-radius:16px;padding:20px;box-shadow:0 20px 55px rgba(15,23,42,.28);">'
+      + '<h3 style="margin:0 0 4px;font-size:18px;color:#0f172a;">🛂 ' + esc(t('bce.title')) + '</h3>'
+      + '<div style="font-size:12.5px;color:#475569;">' + esc(t('bce.hint')) + '</div>'
+      + '<label style="' + lbl + '">' + esc(t('bce.dir')) + '</label>'
+      + '<select id="daBcTip" style="' + inp + '">'
+      +   '<option value="Iesire"' + (b.tip !== 'Intrare' ? ' selected' : '') + '>' + esc(t('sof.crossOut')) + '</option>'
+      +   '<option value="Intrare"' + (b.tip === 'Intrare' ? ' selected' : '') + '>' + esc(t('sof.crossIn')) + '</option>'
+      + '</select>'
+      + '<label style="' + lbl + '">' + esc(t('bce.at')) + '</label>'
+      + '<input id="daBcAt" type="datetime-local" step="60" style="' + inp + '" value="' + esc(_localDt(b.at)) + '">'
+      + '<label style="' + lbl + '">' + esc(t('bce.loc')) + '</label>'
+      + '<input id="daBcLoc" type="text" maxlength="255" style="' + inp + '" value="' + esc(b.locatie) + '">'
+      + '<div style="display:flex;gap:10px;margin-top:18px;">'
+      +   '<button type="button" class="btn ghost" style="flex:1;" onclick="DriverActivity.closeBorderEdit()">' + esc(t('common.cancel')) + '</button>'
+      +   '<button type="button" id="daBcSave" class="btn ok" style="flex:1.4;" onclick="DriverActivity.saveBorderEdit(' + Number(id) + ')">💾 ' + esc(t('bce.save')) + '</button>'
+      + '</div></div>';
+    ov.addEventListener('click', function (e) { if (e.target === ov) closeBorderEdit(); });
+    document.body.appendChild(ov);
+  }
+  function closeBorderEdit() { var o = document.getElementById('daBcEdit'); if (o) o.remove(); }
+  function saveBorderEdit(id) {
+    var at = document.getElementById('daBcAt').value;
+    if (!at) { toast(t('bce.atRequired'), 'err'); return; }
+    var btn = document.getElementById('daBcSave'); if (btn) btn.disabled = true;
+    gas('borderCrossingUpdate', [{
+      id: id,
+      tip: document.getElementById('daBcTip').value,
+      at: new Date(at).toISOString(),
+      locatie: document.getElementById('daBcLoc').value,
+    }]).then(function (r) {
+      if (!r || !r.ok) { if (btn) btn.disabled = false; toast((r && r.err) || t('common.error'), 'err'); return; }
+      var cb = _bcDone;
+      var res = { id: id, tip: document.getElementById('daBcTip').value, at: new Date(at).toISOString(), locatie: document.getElementById('daBcLoc').value };
+      closeBorderEdit();
+      if (cb) { try { cb(res); } catch (_) {} }
+      toast(t('bce.saved') + (r.waybills_recalc ? ' · ' + t('bce.recalc').replace('{n}', r.waybills_recalc) : ''), 'ok');
+      _loadDriverDetail();
+    }).catch(function () { if (btn) btn.disabled = false; toast(t('common.error'), 'err'); });
+  }
+
+  // ═════════════════════════════════════════════
   //  PUBLIKUS API
   // ═════════════════════════════════════════════
   window.DriverActivity = {
@@ -438,5 +517,39 @@
     openLightbox: openLightbox,
     closeLightbox: closeLightbox,
     navLightbox: navLightbox,
+    editBorder: editBorder,
+    closeBorderEdit: closeBorderEdit,
+    saveBorderEdit: saveBorderEdit,
+    openBorderEdit: openBorderEdit,
+  };
+
+  // A chat-kártya (lib/driverInfo.js renderBorder) ✏️ gombja: a sor adatait a
+  // gomb data-attribútumaiból veszi, mentés után a sort frissíti, és a
+  // táblát időpont szerint (legújabb elöl) újrarendezi.
+  window.vsEditBorderCrossing = function (btn) {
+    if (!btn) return;
+    var b = { id: parseInt(btn.getAttribute('data-bc-id'), 10), tip: btn.getAttribute('data-bc-tip'),
+      at: btn.getAttribute('data-bc-at'), locatie: btn.getAttribute('data-bc-loc') || '' };
+    if (!b.id) return;
+    openBorderEdit(b, function (res) {
+      btn.setAttribute('data-bc-tip', res.tip);
+      btn.setAttribute('data-bc-at', res.at);
+      btn.setAttribute('data-bc-loc', res.locatie || '');
+      var tr = btn.closest('tr');
+      if (!tr) return;
+      var atEl = tr.querySelector('.bc-at'), tipEl = tr.querySelector('.bc-tip');
+      if (atEl) atEl.textContent = new Date(res.at).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' ✏️';
+      if (tipEl) tipEl.textContent = res.tip === 'Iesire' ? '↗ ' + t('bce.out') : '↘ ' + t('bce.in');
+      var cells = tr.querySelectorAll('td'); if (cells[3]) cells[3].textContent = res.locatie || '';
+      var tbody = tr.parentNode;
+      var rows = Array.prototype.slice.call(tbody.children);
+      rows.sort(function (x, y) {
+        var bx = x.querySelector('[data-bc-at]'), by = y.querySelector('[data-bc-at]');
+        var tx = bx ? new Date(bx.getAttribute('data-bc-at')).getTime() : 0;
+        var ty = by ? new Date(by.getAttribute('data-bc-at')).getTime() : 0;
+        return ty - tx;
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+    });
   };
 })();

@@ -271,6 +271,7 @@ const CHAT_STYLE = [
   'Do not repeat the same sentence you already wrote, vary your wording, mention only what changed, and never recite every field. Ask questions the way a person would ("Melyik nap rakodnak?", "Când se încarcă?"), not "Please provide…".',
   'If the dispatcher only chats, thanks you or reacts ("ok", "szuper", "mersi"), answer in one short natural sentence and leave the draft unchanged.',
   'Lines marked SIDE TOPIC were answered by the system itself (questions about other orders, drivers, money…). Use them to understand references ("ugyanoda", "neki", "acolo"), but never copy their data into the draft unless the dispatcher clearly asks for it.',
+  'Border crossings (határátlépések / treceri de frontieră) CAN be corrected: when the system shows the list card, every row has a ✏️ button to change the date, time and direction (in/out); the list then re-sorts by time and the waybill per-diem is recalculated. If asked how to change one, point to that button — never say it cannot be changed.',
   'MEMORY / EARLIER CONVERSATIONS (if given) are what you remember about this dispatcher and company (nicknames, habits). Use them when they fit; what the dispatcher writes now always wins. Never mention that you have a memory list.',
 ].join('\n');
 
