@@ -51,21 +51,21 @@ d('Valódi DB — határátlépés módosítása', () => {
     return r.rows[0].id;
   }
 
-  test('sofőr módosítja a sajátját: irány + időpont, eredeti megőrizve, lista újrarendezve', async () => {
+  test('az iroda módosítja: irány + időpont, eredeti megőrizve, lista újrarendezve', async () => {
     const a = await cross('Iesire', daysAgo(5));
     const b = await cross('Intrare', daysAgo(3));
     const newAt = daysAgo(1);
-    const r = await call('borderCrossingUpdate', SOFER, { id: a, tip: 'Intrare', at: newAt.toISOString() });
+    const r = await call('borderCrossingUpdate', ADMIN, { id: a, tip: 'Intrare', at: newAt.toISOString() });
     expect(r.ok).toBe(true);
     const row = (await pool.query('SELECT * FROM border_crossings WHERE id=$1', [a])).rows[0];
     expect(row.tip).toBe('Intrare');
     expect(row.orig_tip).toBe('Iesire');
     expect(row.edit_count).toBe(1);
-    expect(row.edited_by).toBe(SOFER.email);
+    expect(row.edited_by).toBe(ADMIN.email);
     expect(new Date(row.orig_created_at).getTime()).toBe(daysAgo(5).getTime());
 
     // Második módosítás: az ERedeti marad
-    await call('borderCrossingUpdate', SOFER, { id: a, tip: 'Iesire' });
+    await call('borderCrossingUpdate', ADMIN, { id: a, tip: 'Iesire' });
     const row2 = (await pool.query('SELECT * FROM border_crossings WHERE id=$1', [a])).rows[0];
     expect(row2.orig_tip).toBe('Iesire');
     expect(row2.edit_count).toBe(2);
@@ -73,7 +73,9 @@ d('Valódi DB — határátlépés módosítása', () => {
     const list = await call('getBorderLogs', SOFER);
     expect(list.map((x) => x.id)).toEqual([a, b]);          // a módosított (legújabb) elöl
     expect(list[0].edited_at).toBeTruthy();
-    expect(list[0].can_edit).toBe(true);
+    expect(list[0].can_edit).toBe(false);                    // a sofőr csak olvashatja
+    const adminList = await call('getBorderLogs', ADMIN);
+    expect(adminList.find((x) => x.id === a).can_edit).toBe(true);
   });
 
   test('két azonos irányú átlépés egymás után → seq_warn', async () => {
@@ -86,23 +88,25 @@ d('Valódi DB — határátlépés módosítása', () => {
     expect(list.filter((x) => x.seq_warn)).toHaveLength(1);
   });
 
-  test('jogosultság: más sofőr / más cég nem módosíthat; sofőr 30 napnál régebbit nem', async () => {
+  test('jogosultság: a sofőr a SAJÁTJÁT sem módosíthatja, más cég sem; az admin régebbit is', async () => {
     const a = await cross('Iesire', daysAgo(2));
+    const own = await call('borderCrossingUpdate', SOFER, { id: a, tip: 'Intrare' });
+    expect(own.ok).toBe(false);
+    expect((await pool.query('SELECT tip FROM border_crossings WHERE id=$1', [a])).rows[0].tip).toBe('Iesire');
     const stranger = { id: 9, email: 'idegen@x.hu', nume: 'X', pozicio: 'Sofer', company_id: cid };
     expect((await call('borderCrossingUpdate', stranger, { id: a, tip: 'Intrare' })).ok).toBe(false);
     expect((await call('borderCrossingUpdate', OTHER, { id: a, tip: 'Intrare' })).ok).toBe(false);
     expect((await call('borderCrossingUpdate', ADMIN, { id: a, tip: 'Intrare' })).ok).toBe(true);
 
     const old = await cross('Intrare', daysAgo(45));
-    expect((await call('borderCrossingUpdate', SOFER, { id: old, tip: 'Iesire' })).ok).toBe(false);
     expect((await call('borderCrossingUpdate', ADMIN, { id: old, tip: 'Iesire' })).ok).toBe(true);
   });
 
   test('érvénytelen bemenet: jövőbeli dátum, ismeretlen irány', async () => {
     const a = await cross('Iesire', daysAgo(2));
     const fut = new Date(Date.now() + 3600000).toISOString();
-    expect((await call('borderCrossingUpdate', SOFER, { id: a, at: fut })).ok).toBe(false);
-    expect((await call('borderCrossingUpdate', SOFER, { id: a, tip: 'X' })).ok).toBe(false);
+    expect((await call('borderCrossingUpdate', ADMIN, { id: a, at: fut })).ok).toBe(false);
+    expect((await call('borderCrossingUpdate', ADMIN, { id: a, tip: 'X' })).ok).toBe(false);
   });
 
   test('a menetlevél diurnája újraszámolódik, a kézzel felülírt nem', async () => {
