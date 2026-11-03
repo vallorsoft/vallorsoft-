@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 64. lépés — Határátlépés utólagos felvétele (2026-11-03, PR #581) ✅ KÉSZ
+- Új író végpontok: `borderCrossingCreate` (Admin/Manager; a cél-sofőr `users.company_id`-ja a saját cég kell legyen, a Sofer szerep szerver-oldalon elutasítva, irány-fehérlista, jövőbeli/400 napnál régebbi időpont tiltva, duplikátum-őr, helyszín 255 karakter, paraméteres SQL, audit `border.create`) és `borderCrossingDelete` (csak a saját cég és CSAK `added_by`-jal jelölt, iroda által felvett sor; a sofőr GPS-rögzítése nem törölhető; audit `border.delete`). A chat-tool `border.add` ugyanezeken a handlereken át, ✅ megerősítés után ír.
+
 ### 63. lépés — Határátlépés módosítása csak irodai jog (2026-10-29, PR #580) ✅ KÉSZ
 - A napidíj (diurna) a határátlépésekből számol, ezért a sofőr nem módosíthatja a saját rögzítését: `borderCrossingUpdate` a `Sofer` szerepet szerver-oldalon elutasítja (nem csak a gomb rejtett), az Admin/Manager csak a SAJÁT cége sofőrjeinek sorát írhatja (`users.company_id` ellenőrzés). Audit `border.update` változatlan. Teszt: a sofőr saját sora változatlan marad elutasítás után.
 

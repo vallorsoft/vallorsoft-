@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-03 — 🛂 Határátlépés utólagos felvétele az irodából — AI-chatből is (PR #581)
+- Új `borderCrossingCreate` / `borderCrossingDelete` (Admin/Manager, saját cég sofőrje): irány-fehérlista, nem lehet jövőbeli vagy 400 napnál régebbi, ±2 perces duplikátum-őr, `added_by` jelölés (`db/border-crossings-added-by.sql`), audit `border.create`/`border.delete`. A sofőr GPS-sora nem törölhető, csak módosítható.
+- A nem kézzel felülírt menetlevelek diurnája újraszámolódik (közös `_applyWaybillRecalc`).
+- AI-chat `border.add` tool („Gondosnak adj hozzá egy kilépést okt. 25-én 18:30-kor Nădlacnál"): bukaresti helyi idő, előnézet az előző átlépéssel + azonos-irány jelzés, ✅-re fut, visszavonható. A `driverInfo` az írás-szándékot nem válaszolja info-kártyával.
+- Sofőr-aktivitás: „➕ Határátlépés" gomb + 🏢 „utólag felvéve" jelvény (chat-kártyán is). Cache-bust `?v=20261103bcadd`. 1955 Jest zöld.
+
 ## 2026-10-29 — 🛂 Határátlépést csak az iroda módosíthat (PR #580)
 - A sofőr többé nem javíthatja a saját határátlépését: `borderCrossingUpdate` csak Admin/Manager szerepre fut (a sofőr szerver-oldalon is elutasítást kap), `getBorderLogs` a sofőrnek `can_edit:false`-t ad.
 - Sofőr felület: a ✏️ gomb, a `#bcEditModal` és a `bcEdit*` függvények kivéve; a napló csak olvasható (a „✏️ módosítva" és „⚠️ azonos irány" jelvény megmarad). Cache-bust `?v=20261029bcadm`.
