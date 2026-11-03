@@ -426,7 +426,8 @@ handlers.getDriverActivity = async function (req, res, args) {
         `SELECT bc.id, bc.tip, bc.tara, bc.locatie, bc.gps_lat, bc.gps_lng, bc.created_at,
                 to_jsonb(bc) ->> 'orig_created_at' AS orig_created_at,
                 to_jsonb(bc) ->> 'orig_tip' AS orig_tip,
-                to_jsonb(bc) ->> 'edited_at' AS edited_at
+                to_jsonb(bc) ->> 'edited_at' AS edited_at,
+                to_jsonb(bc) ->> 'added_by' AS added_by
            FROM border_crossings bc
            JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer) AND u.company_id = $1
           WHERE LOWER(bc.email_sofer) = $2
@@ -449,6 +450,7 @@ handlers.getDriverActivity = async function (req, res, args) {
             bc_id: c.id, tip: c.tip, locatie: c.locatie || '',
             edited: !!c.edited_at, orig_created_at: c.orig_created_at || null,
             orig_tip: c.orig_tip || null, seq_warn: !!c._seqWarn,
+            added: !!c.added_by,
           },
         });
       }

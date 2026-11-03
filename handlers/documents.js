@@ -1032,6 +1032,7 @@ const BC_COLS = `bc.id, bc.email_sofer, bc.nume_sofer, bc.tip, bc.tara, bc.locat
                  to_jsonb(bc) ->> 'orig_tip' AS orig_tip,
                  to_jsonb(bc) ->> 'edited_at' AS edited_at,
                  to_jsonb(bc) ->> 'edited_by' AS edited_by,
+                 to_jsonb(bc) ->> 'added_by' AS added_by,
                  COALESCE((to_jsonb(bc) ->> 'edit_count')::int, 0) AS edit_count`;
 const ADMIN_EDIT_DAYS = 400;    // admin/manager (menetlevél-utólagos javítás)
 
@@ -1094,6 +1095,25 @@ async function _waybillsForRecalc(email, sinceDate) {
   return out;
 }
 
+// A `_waybillsForRecalc`-ban (a változás ELŐTT) kiválasztott menetlevelek
+// diurnáját a változás UTÁNI átlépésekből újraszámolja. Visszaad: módosított db.
+async function _applyWaybillRecalc(email, recalc) {
+  let updated = 0;
+  for (const w of recalc || []) {
+    try {
+      const tc = await fetchTripCrossings(pool, email, w.dep, w.arr);
+      const c = calculateDiurna(w.dep, w.arr, tc.forCalc);
+      const u = await pool.query(
+        `UPDATE fuvarlevelek SET diurna_externa = $2, diurna_interna = $3, hataratok = $4::jsonb
+          WHERE id = $1 AND (diurna_externa IS DISTINCT FROM $2 OR diurna_interna IS DISTINCT FROM $3
+                             OR hataratok::text IS DISTINCT FROM $4::jsonb::text)`,
+        [w.id, c.externDays, c.internDays, JSON.stringify(tc.inWindow)]);
+      updated += u.rowCount || 0;
+    } catch (e) { console.error('diurna újraszámolás hiba:', e.message); }
+  }
+  return updated;
+}
+
 handlers.borderCrossingUpdate = async function (req, res, args) {
     try {
       const me = req.session.user;
@@ -1154,19 +1174,7 @@ handlers.borderCrossingUpdate = async function (req, res, args) {
         [id, tip, newT.toISOString(), locatie, me.email]);
 
       // Az érintett (nem kézzel felülírt) menetlevelek diurnája az új sorrend szerint.
-      let updated = 0;
-      for (const w of recalc) {
-        try {
-          const tc = await fetchTripCrossings(pool, row.email_sofer, w.dep, w.arr);
-          const c = calculateDiurna(w.dep, w.arr, tc.forCalc);
-          const u = await pool.query(
-            `UPDATE fuvarlevelek SET diurna_externa = $2, diurna_interna = $3, hataratok = $4::jsonb
-              WHERE id = $1 AND (diurna_externa IS DISTINCT FROM $2 OR diurna_interna IS DISTINCT FROM $3
-                                 OR hataratok::text IS DISTINCT FROM $4::jsonb::text)`,
-            [w.id, c.externDays, c.internDays, JSON.stringify(tc.inWindow)]);
-          updated += u.rowCount || 0;
-        } catch (e) { console.error('diurna újraszámolás hiba:', e.message); }
-      }
+      const updated = await _applyWaybillRecalc(row.email_sofer, recalc);
 
       audit.fromReq(req, 'border.update', 'border_crossing', id, {
         from: { tip: row.tip, at: oldT.toISOString() },
@@ -1176,6 +1184,97 @@ handlers.borderCrossingUpdate = async function (req, res, args) {
       return res.json({ result: { ok: true, waybills_recalc: updated } });
     } catch (err) {
       console.error('borderCrossingUpdate hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
+// ─── Határátlépés UTÓLAGOS felvétele (iroda) ──────────────────────────
+// Ha a sofőr elfelejtette megnyomni a BE/KI gombot, az Admin/Manager
+// utólag rögzítheti (konzolról vagy az AI-chatből). A sor `added_by`-jal
+// jelölt (nem GPS-ből jött), és ugyanúgy beszámít a diurnába; a nem kézzel
+// felülírt menetlevelek diurnája újraszámolódik.
+handlers.borderCrossingCreate = async function (req, res, args) {
+    try {
+      const me = req.session.user;
+      if (!me) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Doar biroul poate adăuga treceri de frontieră' } });
+      const a = (args && args[0]) || {};
+      const email = String(a.email || '').trim().toLowerCase();
+      if (!email) return res.json({ result: { ok: false, err: 'Selectați șoferul' } });
+      const drv = await pool.query(
+        `SELECT email, nume FROM users WHERE LOWER(email) = $1 AND company_id = $2 LIMIT 1`, [email, me.company_id]);
+      if (!drv.rows[0]) return res.json({ result: { ok: false, err: 'Șoferul nu a fost găsit' } });
+
+      const tip = a.tip;
+      if (tip !== 'Intrare' && tip !== 'Iesire') return res.json({ result: { ok: false, err: 'Direcție invalidă' } });
+      const d = new Date(String(a.at || ''));
+      if (!a.at || isNaN(d.getTime())) return res.json({ result: { ok: false, err: 'Dată invalidă' } });
+      if (d.getTime() > Date.now() + 2 * 60 * 1000) return res.json({ result: { ok: false, err: 'Data nu poate fi în viitor' } });
+      if (d.getTime() < Date.now() - ADMIN_EDIT_DAYS * 86400000) {
+        return res.json({ result: { ok: false, err: `Data nu poate fi mai veche de ${ADMIN_EDIT_DAYS} zile` } });
+      }
+      const locatie = String(a.locatie || '').trim().slice(0, 255) || null;
+      const tara = String(a.tara || 'RO').trim().slice(0, 50) || 'RO';
+
+      // Duplikátum-őr: ugyanaz a sofőr, irány, ±2 perc.
+      const dup = await pool.query(
+        `SELECT id FROM border_crossings WHERE LOWER(email_sofer) = $1 AND tip = $2
+            AND created_at BETWEEN $3::timestamptz - INTERVAL '2 minutes' AND $3::timestamptz + INTERVAL '2 minutes' LIMIT 1`,
+        [email, tip, d.toISOString()]);
+      if (dup.rows[0]) return res.json({ result: { ok: false, err: 'Există deja o trecere identică la această oră' } });
+
+      const since = new Date(d.getTime()); since.setUTCHours(0, 0, 0, 0);
+      let recalc = [];
+      try { recalc = await _waybillsForRecalc(email, since); } catch (_) {}
+
+      let ins;
+      try {
+        ins = await pool.query(
+          `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, created_at, added_by)
+           VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $7) RETURNING id`,
+          [drv.rows[0].email, drv.rows[0].nume || null, tip, tara, locatie, d.toISOString(), me.email]);
+      } catch (e) {
+        // Migráció előtt (nincs added_by oszlop) a jelölés nélkül mentünk.
+        ins = await pool.query(
+          `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6::timestamptz) RETURNING id`,
+          [drv.rows[0].email, drv.rows[0].nume || null, tip, tara, locatie, d.toISOString()]);
+      }
+      const id = ins.rows[0].id;
+      const updated = await _applyWaybillRecalc(email, recalc);
+      audit.fromReq(req, 'border.create', 'border_crossing', id, { email, tip, at: d.toISOString(), waybills_recalc: updated });
+      return res.json({ result: { ok: true, id, waybills_recalc: updated } });
+    } catch (err) {
+      console.error('borderCrossingCreate hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
+// Az iroda által UTÓLAG felvett átlépés törlése (pl. chat-visszavonás). A
+// sofőr GPS-szel rögzített sorai NEM törölhetők (azokat csak módosítani lehet).
+handlers.borderCrossingDelete = async function (req, res, args) {
+    try {
+      const me = req.session.user;
+      if (!me) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Doar biroul poate șterge treceri de frontieră' } });
+      const id = parseInt(((args && args[0]) || {}).id, 10);
+      if (!id) return res.json({ result: { ok: false, err: 'ID invalid' } });
+      const cur = await pool.query(
+        `SELECT bc.id, bc.email_sofer, bc.created_at, to_jsonb(bc) ->> 'added_by' AS added_by, u.company_id
+           FROM border_crossings bc LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
+          WHERE bc.id = $1`, [id]);
+      const row = cur.rows[0];
+      if (!row || String(row.company_id) !== String(me.company_id)) return res.json({ result: { ok: false, err: 'Trecerea nu a fost găsită' } });
+      if (!row.added_by) return res.json({ result: { ok: false, err: 'Trecerile înregistrate de șofer nu pot fi șterse, doar modificate' } });
+      const since = new Date(row.created_at); since.setUTCHours(0, 0, 0, 0);
+      let recalc = [];
+      try { recalc = await _waybillsForRecalc(row.email_sofer, since); } catch (_) {}
+      await pool.query(`DELETE FROM border_crossings WHERE id = $1`, [id]);
+      const updated = await _applyWaybillRecalc(row.email_sofer, recalc);
+      audit.fromReq(req, 'border.delete', 'border_crossing', id, { waybills_recalc: updated });
+      return res.json({ result: { ok: true, waybills_recalc: updated } });
+    } catch (err) {
+      console.error('borderCrossingDelete hiba:', err);
       return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };

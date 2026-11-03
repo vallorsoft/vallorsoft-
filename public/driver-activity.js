@@ -273,6 +273,7 @@
       +       '</select>'
       +     '</div>'
       +   '</div>'
+      +   '<div style="display:flex;justify-content:flex-end;margin-top:8px;"><button type="button" class="btn ghost" onclick="DriverActivity.addBorder()">' + esc(t('bce.addBtn')) + '</button></div>'
       +   kpiPills
       + '</div>';
 
@@ -334,6 +335,9 @@
           if (ev.meta.edited) {
             var origTxt = ev.meta.orig_created_at ? _fmtDateTime(ev.meta.orig_created_at) : '';
             scanBadge += ' <span class="da-bc-badge da-bc-edited" title="' + esc(t('bce.origAt') + ' ' + origTxt) + '">✏️ ' + esc(t('bce.edited')) + '</span>';
+          }
+          if (ev.meta.added) {
+            scanBadge += ' <span class="da-bc-badge da-bc-edited">🏢 ' + esc(t('bce.addedByOffice')) + '</span>';
           }
           if (ev.meta.seq_warn) {
             scanBadge += ' <span class="da-bc-badge da-bc-warn" title="' + esc(t('bce.seqWarnTip')) + '">⚠️ ' + esc(t('bce.seqWarn')) + '</span>';
@@ -448,13 +452,21 @@
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
   var _bcDone = null;
+  var _bcNewEmail = null;
   function editBorder(id) {
     var b = _daBorders[id]; if (!b) return;
     openBorderEdit(b, function () { _loadDriverDetail(); });
   }
   // Közös módosító ablak: { id, tip, at, locatie } + mentés utáni callback.
+  // Új átlépés felvétele (b.id nélkül) — a kiválasztott sofőrnek.
+  function addBorder() {
+    if (!_selectedEmail) return;
+    openBorderEdit({ id: null, email: _selectedEmail, tip: 'Iesire', at: new Date().toISOString(), locatie: '' }, function () { _loadDriverDetail(); });
+  }
   function openBorderEdit(b, onDone) {
     var id = b.id;
+    var isNew = !id;
+    _bcNewEmail = isNew ? (b.email || null) : null;
     closeBorderEdit();
     _bcDone = onDone || null;
     var ov = document.createElement('div');
@@ -464,8 +476,8 @@
     var lbl = 'display:block;font-size:13px;font-weight:700;color:#334155;margin:12px 0 4px;';
     var inp = 'width:100%;box-sizing:border-box;min-height:44px;padding:8px 10px;border:1.5px solid #94a3b8;border-radius:10px;font-size:15px;color:#0f172a;background:#fff;font-family:inherit;';
     ov.innerHTML = '<div style="width:min(420px,100%);background:#fff;color:#0f172a;border:1.5px solid #94a3b8;border-radius:16px;padding:20px;box-shadow:0 20px 55px rgba(15,23,42,.28);">'
-      + '<h3 style="margin:0 0 4px;font-size:18px;color:#0f172a;">🛂 ' + esc(t('bce.title')) + '</h3>'
-      + '<div style="font-size:12.5px;color:#475569;">' + esc(t('bce.hint')) + '</div>'
+      + '<h3 style="margin:0 0 4px;font-size:18px;color:#0f172a;">🛂 ' + esc(t(isNew ? 'bce.addTitle' : 'bce.title')) + '</h3>'
+      + '<div style="font-size:12.5px;color:#475569;">' + esc(t(isNew ? 'bce.addHint' : 'bce.hint')) + '</div>'
       + '<label style="' + lbl + '">' + esc(t('bce.dir')) + '</label>'
       + '<select id="daBcTip" style="' + inp + '">'
       +   '<option value="Iesire"' + (b.tip !== 'Intrare' ? ' selected' : '') + '>' + esc(t('sof.crossOut')) + '</option>'
@@ -477,7 +489,7 @@
       + '<input id="daBcLoc" type="text" maxlength="255" style="' + inp + '" value="' + esc(b.locatie) + '">'
       + '<div style="display:flex;gap:10px;margin-top:18px;">'
       +   '<button type="button" class="btn ghost" style="flex:1;" onclick="DriverActivity.closeBorderEdit()">' + esc(t('common.cancel')) + '</button>'
-      +   '<button type="button" id="daBcSave" class="btn ok" style="flex:1.4;" onclick="DriverActivity.saveBorderEdit(' + Number(id) + ')">💾 ' + esc(t('bce.save')) + '</button>'
+      +   '<button type="button" id="daBcSave" class="btn ok" style="flex:1.4;" onclick="DriverActivity.saveBorderEdit(' + (isNew ? 0 : Number(id)) + ')">💾 ' + esc(t('bce.save')) + '</button>'
       + '</div></div>';
     ov.addEventListener('click', function (e) { if (e.target === ov) closeBorderEdit(); });
     document.body.appendChild(ov);
@@ -487,18 +499,20 @@
     var at = document.getElementById('daBcAt').value;
     if (!at) { toast(t('bce.atRequired'), 'err'); return; }
     var btn = document.getElementById('daBcSave'); if (btn) btn.disabled = true;
-    gas('borderCrossingUpdate', [{
-      id: id,
+    var isNew = !id;
+    var body = {
       tip: document.getElementById('daBcTip').value,
       at: new Date(at).toISOString(),
       locatie: document.getElementById('daBcLoc').value,
-    }]).then(function (r) {
+    };
+    if (isNew) body.email = _bcNewEmail; else body.id = id;
+    gas(isNew ? 'borderCrossingCreate' : 'borderCrossingUpdate', [body]).then(function (r) {
       if (!r || !r.ok) { if (btn) btn.disabled = false; toast((r && r.err) || t('common.error'), 'err'); return; }
       var cb = _bcDone;
       var res = { id: id, tip: document.getElementById('daBcTip').value, at: new Date(at).toISOString(), locatie: document.getElementById('daBcLoc').value };
       closeBorderEdit();
       if (cb) { try { cb(res); } catch (_) {} }
-      toast(t('bce.saved') + (r.waybills_recalc ? ' · ' + t('bce.recalc').replace('{n}', r.waybills_recalc) : ''), 'ok');
+      toast(t(isNew ? 'bce.addSaved' : 'bce.saved') + (r.waybills_recalc ? ' · ' + t('bce.recalc').replace('{n}', r.waybills_recalc) : ''), 'ok');
       _loadDriverDetail();
     }).catch(function () { if (btn) btn.disabled = false; toast(t('common.error'), 'err'); });
   }
@@ -518,6 +532,7 @@
     closeLightbox: closeLightbox,
     navLightbox: navLightbox,
     editBorder: editBorder,
+    addBorder: addBorder,
     closeBorderEdit: closeBorderEdit,
     saveBorderEdit: saveBorderEdit,
     openBorderEdit: openBorderEdit,

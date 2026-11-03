@@ -135,4 +135,47 @@ d('Valódi DB — határátlépés módosítása', () => {
     expect(Array.isArray(rows[0].hataratok) && rows[0].hataratok.length).toBe(2);
     expect(Number(rows[1].diurna_externa)).toBe(99);       // kézi felülírás érintetlen
   });
+  test('utólagos felvétel (iroda): beszúrás added_by-jal, diurna újraszámolva, jogosultság + duplikátum', async () => {
+    const dep = daysAgo(6, 6), arr = daysAgo(1, 20);
+    await cross('Intrare', daysAgo(2, 9));
+    await pool.query(
+      `INSERT INTO fuvarlevelek (id, email_sofer, nume_sofer, indulas_dt, erkezes_dt, diurna_externa, diurna_interna, company_id)
+       VALUES ('FUV-C',$1,$2,$3,$4,0,6,$5)`,
+      [SOFER.email, SOFER.nume, dep.toISOString(), arr.toISOString(), cid]);
+    const { calculateDiurna } = require('../../lib/diurna');
+    const { fetchTripCrossings } = require('../../lib/tripCrossings');
+    const tc0 = await fetchTripCrossings(pool, SOFER.email, dep.toISOString(), arr.toISOString());
+    const c0 = calculateDiurna(dep.toISOString(), arr.toISOString(), tc0.forCalc);
+    await pool.query("UPDATE fuvarlevelek SET diurna_externa=$1, diurna_interna=$2 WHERE id='FUV-C'", [c0.externDays, c0.internDays]);
+
+    const at = daysAgo(5, 9).toISOString();
+    expect((await call('borderCrossingCreate', SOFER, { email: SOFER.email, tip: 'Iesire', at })).ok).toBe(false);
+    expect((await call('borderCrossingCreate', OTHER, { email: SOFER.email, tip: 'Iesire', at })).ok).toBe(false);
+    expect((await call('borderCrossingCreate', ADMIN, { email: SOFER.email, tip: 'X', at })).ok).toBe(false);
+    expect((await call('borderCrossingCreate', ADMIN, { email: SOFER.email, tip: 'Iesire', at: new Date(Date.now() + 3600000).toISOString() })).ok).toBe(false);
+
+    const r = await call('borderCrossingCreate', ADMIN, { email: SOFER.email.toUpperCase(), tip: 'Iesire', at, locatie: 'Nădlac' });
+    expect(r.ok).toBe(true);
+    const row = (await pool.query('SELECT * FROM border_crossings WHERE id=$1', [r.id])).rows[0];
+    expect(row.added_by).toBe(ADMIN.email);
+    expect(row.nume_sofer).toBe(SOFER.nume);
+    expect(row.locatie).toBe('Nădlac');
+    expect(new Date(row.created_at).toISOString()).toBe(at);
+    expect(r.waybills_recalc).toBe(1);
+    const fuv = (await pool.query("SELECT diurna_externa FROM fuvarlevelek WHERE id='FUV-C'")).rows[0];
+    expect(Number(fuv.diurna_externa)).toBeGreaterThan(c0.externDays);
+
+    // duplikátum (±2 perc)
+    expect((await call('borderCrossingCreate', ADMIN, { email: SOFER.email, tip: 'Iesire', at })).ok).toBe(false);
+
+    // törlés: a sofőr GPS-sorát nem, az iroda által felvettet igen (diurna vissza)
+    const gps = await cross('Iesire', daysAgo(10));
+    expect((await call('borderCrossingDelete', ADMIN, { id: gps })).ok).toBe(false);
+    await pool.query('DELETE FROM border_crossings WHERE id=$1', [gps]);   // ne torzítsa a diurna-ellenőrzést
+    expect((await call('borderCrossingDelete', OTHER, { id: r.id })).ok).toBe(false);
+    const del = await call('borderCrossingDelete', ADMIN, { id: r.id });
+    expect(del.ok).toBe(true);
+    const fuv2 = (await pool.query("SELECT diurna_externa FROM fuvarlevelek WHERE id='FUV-C'")).rows[0];
+    expect(Number(fuv2.diurna_externa)).toBe(c0.externDays);
+  });
 });
