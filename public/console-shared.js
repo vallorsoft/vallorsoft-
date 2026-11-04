@@ -3065,7 +3065,12 @@ function printPdfView(){
 // ===== Menetlevél megtekintés / szerkesztés (Admin/Manager) =====
 function feEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-function feRowPunct(p){p=p||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1fr 2fr 1.2fr auto;gap:6px;align-items:center;">'
+// A pont rejtett mezői (stopId/orderId/role/time, GPS-cím jelölők) a data-meta-ban
+// utaznak, és mentéskor változatlanul visszakerülnek (különben a pont elveszítené
+// a fuvar-állomás kötését és a Plecare/Sosire óráját).
+function feRowPunct(p){p=p||{};var meta={};Object.keys(p).forEach(function(k){if(k!=='tip'&&k!=='loc'&&k!=='data')meta[k]=p[k];});
+  var gpsTag=(p.loc_source==='gps')?'<span class="badge info" title="'+feEsc((typeof t==='function'?t('sa.wbPlanned'):'Planificat')+': '+(p.loc_planned||''))+'" style="grid-column:1/-1;justify-self:start;">📍 '+feEsc(typeof t==='function'?t('sa.wbGpsTag'):'Adresă GPS')+'</span>':'';
+  return '<div class="fe-row" data-meta="'+feEsc(JSON.stringify(meta))+'" style="display:grid;grid-template-columns:1fr 2fr 1.2fr auto;gap:6px;align-items:center;">'+gpsTag
   +'<input class="input fe-p-tip" data-sg="punct_tip" placeholder="Tip" value="'+feEsc(p.tip)+'">'
   +'<input class="input fe-p-loc" data-sg="punct_loc" placeholder="Localitate" value="'+feEsc(p.loc)+'">'
   +'<input class="input fe-p-data" placeholder="Dată" value="'+feEsc(p.data)+'">'
@@ -3407,7 +3412,11 @@ function _sgRenderFromMap(el, map){
 
 function saveFuvEdit(){
   var id=document.getElementById('feId').value;
-  var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){return {tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value};});
+  var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){var m={};try{m=JSON.parse(r.getAttribute('data-meta')||'{}')||{};}catch(e){m={};}
+    var o=Object.assign({},m,{tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value});
+    // kézi átírás után a GPS-jelölés már nem igaz
+    if(o.loc_source==='gps'&&o.loc_gps&&o.loc!==o.loc_gps){delete o.loc_source;delete o.loc_gps;}
+    return o;});
   var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return {loc:r.querySelector('.fe-a-loc').value,data:((r.querySelector('.fe-a-data')||{}).value||''),tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0};});
   var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value,categorie:((r.querySelector('.fe-c-cat')||{}).value||'altele')};});
   var payload={

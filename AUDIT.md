@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 68. lépés — GPS-cím a menetlevélre (2026-11-04, PR #589) ✅ KÉSZ
+- Új író utak: `stopMatchDecide` `apply`/`unapply`, `stopMatchApplyBulk` (max. 500 pont), `stopMatchSettingsSave` (CSAK Admin; küszöb 30–200 közé szorítva) — Admin/Manager kapu + `stop-address` kapcsoló, a pont és a menetlevél is `company_id`-szűrt (`fuvarlevelek.company_id` horgony), paraméteres SQL, audit `order.stop_address.apply*`/`settings`. A menetlevélbe csak a felismert cím-szöveg kerül (500 karakter), az eredeti `loc_planned`-ben visszaállítható. Régi hiba javítva: az irodai menetlevél-szerkesztő eldobta a pontok rejtett kötés-mezőit (adat-integritás).
+
 ### 67. lépés — Tényleges fel-/lerakási címek a GPS-ből (2026-11-04, PR #588) ✅ KÉSZ
 - Új végpontok: `stopMatchList`/`stopMatchDecide`/`stopMatchRerun`/`stopMatchBackfill`/`stopMatchProbe` — CSAK Admin/Manager, `gps-integracio` + `stop-address` kapu; minden lekérdezés `company_id`-szűrt, paraméteres; a döntés előtt a pont tulajdona ellenőrzött (idegen pont → „nem található"); akció-fehérlista, cím 500 karakter, időszak max. 400 nap; audit `order.stop_address.*`. A sofőr-nézetek (`getMySoferOrders`, fuvar-kártya) explicit mezőlistát adnak — az `actual_*`/`match_*` NEM kerül ki. A CargoTrack-kulcs csak szerver-oldalon (AES), a mezőpróba csak mezőneveket + a releváns jelek értékét adja vissza. Külső hívás: Nominatim reverse (nem személyes adat — koordináta), DB-cache + 1 kérés/1,1 mp fojtás; felhasználói kérésben nincs await. GDPR: a GPS-ből származó állomás-hely/-idő a cég-exportba került.
 

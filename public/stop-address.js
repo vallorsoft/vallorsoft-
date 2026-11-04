@@ -59,6 +59,13 @@
         + '<button class="btn ghost" onclick="StopAddress.probe()">🛰️ ' + _t('sa.probe', 'Date dispozitiv GPS') + '</button>'
         + '</div>'
         + '<div id="saCounts" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;"></div>'
+        + '<div id="saSettings" style="margin-top:12px;padding:10px 12px;border:1px solid rgba(148,163,184,0.35);border-radius:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
+        + '<label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;"><input type="checkbox" id="saAuto" style="width:18px;height:18px;"> 📄 ' + _t('sa.autoApply', 'Pune automat adresa pe foaia de parcurs') + '</label>'
+        + '<label style="display:flex;align-items:center;gap:6px;">' + _t('sa.minScore', 'peste') + ' <input type="number" class="input" id="saMin" min="30" max="200" step="5" style="width:90px;"> ' + _t('sa.points', 'pct') + '</label>'
+        + '<button class="btn" id="saSaveSet" onclick="StopAddress.saveSettings()">💾 ' + _t('sa.saveSet', 'Salvează') + '</button>'
+        + '<button class="btn" onclick="StopAddress.applyBulk()">📄 ' + _t('sa.applyBulk', 'Pune pe foile de parcurs toate confirmatele din perioadă') + '</button>'
+        + '<div class="text-muted" style="font-size:12px;flex-basis:100%;">' + _t('sa.autoHint', 'Recomandat: 80+ pct. Adresa originală rămâne salvată și poate fi restaurată oricând (↩).') + '</div>'
+        + '</div>'
         + '<div id="saProbe"></div>'
         + '</div>'
         + '<div class="glass" style="padding:10px 12px;"><div id="saBody" style="overflow-x:auto;"></div></div>';
@@ -66,6 +73,7 @@
       f.value = S.from; tt.value = S.to; st.value = S.status; q.value = S.q;
       q.addEventListener('keydown', function (e) { if (e.key === 'Enter') reload(); });
       st.addEventListener('change', reload);
+      ['saAuto', 'saMin'].forEach(function (id) { var el = box.querySelector('#' + id); if (el) el.addEventListener('change', function () { S.setTouched = true; }); });
     }
     return box;
   }
@@ -84,6 +92,10 @@
       if (!r || !r.ok) { body.innerHTML = '<div class="text-muted" style="padding:14px;">' + _e((r && r.err) || 'Eroare') + '</div>'; return; }
       S.rows = r.rows || [];
       renderCounts(r.counts || {}, r.queue || 0);
+      if (r.settings) {
+        var au = document.getElementById('saAuto'), mn = document.getElementById('saMin');
+        if (au && !S.setTouched) { au.checked = !!r.settings.auto_apply; mn.value = r.settings.min_score; }
+      }
       render();
     }).catch(function () { body.innerHTML = '<div class="text-muted" style="padding:14px;">Eroare de rețea</div>'; });
   }
@@ -129,6 +141,8 @@
         + '<div class="text-muted" style="font-size:12px;">' + _e(r.firma || '') + (r.data ? ' · ' + _e(r.data) : '') + '</div></td>'
         + '<td>' + (actual ? '<div>📍 ' + _e(actual) + (r.actual_lat != null ? ' <a href="' + osm(r.actual_lat, r.actual_lng) + '" target="_blank" rel="noopener">🗺️</a>' : '') + '</div>' : '<span class="text-muted">—</span>')
         + (r.gps_arrived_at ? '<div class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(r.gps_arrived_at)) + ' – ' + _e(dt(r.gps_left_at)) + (dm != null ? ' (' + dur(dm) + ')' : '') + '</div>' : '')
+        + (r.waybill_apply ? '<div style="margin-top:4px;"><span class="badge ok">📄 ' + (r.waybill_applied_at ? _t('sa.onWaybill', 'Pe foaia de parcurs') : _t('sa.wbWaiting', 'Se va pune pe foaia de parcurs')) + '</span></div>'
+          : (r.wb_count ? '' : '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _t('sa.noWaybill', 'Încă fără foaie de parcurs') + '</div>'))
         + (S.open[r.id] ? signalsHtml(det) : '')
         + '</td>'
         + '<td>' + (st ? '<span class="badge ' + st.cls + '">' + _t(st.k, st.d) + '</span>' : '<span class="badge">' + _t('sa.f.none', 'Neprocesat') + '</span>')
@@ -136,6 +150,9 @@
         + '<td style="white-space:nowrap;">'
         + ((r.match_status === 'auto' || r.match_status === 'suggested') ? '<button class="btn ok" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'confirm\')" title="' + _t('sa.a.confirm', 'Acceptă') + '">✓</button> ' : '')
         + (r.match_status !== 'rejected' && r.match_status ? '<button class="btn danger" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'reject\')" title="' + _t('sa.a.reject', 'Respinge') + '">✕</button> ' : '')
+        + (r.actual_address && r.match_status !== 'rejected' ? (r.waybill_apply
+            ? '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'unapply\')" title="' + _t('sa.a.unapply', 'Scoate de pe foaia de parcurs (restaurează adresa planificată)') + '">↩</button> '
+            : '<button class="btn" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'apply\')" title="' + _t('sa.a.apply', 'Pune pe foaia de parcurs') + '">📄</button> ') : '')
         + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.toggle(' + r.id + ')" title="' + _t('sa.a.details', 'Detalii / alt candidat') + '">' + (S.open[r.id] ? '▾' : '▸') + '</button> '
         + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.edit(' + r.id + ')" title="' + _t('sa.a.edit', 'Adresă manuală') + '">✏️</button> '
         + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.rerun(\'' + _e(r.order_id) + '\')" title="' + _t('sa.a.rerun', 'Recalculează cursa') + '">🔄</button>'
@@ -162,7 +179,8 @@
     var a = Object.assign({ stop_id: id, action: action }, extra || {});
     gas('stopMatchDecide', [a]).then(function (r) {
       if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
-      _toast(_t('sa.saved', 'Salvat'));
+      if (action === 'apply') _toast(r.total_waybills ? _t('sa.applied', 'Pus pe foile de parcurs') + ': ' + r.waybills : _t('sa.appliedLater', 'Se va pune pe foaia de parcurs când aceasta este trimisă'));
+      else _toast(_t('sa.saved', 'Salvat'));
       reload();
     });
   }
@@ -191,6 +209,26 @@
       gas('stopMatchBackfill', [{ from: S.from, to: S.to }]).then(function (r) {
         if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
         _toast(_t('sa.backfillQueued', 'Curse puse în coadă') + ': ' + r.queued);
+        reload();
+      });
+    },
+    saveSettings: function () {
+      var au = document.getElementById('saAuto'), mn = document.getElementById('saMin');
+      var v = { auto_apply: !!(au && au.checked), min_score: parseInt(mn && mn.value, 10) || 80 };
+      if (v.auto_apply && !window.confirm(_t('sa.autoConfirm', 'Adresele recunoscute peste pragul ales vor fi puse automat pe foile de parcurs (și pe cele deja trimise). Continui?'))) return;
+      gas('stopMatchSettingsSave', [v]).then(function (r) {
+        if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
+        S.setTouched = false;
+        _toast(_t('sa.saved', 'Salvat'));
+        reload();
+      });
+    },
+    applyBulk: function () {
+      readFilters();
+      if (!window.confirm(_t('sa.applyBulkConfirm', 'Pun adresele confirmate din perioada selectată pe foile de parcurs?'))) return;
+      gas('stopMatchApplyBulk', [{ from: S.from, to: S.to }]).then(function (r) {
+        if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
+        _toast(_t('sa.applied', 'Pus pe foile de parcurs') + ': ' + r.waybills + ' · ' + r.points + ' ' + _t('sa.pointsWb', 'puncte'));
         reload();
       });
     },

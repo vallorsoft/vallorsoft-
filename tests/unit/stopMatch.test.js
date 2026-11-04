@@ -146,3 +146,18 @@ describe('handlers/stopMatch', () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe('handlers/stopMatch — menetlevél-beállítás', () => {
+  beforeEach(() => { reset(); featureEnabled.mockReset().mockResolvedValue(true); });
+  test('a beállítást csak Admin mentheti', async () => {
+    const r = await call('stopMatchSettingsSave', { pozicio: 'Manager', company_id: 7, email: 'm@x.ro' }, { auto_apply: true, min_score: 80 });
+    expect(r.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+  test('küszöb korlátok közé szorítva', async () => {
+    pool.query.mockResolvedValue(rows([]));
+    const r = await call('stopMatchSettingsSave', ADMIN, { auto_apply: false, min_score: 5 });
+    expect(r.ok).toBe(true);
+    expect(r.settings.min_score).toBe(30);
+  });
+});
