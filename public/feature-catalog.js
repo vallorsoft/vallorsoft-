@@ -84,6 +84,7 @@ window.VS_FEATURES = [
   { key: 'pdf-settings',     label: 'PDF-sablonok 📄',             group: 'Rendszer' },
   { key: 'morning-digest',   label: 'Reggeli összefoglaló 📧',      group: 'Rendszer' },
   { key: 'gps-daily-track',  label: 'Napi GPS útvonal 🗺️',           group: 'Flotta' },
+  { key: 'stop-address',     label: 'Tényleges címek GPS-ből 📍',      group: 'Flotta' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },
   // ── Prémium funkció-gate-ek (csomag-szintű korlátozáshoz) ──────────────────
   { key: 'visszfuvar-radar',     label: 'Visszfuvar-radar 🎯',          group: 'Fuvarozás & Logisztika' },

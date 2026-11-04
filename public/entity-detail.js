@@ -333,7 +333,31 @@
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
       + '<div>' + statusBadge(o.status) + '</div>' + editLink + '</div>'
       + infoTable(rows)
-      + milestoneBlock(o);
+      + milestoneBlock(o)
+      + actualStopsBlock(T._data.stops || []);
+  }
+
+  // Tervezett vs. GPS szerinti tényleges fel-/lerakási hely (csak Admin/Manager)
+  function actualStopsBlock(stops) {
+    var withAct = stops.filter(function (s) { return s.actual_address || s.actual_lat != null; });
+    if (!withAct.length) return '';
+    var stLbl = { auto: _t('sa.st.auto', 'Sigur'), suggested: _t('sa.st.suggested', 'Propunere'), confirmed: _t('sa.st.confirmed', 'Confirmat') };
+    var stCls = { auto: 'ok', suggested: 'warn', confirmed: 'ok' };
+    var rows = withAct.map(function (s) {
+      if (s.match_status === 'rejected') return '';
+      var tm = s.gps_arrived_at ? dt2(s.gps_arrived_at) + (s.gps_left_at ? ' – ' + dt2(s.gps_left_at) : '') : '';
+      var map = s.actual_lat != null ? ' <a href="https://www.openstreetmap.org/?mlat=' + encodeURIComponent(s.actual_lat) + '&mlon=' + encodeURIComponent(s.actual_lng) + '#map=17/' + encodeURIComponent(s.actual_lat) + '/' + encodeURIComponent(s.actual_lng) + '" target="_blank" rel="noopener">🗺️</a>' : '';
+      return '<div style="padding:7px 0;border-bottom:1px solid var(--border,rgba(148,163,184,0.25));font-size:13px;">'
+        + '<div style="font-weight:700;">' + (s.kind === 'pickup' ? '⬆️ ' : '⬇️ ') + _esc(s.loc || '') + (s.firma ? ' · ' + _esc(s.firma) : '')
+        + (s.match_status ? ' <span class="badge ' + (stCls[s.match_status] || 'info') + '">' + _esc(stLbl[s.match_status] || s.match_status) + '</span>' : '') + '</div>'
+        + '<div>📍 ' + _esc(s.actual_address || '') + map + '</div>'
+        + (tm ? '<div class="text-muted">⏱ ' + _esc(tm) + '</div>' : '')
+        + '</div>';
+    }).join('');
+    return '<div style="margin-top:16px;">'
+      + '<div style="font-weight:700;margin-bottom:6px;color:var(--text-primary);">📍 ' + _t('sa.detailTitle', 'Adrese reale (GPS)') + '</div>'
+      + '<div style="border:1px solid rgba(99,102,241,0.18);border-radius:10px;padding:4px 14px;">' + rows + '</div>'
+      + '</div>';
   }
 
   // ════════════════ FUVAR — Dokumentumok ════════════════

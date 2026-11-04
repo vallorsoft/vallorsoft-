@@ -260,10 +260,22 @@ handlers.getOrderDetail = async function (req, res, args) {
       [cid, id]
     );
 
+    // 7) Állomások tervezett vs. GPS szerinti tényleges helye (csak Admin/Manager —
+    // ez a handler _isAdminOrManager-kapus). Migráció-toleráns.
+    let stopRows = [];
+    try {
+      stopRows = (await pool.query(
+        `SELECT id, kind, loc, firma, data::text AS data, actual_address, actual_lat, actual_lng,
+                gps_arrived_at, gps_left_at, match_score, match_status
+           FROM order_stops WHERE order_id = $1 AND company_id = $2
+          ORDER BY COALESCE(seq_index, 999999), (kind = 'pickup') DESC, stop_index`, [id, cid])).rows;
+    } catch (_) { stopRows = []; }
+
     return res.json({
       result: {
         ok: true,
         order: order,
+        stops: stopRows,
         documents: docR.rows,
         pod: podR.rows,
         invoices: invR.rows,

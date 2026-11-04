@@ -1689,4 +1689,54 @@ function startGpsTrackHistoryScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler };
+// ── Tényleges fel-/lerakási címek a GPS-ből (lib/stopMatchRunner) ──
+// Háttérben dolgozza fel a fuvarokat (új / részleges / kézzel újrasorba tett),
+// körönként legfeljebb STOP_MATCH_PER_ROUND fuvart, időkerettel. A Nominatim
+// fair-use miatt a reverse-geokód fojtott (1 kérés / 1,1 mp) és cache-elt.
+function startStopMatchScheduler() {
+  const runner = require('../lib/stopMatchRunner');
+  const { featureEnabled } = require('../lib/featureEnabled');
+  const MIN = Math.max(2, parseInt(process.env.STOP_MATCH_INTERVAL_MIN, 10) || 5);
+  const PER_ROUND = Math.max(1, Math.min(100, parseInt(process.env.STOP_MATCH_PER_ROUND, 10) || 15));
+  const BUDGET_MS = 4 * 60 * 1000;
+  let running = false;
+  const featCache = new Map();
+  async function allowed(cid) {
+    const c = featCache.get(cid);
+    if (c && Date.now() - c.t < 10 * 60 * 1000) return c.v;
+    const v = (await featureEnabled(cid, 'gps-integracio')) && (await featureEnabled(cid, 'stop-address'));
+    featCache.set(cid, { v, t: Date.now() });
+    return v;
+  }
+  async function tick() {
+    if (running) return;
+    running = true;
+    const t0 = Date.now();
+    try {
+      let queue = [];
+      try { queue = await runner.pickQueue(PER_ROUND * 3); } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] sor hiba', e.message); return; }
+      let n = 0;
+      for (const q of queue) {
+        if (n >= PER_ROUND || Date.now() - t0 > BUDGET_MS) break;
+        if (!(await allowed(q.company_id))) continue;
+        n++;
+        try { await runner.matchOrder(q.company_id, q.id); }
+        catch (e) {
+          console.warn('[StopMatch] fuvar hiba', q.id, e.message);
+          await pool.query(
+            `INSERT INTO stop_match_state (order_id, company_id, status, attempts, attempted_at, requeued, note)
+             VALUES ($1,$2,'error',1,NOW(),false,$3)
+             ON CONFLICT (order_id) DO UPDATE SET status='error', attempts=stop_match_state.attempts+1, attempted_at=NOW(), requeued=false, note=EXCLUDED.note`,
+            [q.id, q.company_id, String(e.message || '').slice(0, 300)]).catch(() => {});
+        }
+      }
+      if (n) console.log('[StopMatch] feldolgozva', n, 'fuvar');
+    } finally { running = false; }
+  }
+  setTimeout(tick, 4 * 60 * 1000);
+  const interval = setInterval(tick, MIN * 60 * 1000);
+  console.log('[StopMatch] Tényleges cím-felismerő elindítva (' + MIN + ' perces ciklus).');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler };

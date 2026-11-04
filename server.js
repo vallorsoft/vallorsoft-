@@ -237,7 +237,7 @@ app.use((err, req, res, next) => {
 // e-mailek/push-ok/IMAP-feldolgozás), és csak a DB-migrációk UTÁN indulnak
 // (friss deploynál az első tick ne fusson hiányzó táblába). lib/schedulerLeader.js
 const schedulerLeader = require('./lib/schedulerLeader');
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler } = require('./services/scheduler');
 function startAllSchedulers() {
   startIntakeScheduler();
   startExpiryScheduler();
@@ -255,6 +255,7 @@ function startAllSchedulers() {
   startMorningDigestScheduler();     // Reggeli összefoglaló (cégenként állítható, alap 07:00 Europe/Bucharest)
   startGpsDailyTrackScheduler();     // Napi GPS útvonal (breadcrumb) — 10 percenként, mozgás-szűrővel
   startGpsTrackHistoryScheduler();   // GPS útvonal-előzmény: teljes pont-sor naponként mentve + úthálózatra illesztve
+  startStopMatchScheduler();         // tényleges fel-/lerakási címek a GPS-ből (csak Admin/Manager látja)
   startChatHistoryCleanup();         // AI-chat beszélgetések: megőrzési idő (alap 365 nap) utáni törlés
 
   // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
