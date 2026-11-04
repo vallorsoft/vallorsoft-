@@ -241,6 +241,15 @@
       + '</div></div>';
     document.body.appendChild(el);
     el.addEventListener('click', function (e) { if (e.target === el) StopAddress.mapClose(); });
+    if (!document.getElementById('saMapCss')) {
+      var css = document.createElement('style'); css.id = 'saMapCss';
+      css.textContent = '.sa-poi-lbl{background:#ffffff;color:#1e1b4b;border:1px solid #7c3aed;font-weight:600;font-size:11px;padding:1px 5px;box-shadow:0 1px 3px rgba(0,0,0,.35);}'
+        + '.sa-poi-lbl:before{display:none;}'
+        + '.sa-near{margin-top:6px;font-size:12px;line-height:1.45;max-height:170px;overflow:auto;color:#0f172a;}'
+        + '.sa-near .text-muted{color:#475569 !important;}'
+        + '.sa-near-h{font-weight:700;margin-top:4px;color:#1e293b;}';
+      document.head.appendChild(css);
+    }
     return el;
   }
   function mapRender(d) {
@@ -261,9 +270,10 @@
       L.control.layers(null, ov, { collapsed: false, position: 'topright' }).addTo(M.map);
       L.control.scale({ imperial: false }).addTo(M.map);
       M.layers = L.layerGroup().addTo(M.map);
+      M.near = L.layerGroup().addTo(M.map);   // a kijelölt pont körüli cégnevek
       M.map.on('click', function (e) { mapPickAt(e.latlng.lat, e.latlng.lng, null, null); });
     }
-    M.layers.clearLayers();
+    M.layers.clearLayers(); M.near.clearLayers(); M.nearSeq = (M.nearSeq || 0) + 1;
     var bounds = [];
     (d.lines || []).forEach(function (ln) {
       var ll = decodePl(ln.p); if (ll.length < 2) return;
@@ -290,7 +300,7 @@
       // a (automatikusan vagy kézzel) kiválasztott pont — zöld, felül
       act = L.circleMarker([d.actual.lat, d.actual.lng], { radius: 11, color: '#ffffff', weight: 3, fillColor: '#16a34a', fillOpacity: 0.95 }).addTo(M.layers);
       act.bindPopup('<div style="min-width:200px;"><b>✓ ' + _e(_t('sa.mapChosen', 'Locul ales')) + '</b><br>📍 ' + _e(d.actual.address || (d.actual.lat + ', ' + d.actual.lng))
-        + (d.actual.from ? '<br><span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(d.actual.from)) + ' – ' + _e(dt(d.actual.to)) + '</span>' : '') + '</div>');
+        + (d.actual.from ? '<br><span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(d.actual.from)) + ' – ' + _e(dt(d.actual.to)) + '</span>' : '') + NEAR_BOX + '</div>');
       bounds.push([d.actual.lat, d.actual.lng]);
     }
     var f = M.focus, fp = null;
@@ -309,16 +319,55 @@
     if (fp) M.map.setView(fp, 17);
     else if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
     else M.map.setView([45.9, 24.9], 6);
+    if (act) act.on('popupopen', function () { loadNearby(d.actual.lat, d.actual.lng, act.getPopup()); });
     if (fp && f === 'actual' && act) setTimeout(function () { act.openPopup(); }, 150);
+    else if (fp) loadNearby(fp[0], fp[1], null);
     setTimeout(function () { M.map.invalidateSize(); }, 50);
   }
-  function mapPickAt(lat, lng, from, to, addr) {
+  var NEAR_BOX = '<!--near--><div class="sa-near"></div><!--/near-->';
+  function nearHtml(inner) { return '<!--near--><div class="sa-near">' + inner + '</div><!--/near-->'; }
+  // a kijelölt pont körüli cégek + utcák (szerveren OSM-ből): feliratok a térképen + lista a buborékban
+  function loadNearby(lat, lng, popup) {
+    var seq = M.nearSeq = (M.nearSeq || 0) + 1;
+    // a buborék tartalmát szövegként cseréljük (a Leaflet update() a régi tartalmat írná vissza)
+    var setBox = function (inner) {
+      if (!popup || !popup.getContent) return;
+      var c = popup.getContent();
+      if (typeof c !== 'string' || c.indexOf('<!--near-->') < 0) return;
+      popup.setContent(c.replace(/<!--near-->[\s\S]*<!--\/near-->/, nearHtml(inner)));
+    };
+    setBox('<span class="text-muted">⏳ ' + _e(_t('sa.nearLoading', 'Firme și străzi din apropiere…')) + '</span>');
+    gas('stopMatchNearby', [{ lat: lat, lng: lng }]).then(function (r) {
+      if (seq !== M.nearSeq || !M.map) return;
+      M.near.clearLayers();
+      var places = (r && r.ok && r.places) || [], streets = (r && r.ok && r.streets) || [];
+      places.slice(0, 15).forEach(function (p) {
+        var lbl = p.name + (p.street ? ' · ' + p.street : '');
+        L.circleMarker([p.lat, p.lng], { radius: 5, color: '#ffffff', weight: 2, fillColor: '#7c3aed', fillOpacity: 1 })
+          .addTo(M.near)
+          .bindTooltip(_e(p.name), { permanent: true, interactive: true, direction: 'right', offset: [6, 0], className: 'sa-poi-lbl' })
+          .on('click', function (ev) { L.DomEvent.stopPropagation(ev); mapPickAt(p.lat, p.lng, null, null, lbl, true); });
+      });
+      if (!r || !r.ok || r.available === false) { setBox('<span class="text-muted">' + _e(_t('sa.nearNone', 'Lista firmelor din apropiere nu este disponibilă acum.')) + '</span>'); }
+      else {
+        var h = '';
+        if (places.length) h += '<div class="sa-near-h">🏢 ' + _e(_t('sa.nearFirms', 'Firme în apropiere')) + '</div>'
+          + places.slice(0, 8).map(function (p) { return '<div>' + _e(p.name) + (p.street ? ' <span class="text-muted">· ' + _e(p.street) + '</span>' : '') + ' <span class="text-muted">' + p.dist + ' m</span></div>'; }).join('');
+        if (streets.length) h += '<div class="sa-near-h">🛣️ ' + _e(_t('sa.nearStreets', 'Străzi')) + '</div>'
+          + '<div>' + streets.slice(0, 5).map(function (x) { return _e(x.name) + ' <span class="text-muted">' + x.dist + ' m</span>'; }).join(' · ') + '</div>';
+        setBox(h || '<span class="text-muted">' + _e(_t('sa.nearEmpty', 'Nu sunt firme marcate pe hartă în apropiere.')) + '</span>');
+      }
+    });
+  }
+  function mapPickAt(lat, lng, from, to, addr, keepNear) {
     M.pick = { lat: lat, lng: lng, from: from, to: to };
     var html = '<div style="min-width:200px;">'
       + (addr ? '<div style="margin-bottom:4px;">📍 ' + _e(addr) + '</div>' : '<div style="margin-bottom:4px;">📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '</div>')
       + (from ? '<div class="text-muted" style="font-size:12px;margin-bottom:6px;">⏱ ' + _e(dt(from)) + ' – ' + _e(dt(to)) + '</div>' : '')
-      + '<button class="btn primary" style="padding:5px 12px;" onclick="StopAddress.mapConfirm()">✓ ' + _t('sa.mapUse', 'Aici a fost') + '</button></div>';
-    L.popup().setLatLng([lat, lng]).setContent(html).openOn(M.map);
+      + '<button class="btn primary" style="padding:5px 12px;" onclick="StopAddress.mapConfirm()">✓ ' + _t('sa.mapUse', 'Aici a fost') + '</button>'
+      + (keepNear ? '' : NEAR_BOX) + '</div>';
+    var pp = L.popup({ maxWidth: 320 }).setLatLng([lat, lng]).setContent(html).openOn(M.map);
+    if (!keepNear) loadNearby(lat, lng, pp);
   }
   function mapLoad(day, at) {
     var info = document.getElementById('saMapInfo');

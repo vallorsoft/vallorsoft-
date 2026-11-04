@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 71. lépés — Közeli cégek + utcák a cím-térképen (2026-11-04, PR #593) ✅ KÉSZ
+- Új olvasó végpont `stopMatchNearby` (Admin/Manager + `stop-address`/`gps-integracio` kapu): csak koordinátát fogad (tartomány-ellenőrzés), a külső hívás (Overpass/OSM, `lib/nearbyPlaces.js`) KIZÁRÓLAG szerveren, sorosítva (≥1 mp szünet), 18 mp timeouttal, ~11 m-es rácson 24 órás memória-cache-sel (max. 500 kulcs) — a kliens nem hív külső szolgáltatót, és cég-adat nem megy ki (csak a koordináta). A sugár 50–400 m-re szorítva. Hiba → üres lista, stack nem szivárog. A `map` akció a cégnevet csak a cache-ből veszi (nincs új külső hívás a mentéskor).
+
 ### 70. lépés — Térképes cím-kiválasztás (2026-11-04, PR #591) ✅ KÉSZ
 - Új olvasó végpont `stopMatchTrack` (Admin/Manager + `stop-address`/`gps-integracio` kapu): a pont és a fuvar `company_id`-szűrt JOIN-nal, a GPS-nap a fuvar saját rendszámára és ±3/4 napra korlátozva — más jármű/cég útvonala nem kérhető le. Új író akció `stopMatchDecide` `map`: koordináta-tartomány ellenőrzés, időbélyegek parse-olva, cím szerver-oldali reverse-geokódból, paraméteres SQL, audit. A háttér-újraszámolás csak a saját fuvarra fut.
 
