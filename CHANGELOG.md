@@ -20,7 +20,7 @@
   1. **Megállók** (`stopCheck`): a megállás ELŐTTI és UTÁNI menet szintje (2–15 km-re a megállótól, normál menetmagasság, fogyasztással korrigálva, járó motoros állás 2,5 L/h levonva) — a parkolás alatti szint (légrugó/dőlés) csak megerősítés. Küszöb 6 L, ≥20 perces állás, tankolásos állás kihagyva.
   2. **Bon ↔ tartály** (`receiptCheck`): a jármű menetleveleinek dízel-bonjai (AdBlue nélkül, időszakon belül) naponként vs. a mért emelkedés; ±1 nap éjféli illesztés; tűrés max(5 L, 3%); státusz hiány/egyezik/több/nem mérhető + GPS-ben látott, bon nélküli tankolás.
   3. **Fogyasztás** (`consumptionCheck`): tartály-szint / számláló / bon-alapú L/100km vs. a jármű saját 6 havi menetlevél-átlaga (fallback névleges); ≥2,5 L/100km eltérésnél becsült többlet-liter; szint-csökkenés vs. számláló eltérés.
-- **Felület:** 🔍 „Üzemanyag-ellenőrzés" kártya az összesítő alatt (Flotta → GPS útvonal), kattintható tétel → térkép. RO+HU i18n `gtr.fc.*`, cache-bust `?v=20261104fcheck`. +12 teszt (köztük egy valódi rendszám-normalizálási hiba a menetlevél-lekérdezésben, javítva). 1930 Jest zöld.
+- **Felület:** 🔍 „Üzemanyag-ellenőrzés" kártya az összesítő alatt (Flotta → GPS útvonal), kattintható tétel → térkép. RO+HU i18n `gtr.fc.*`, cache-bust `?v=20261104fcheck`. +12 teszt (köztük egy valódi rendszám-normalizálási hiba a menetlevél-lekérdezésben, javítva). 1929 Jest zöld.
 
 ## 2026-11-04 — ⛽ FIX: GPS tartály-szint — a lejtős „átfolyás" nem veszteség, tankolás csak ≥ 50 L (PR #584)
 - **Gyökér:** a két tartály két szondája lejtőn/billenéskor 15–30 L-t „mozgat"; a felismerő ezt veszteségnek vagy tankolásnak vette (5 hamis veszteség / 8 tankolás egy héten).
