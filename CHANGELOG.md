@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-04 — ⛽ FIX: GPS tartály-szint — a lejtős „átfolyás" nem veszteség, tankolás csak ≥ 50 L (PR #584)
+- **Gyökér:** a két tartály két szondája lejtőn/billenéskor 15–30 L-t „mozgat"; a felismerő ezt veszteségnek vagy tankolásnak vette (5 hamis veszteség / 8 tankolás egy héten).
+- **Javítás (`lib/gpsTrack.js` `levelFuel`, determinisztikus — nem AI):** tankolás csak ≥ 50 L, álló helyzetben (≤ 1 km mozgás), és ha a szint utána nem esik vissza. Veszteség: álló helyzetben ≥ 20 L, menet közben ≥ 40 L a várható fogyasztáson felül, ÉS a következő ~40 km-en (3 órán belül, tankolásig) a fogyasztással korrigált szint mediánja nem tér vissza a csökkenés felére — a lejtő okozta eltérés sík úton visszaáll, így kiesik. Új `moving` jelző a veszteségen. +4 teszt (a régi kóddal mind bukik).
+
 ## 2026-11-04 — 🛣️ FIX: GPS-útdíj „importSplitRoute" — sűrű, útra illesztett nyomvonal (PR #583)
 - **Gyökér:** a nyomvonal ~150 m-re ritkított nyers GPS-pontokból ment a HERE-nek; a HERE a nyomvonalat útvonal-geometriaként kezeli, a kanyart levágó ritka pontsort nem tudta egyben illeszteni → `importSplitRoute`, a nap elbukott, a felület mégis 0,00 €-t mutatott.
 - **Javítás:** a HERE a nap úthálózatra illesztett (OSRM, `gps_track_days.segments`) geometriáját kapja, ~25 m-re sűrítve (`densifyTrace`); még nem illesztett napot előbb illesztünk (`matchAndSaveDay`, max. 5/kérés); 20 000 pont fölött egymásba érő darabok; tartós split → felezés, végül a darabolt útvonalból számol `≈` közelítő jelöléssel. Cache-kulcs új számítási verzióval; a nyers nyomvonalas cache-sor illesztés után újraszámolódik.
