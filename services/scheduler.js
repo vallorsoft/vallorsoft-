@@ -1731,6 +1731,12 @@ function startStopMatchScheduler() {
         }
       }
       if (n) console.log('[StopMatch] feldolgozva', n, 'fuvar');
+      // a rátételt kért címek a közben beküldött menetlevelekre is
+      try {
+        const wb = require('../lib/stopWaybill');
+        const x = await wb.applyPending(50);
+        if (x.points) console.log('[StopMatch] menetlevélre téve', x.points, 'pont');
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] menetlevél-rátétel hiba', e.message); }
     } finally { running = false; }
   }
   setTimeout(tick, 4 * 60 * 1000);

@@ -4,6 +4,8 @@
 //    stopMatchDecide   — elfogadás / elvetés / másik jelölt / kézi cím
 //    stopMatchRerun    — egy fuvar újrafuttatása (háttérben, nem várjuk meg)
 //    stopMatchBackfill — visszamenőleges futtatás egy időszakra (sorba állítás)
+//    stopMatchApplyBulk — az időszak elfogadott címei a menetlevelekre
+//    stopMatchSettingsGet / stopMatchSettingsSave — automatikus rátétel + küszöb
 //    stopMatchProbe    — CargoTrack-eszköz nyers mezőinek felmérése
 //                        (tahográf / tengelysúly / ajtó jel van-e)
 //  CSAK Admin/Manager (a sofőr sehol nem kapja meg), company_id-szűrt,
@@ -14,6 +16,7 @@ const audit = require('../lib/audit');
 const { featureEnabled } = require('../lib/featureEnabled');
 const { decrypt } = require('../lib/crypto');
 const runner = require('../lib/stopMatchRunner');
+const wb = require('../lib/stopWaybill');
 
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
@@ -54,7 +57,9 @@ handlers.stopMatchList = async function (req, res, args) {
       `SELECT s.id, s.order_id, s.kind, s.seq_index, s.stop_index, s.loc, s.firma, s.data::text AS data,
               s.arrived_at, s.done_at, s.actual_lat, s.actual_lng, s.actual_address, s.actual_city, s.actual_country,
               s.gps_arrived_at, s.gps_left_at, s.match_score, s.match_source, s.match_status, s.match_detail,
-              s.matched_at, s.match_decided_by,
+              s.matched_at, s.match_decided_by, s.waybill_apply, s.waybill_applied_at,
+              (SELECT COUNT(*)::int FROM fuvarlevelek f WHERE f.company_id = s.company_id
+                  AND f.order_ids @> jsonb_build_array(s.order_id)) AS wb_count,
               o.fuvar_no, o.client, o.rendszam_camion, o.status AS order_status, o.nume_sofer
          FROM order_stops s
          JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
@@ -72,7 +77,8 @@ handlers.stopMatchList = async function (req, res, args) {
     try { queue = (await pool.query('SELECT COUNT(*)::int AS n FROM stop_match_state WHERE company_id=$1 AND requeued=true', [cid])).rows[0].n; } catch (_) {}
     const counts = {};
     for (const r of cnt.rows) counts[r.st] = r.n;
-    return res.json({ result: { ok: true, from, to, rows, counts, queue } });
+    const settings = await wb.getSettings(cid);
+    return res.json({ result: { ok: true, from, to, rows, counts, queue, settings } });
   } catch (err) {
     console.error('stopMatchList hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -87,7 +93,7 @@ handlers.stopMatchDecide = async function (req, res, args) {
     const id = parseInt(a.stop_id, 10);
     if (!id) return res.json({ result: { ok: false, err: 'Punct invalid' } });
     const cur = (await pool.query(
-      `SELECT id, order_id, kind, loc, firma, actual_lat, actual_lng, actual_address, actual_city, match_status, match_detail
+      `SELECT id, order_id, kind, loc, firma, actual_lat, actual_lng, actual_address, actual_city, match_status, match_detail, waybill_apply
          FROM order_stops WHERE id=$1 AND company_id=$2`, [id, cid])).rows[0];
     if (!cur) return res.json({ result: { ok: false, err: 'Punctul nu a fost găsit' } });
     const by = String(u.email || '').slice(0, 255);
@@ -119,8 +125,26 @@ handlers.stopMatchDecide = async function (req, res, args) {
         `UPDATE order_stops SET actual_address=$3, match_source='manual', match_status='confirmed', match_decided_by=$4
           WHERE id=$1 AND company_id=$2`, [id, cid, addr, by]);
       if (cur.actual_lat != null) { try { await runner.learnPlace(cid, { ...cur, actual_address: addr }); } catch (_) {} }
+    } else if (action === 'apply') {
+      if (!cur.actual_address) return res.json({ result: { ok: false, err: 'Nu există adresă de aplicat' } });
+      // a rátétel egyben elfogadás is
+      if (cur.match_status !== 'confirmed') {
+        await pool.query(`UPDATE order_stops SET match_status='confirmed', match_decided_by=$3 WHERE id=$1 AND company_id=$2`, [id, cid, by]);
+        try { await runner.learnPlace(cid, cur); } catch (_) {}
+      }
+      const x = await wb.applyStop(cid, id);
+      audit.fromReq(req, 'order.stop_address.apply', 'order', cur.order_id, { stop_id: id, points: x.points });
+      return res.json({ result: { ok: true, waybills: x.waybills || 0, points: x.points || 0, total_waybills: x.total_waybills || 0 } });
+    } else if (action === 'unapply') {
+      const x = await wb.applyStop(cid, id, { revert: true });
+      audit.fromReq(req, 'order.stop_address.unapply', 'order', cur.order_id, { stop_id: id, points: x.points });
+      return res.json({ result: { ok: true, points: x.points || 0 } });
     } else {
       return res.json({ result: { ok: false, err: 'Acțiune invalidă' } });
+    }
+    // ha a cím már rá volt téve a menetlevélre, a javított cím is oda kerül (elvetésnél vissza)
+    if (cur.waybill_apply) {
+      try { await wb.applyStop(cid, id, { revert: action === 'reject' }); } catch (e) { console.warn('[StopMatch] újra-rátétel hiba', e.message); }
     }
     audit.fromReq(req, 'order.stop_address.' + action, 'order', cur.order_id, { stop_id: id });
     return res.json({ result: { ok: true } });
@@ -172,6 +196,62 @@ handlers.stopMatchBackfill = async function (req, res, args) {
     return res.json({ result: { ok: true, queued: r.rowCount } });
   } catch (err) {
     console.error('stopMatchBackfill hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.stopMatchApplyBulk = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const a = (args && args[0]) || {};
+    const cid = u.company_id;
+    if (!isDay(a.from) || !isDay(a.to) || a.from > a.to) return res.json({ result: { ok: false, err: 'Perioadă invalidă' } });
+    const { rows } = await pool.query(
+      `SELECT s.id FROM order_stops s JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
+        WHERE s.company_id=$1 AND s.match_status='confirmed' AND s.actual_address IS NOT NULL
+          AND COALESCE(s.data, o.data_incarcare, o.created_at::date) BETWEEN $2::date AND $3::date
+        LIMIT 500`, [cid, a.from, a.to]);
+    let points = 0, waybills = 0;
+    for (const r of rows) {
+      const x = await wb.applyStop(cid, r.id);
+      if (x.ok) { points += x.points; waybills += x.waybills; }
+    }
+    audit.fromReq(req, 'order.stop_address.apply_bulk', 'company', String(cid), { from: a.from, to: a.to, stops: rows.length, points });
+    return res.json({ result: { ok: true, stops: rows.length, points, waybills } });
+  } catch (err) {
+    console.error('stopMatchApplyBulk hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.stopMatchSettingsGet = async function (req, res) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    return res.json({ result: { ok: true, settings: await wb.getSettings(u.company_id) } });
+  } catch (err) {
+    console.error('stopMatchSettingsGet hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.stopMatchSettingsSave = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    if (u.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Doar administratorul poate modifica această setare' } });
+    const a = (args && args[0]) || {};
+    const st = await wb.saveSettings(u.company_id, { auto_apply: a.auto_apply === true, min_score: a.min_score }, u.email);
+    audit.fromReq(req, 'order.stop_address.settings', 'company', String(u.company_id), st);
+    // bekapcsoláskor a már felismert, küszöb feletti címek is rákerülnek (háttérben)
+    if (st.auto_apply) {
+      pool.query(
+        `UPDATE order_stops SET waybill_apply = true
+          WHERE company_id=$1 AND waybill_apply = false AND actual_address IS NOT NULL
+            AND match_status IN ('auto','suggested','confirmed') AND match_score >= $2`, [u.company_id, st.min_score])
+        .catch((e) => console.warn('[StopMatch] auto-rátétel jelölés hiba', e.message));
+    }
+    return res.json({ result: { ok: true, settings: st } });
+  } catch (err) {
+    console.error('stopMatchSettingsSave hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

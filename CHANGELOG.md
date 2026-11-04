@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-11-04 — 📄 GPS szerinti cím a menetlevélre: kézi + automatikus rátétel küszöbbel (PR #589)
+- **Kérés:** az iroda tehesse rá a felismert tényleges címet a menetlevélre, és legyen kapcsolható, hogy egy pontszám felett ez automatikusan megtörténjen.
+- **Új `lib/stopWaybill.js`:** a menetlevél-pont (`fuvarlevelek.puncte[i]`) `stopId`-vel kötődik az állomáshoz; régi pontnál `orderId`+`role`, de csak ha a fuvarnak abból a fajtából egy állomása van. Az eredeti cím a `loc_planned`-be kerül, `loc_source='gps'` jelzi; ↩ visszaállítható; az irodában kézzel átírt címhez nem nyúl. `order_stops.waybill_apply` → a később beküldött menetlevélre is rákerül (ütemező `applyPending`).
+- **Beállítás** (`stop_match_settings`, migráció `db/zz-order-stop-waybill-apply.sql`): „Automatikus rátétel" + küszöb (alap 80, 30–200 közé szorítva) — CSAK Admin mentheti; bekapcsoláskor a már felismert, küszöb feletti címek is rákerülnek. A futtató a felismeréskor azonnal rátesz, ha a pont megfelel.
+- **Felület** (Flotta → 📍 Tényleges címek): 📄 rátétel (egyben elfogadás) / ↩ levétel soronként, „📄 A menetlevélen" jelvény, tömeges rátétel az időszak elfogadott címeire, beállítás-sáv. Új handlerek: `stopMatchApplyBulk`, `stopMatchSettingsGet/Save`; `stopMatchDecide` `apply`/`unapply` + javítás/elvetés után újra-rátétel.
+- **Hibajavítás (régi):** az irodai menetlevél-szerkesztő mentéskor eldobta a pont rejtett mezőit (`stopId`/`orderId`/`role`/`time`) → a pont elveszítette a fuvar-kötést és a Plecare/Sosire óráját. Most `data-meta`-ban megmarad; a GPS-címet jelvény mutatja.
+- **CargoTrack-eszköz mezőpróba eredménye** (B104VLR, B144VLR): `weight` és `din1–4_working_time` üres, `temperature` a motor hőfoka, tahográf-mező nincs → extra jel nem használható, a felismerés GPS-alapú marad.
+- **Ellenőrzés:** +7 teszt, 1953 Jest zöld; valódi Postgres 16-on: 144 migráció, automatikus rátétel, ↩/📄, később beküldött menetlevél; kontraszt-audit 0 hiba. Cache-bust `?v=20261104wbapply`.
+
 ## 2026-11-04 — 📍 Tényleges fel-/lerakási címek a GPS-ből, csak Admin/Manager (PR #588)
 - **Kérés:** a kiíráskor gyakran csak városnév kerül a fel-/lerakóhoz; a rendszer ismerje fel a GPS-ből a pontos helyet. A sofőr gombnyomása nem megbízható (akár 2 órával később nyomja), ezért arra nem épülhet.
 - **Motor `lib/stopMatch.js`:** a `detectStops` állásaiból telephely-látogatások (≥20 perc, `STOP_MATCH_MIN_MINUTES`; 400 m / 25 perc összevonás), majd a fuvar állomásaival **sorrendtartó párosítás (DP)**. Jelek: helymemória (+45), tervezett cég geokódolt helye (+35), település-távolság/-név, POI-név, úton kívül (illesztett útvonaltól), manőverezés, OSM-környezet (ipari + / kút-parkoló −), dátum, állás-hossz, tankolás (−), saját telephely (−). A gomb csak felső korlát (a „kész" után 45 percnél később kezdődő állás nem lehet). Szintek: `auto` (≥60 pont, ≥12 előny) / `suggested` (≥30) / `unmatched`.
