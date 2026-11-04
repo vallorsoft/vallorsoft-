@@ -97,6 +97,7 @@
           '</div>' +
           '<div id="gtrStatus" class="gtr-hint"></div>' +
           '<div id="gtrSummary"></div>' +
+          '<div id="gtrFuelCheck"></div>' +
           '<div id="gtrToll"></div>' +
           '<div id="gtrList" class="gtr-list"></div>' +
         '</div>' +
@@ -144,7 +145,7 @@
       if (!r || !r.ok) { st.textContent = (r && r.err) || tt('common.error', 'Eroare'); return; }
       _data = r;
       st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
-      renderSummary(r); renderList(r); drawMap(r);
+      renderSummary(r); renderFuelCheck(r); renderList(r); drawMap(r);
       renderTollCard(plate, from, to, !!r.days.length);
       if (r.missing_days) {
         st.textContent = (st.textContent ? st.textContent + ' ' : '') + '⏳ ' + tt('gtr.backfill', 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.', { n: r.missing_days });
@@ -175,6 +176,59 @@
       (T.pending_days ? '<div class="gtr-note">⏳ ' + esc(tt('gtr.pending', '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.', { n: T.pending_days })) + '</div>' : '') +
       '</div>';
   }
+
+  // ── Üzemanyag-ellenőrzés: 3 független mód (álló helyzet / bon / fogyasztás) ──
+  function renderFuelCheck(r) {
+    var el = document.getElementById('gtrFuelCheck');
+    if (!el) return;
+    var F = r.totals && r.totals.fuel_check;
+    if (!F) { el.innerHTML = ''; return; }
+    var fail = '<div class="gtr-fc-na">' + esc(tt('gtr.fc.failed', 'Nu s-a putut calcula acum.')) + '</div>';
+    var ok = function (txt) { return '<div class="gtr-fc-ok">✓ ' + esc(txt) + '</div>'; };
+    // 1) álló helyzet
+    var S = F.stops, s1;
+    if (!S || !S.ok) s1 = fail;
+    else if (!S.items.length) s1 = ok(tt('gtr.fc.stopsOk', '{n} opriri verificate — nicio lipsă.', { n: S.checked || 0 }));
+    else s1 = S.items.map(function (x) {
+      return '<div class="gtr-fc-it warn" data-gtr-ev="' + x.lat + '|' + x.lng + '"><span>' + esc(dayLabel(gtrDay(x.from))) + ' ' + hm(x.from) + '–' + hm(x.to) + '</span><b>−' + esc(num(x.liters, 'l')) + '</b>' +
+        '<small>' + esc(x.confirmed ? tt('gtr.fc.stopConfirmed', 'confirmat și de nivelul din parcare') : tt('gtr.fc.stopUnconfirmed', 'nivelul din parcare nu confirmă (suspensie/înclinare?) — verificați')) + '</small></div>';
+    }).join('');
+    // 2) bon ↔ mért
+    var R = F.receipts, s2;
+    if (!R || !R.ok) s2 = fail;
+    else if (!R.count) s2 = '<div class="gtr-fc-na">' + esc(tt('gtr.fc.noReceipts', 'Nu există bonuri de alimentare pe foile de parcurs din această perioadă.')) + '</div>';
+    else s2 = R.items.map(function (x) {
+      var cls = x.status === 'missing' ? 'warn' : (x.status === 'ok' ? 'good' : 'info');
+      var note = x.status === 'missing' ? tt('gtr.fc.rcMissing', 'în rezervor au ajuns cu {l} mai puțin', { l: num(x.diff_l, 'l') })
+        : x.status === 'extra' ? tt('gtr.fc.rcExtra', 'nivelul a crescut cu {l} mai mult decât bonul', { l: num(-x.diff_l, 'l') })
+        : x.status === 'not_measured' ? tt('gtr.fc.rcNotMeasured', 'creșterea nu se vede în GPS (sub 50 l sau lipsă date)')
+        : tt('gtr.fc.rcOk', 'corespunde');
+      return '<div class="gtr-fc-it ' + cls + '"><span>' + esc(dayLabel(x.day)) + (x.places.length ? ' · ' + esc(x.places.join(', ')) : '') + '</span>' +
+        '<b>' + esc(tt('gtr.fc.rcBon', 'bon')) + ' ' + esc(num(x.receipt_l, 'l')) + ' / GPS ' + esc(num(x.measured_l, 'l')) + '</b><small>' + esc(note) + '</small></div>';
+    }).join('') + (R.no_receipt && R.no_receipt.length ? '<div class="gtr-fc-na">' + esc(tt('gtr.fc.noBon', '{n} alimentare(i) văzute în GPS fără bon pe foaia de parcurs.', { n: R.no_receipt.length })) + '</div>' : '');
+    // 3) fogyasztás
+    var C = F.consumption, s3;
+    if (!C || !C.ok) s3 = fail;
+    else if (C.too_short) s3 = '<div class="gtr-fc-na">' + esc(tt('gtr.fc.tooShort', 'Perioadă prea scurtă (sub 300 km) pentru comparare.')) + '</div>';
+    else {
+      var names = { level: tt('gtr.fc.srcLevel', 'după nivel rezervor'), counter: tt('gtr.fc.srcCounter', 'după contorul vehiculului'), receipts: tt('gtr.fc.srcReceipts', 'după bonuri') };
+      s3 = C.sources.map(function (x) { return '<div class="gtr-fc-it"><span>' + esc(names[x.key] || x.key) + '</span><b>' + esc(num(x.l100, 'l/100km')) + '</b></div>'; }).join('') +
+        (C.baseline ? '<div class="gtr-fc-it"><span>' + esc(C.baseline_src === 'history' ? tt('gtr.fc.baseHist', 'media proprie (ultimele 6 luni)') : tt('gtr.fc.baseNom', 'consum nominal vehicul')) + '</span><b>' + esc(num(C.baseline, 'l/100km')) + '</b></div>'
+          : '<div class="gtr-fc-na">' + esc(tt('gtr.fc.noBase', 'Nu există medie de referință (foi de parcurs mai vechi sau consum nominal).')) + '</div>') +
+        (C.flags.length ? C.flags.map(function (f) {
+          return '<div class="gtr-fc-it warn"><span>' + esc(f.key === 'level_vs_counter' ? tt('gtr.fc.lvlVsCnt', 'nivelul a scăzut mai mult decât a consumat motorul') : (names[f.key] || f.key) + ' +' + num(f.over_l100, 'l/100km')) + '</span><b>≈ ' + esc(num(f.excess_l, 'l')) + '</b></div>';
+        }).join('') : (C.baseline ? ok(tt('gtr.fc.consOk', 'Consumul este în limite normale.')) : ''));
+    }
+    el.innerHTML = '<div class="gtr-sum gtr-fc"><div class="gtr-sum-h">🔍 ' + esc(tt('gtr.fc.title', 'Verificare combustibil')) + '</div>' +
+      '<div class="gtr-fc-sec"><div class="gtr-fc-h">1 · ' + esc(tt('gtr.fc.h1', 'Opriri — nivel înainte și după')) + '</div>' + s1 + '</div>' +
+      '<div class="gtr-fc-sec"><div class="gtr-fc-h">2 · ' + esc(tt('gtr.fc.h2', 'Bonuri de alimentare vs. rezervor')) + '</div>' + s2 + '</div>' +
+      '<div class="gtr-fc-sec"><div class="gtr-fc-h">3 · ' + esc(tt('gtr.fc.h3', 'Consum în perioadă')) + '</div>' + s3 + '</div>' +
+      '<div class="gtr-note">' + esc(tt('gtr.fc.hint', 'Fiecare verificare se calculează separat; o diferență mică pe o singură zi nu înseamnă neapărat o problemă.')) + '</div></div>';
+    el.querySelectorAll('[data-gtr-ev]').forEach(function (n) {
+      n.addEventListener('click', function () { var p = n.getAttribute('data-gtr-ev').split('|'); if (_map) _map.setView([+p[0], +p[1]], 14); });
+    });
+  }
+  function gtrDay(sec) { try { return new Intl.DateTimeFormat('sv-SE', { timeZone: TZ }).format(new Date(sec * 1000)); } catch (_) { return new Date(sec * 1000).toISOString().slice(0, 10); } }
 
   function renderList(r) {
     var el = document.getElementById('gtrList');
