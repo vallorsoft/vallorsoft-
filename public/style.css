@@ -5836,3 +5836,19 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #driverActivityBox .da-bc-badge{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid}
 #driverActivityBox .da-bc-edited{background:#eff6ff;color:#1d4ed8;border-color:#93c5fd}
 #driverActivityBox .da-bc-warn{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+
+/* ── GPS útvonal → 🛣️ Útdíj (HERE) kártya ─────────────────────────────── */
+#gpsDailyTrackBox .gtr-toll { display: flex; flex-direction: column; gap: 8px; }
+#gpsDailyTrackBox .gtr-tdet summary { cursor: pointer; font-weight: 700; font-size: 12.5px; color: #1e293b; padding: 4px 0; }
+#gpsDailyTrackBox .gtr-tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin: 6px 0; }
+#gpsDailyTrackBox .gtr-tf { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #334155; font-weight: 600; min-width: 0; }
+#gpsDailyTrackBox .gtr-tf .input, #gpsDailyTrackBox .gtr-tf .select { padding: 6px 8px; min-width: 0; font-size: 13px; }
+#gpsDailyTrackBox .gtr-src { font-style: normal; font-size: 11px; }
+#gpsDailyTrackBox .gtr-tsave { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #1e293b; font-weight: 600; margin: 4px 0; }
+#gpsDailyTrackBox .gtr-tres { display: flex; flex-direction: column; gap: 2px; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-tdet summary,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-tsave { color: #e2e8f0; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-tf { color: #cbd5e1; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-hint,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-row span,
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-day-sub { color: #a8b3c4; }

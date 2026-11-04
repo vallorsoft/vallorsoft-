@@ -29,6 +29,7 @@ const TRUCK_TYPES = ['straight', 'tractor', 'lightTruck'];
 const TUNNEL_CATS = ['B', 'C', 'D', 'E'];
 const HAZMAT_KINDS = ['explosive', 'gas', 'flammable', 'combustible', 'organic', 'poison', 'harmfulToWater'];
 const TRAILER_KINDS = ['standard', 'mega'];
+const EMISSION_CLASSES = require('../lib/tollProvider').EMISSION_CLASSES;
 
 handlers.vehicleList = async function (req, res, args) {
     try {
@@ -157,6 +158,8 @@ handlers.vehicleUpdate = async function (req, res, args) {
       if (f.tunnel_category !== undefined)    { updates.push(`tunnel_category = $${i++}`);    values.push(_enumOrNull(f.tunnel_category, TUNNEL_CATS)); }
       if (f.hazardous_goods !== undefined)    { updates.push(`hazardous_goods = $${i++}`);    values.push(_enumOrNull(f.hazardous_goods, HAZMAT_KINDS)); }
       if (f.fuel_per_100km !== undefined)     { updates.push(`fuel_per_100km = $${i++}`);     values.push(_numOrNull(f.fuel_per_100km)); }
+      // EURO emissziós osztály — a HERE GPS-útdíj (tolls[emissionType]) használja
+      if (f.emission_class !== undefined)     { updates.push(`emission_class = $${i++}`);     values.push(_enumOrNull(String(f.emission_class || '').toUpperCase(), EMISSION_CLASSES)); }
       // Üzemanyag-szint GPS-korrekció (+/- L). NULL = nincs korrekció (nyers érték).
       // A sofőr menetlevél „⛽ GPS-üzemanyag" gombja ezzel igazítja ki a lekért
       // tartály-szintet MIELŐTT a menetlevélbe kerül.
