@@ -97,6 +97,7 @@
           '</div>' +
           '<div id="gtrStatus" class="gtr-hint"></div>' +
           '<div id="gtrSummary"></div>' +
+          '<div id="gtrToll"></div>' +
           '<div id="gtrList" class="gtr-list"></div>' +
         '</div>' +
         '<div class="gtr-mapwrap"><div id="gtrMap" class="gtr-map"></div>' +
@@ -144,6 +145,7 @@
       _data = r;
       st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
       renderSummary(r); renderList(r); drawMap(r);
+      renderTollCard(plate, from, to, !!r.days.length);
       if (r.missing_days) {
         st.textContent = (st.textContent ? st.textContent + ' ' : '') + '⏳ ' + tt('gtr.backfill', 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.', { n: r.missing_days });
       }
@@ -310,6 +312,142 @@
       try { console.warn('[GpsTrack] pont-lekérés hiba', e); } catch (_) {}
       pop.setContent('<div class="gtr-pp-load">' + esc(tt('common.error', 'Eroare')) + '</div>');
     });
+  }
+
+  // ── 🛣️ Útdíj a GPS-útvonalból (HERE) ─────────────────────────────────────
+  // Kamion-paraméterek: az útvonaltervező alap-szerelvénye ← a jármű adata
+  // (gpsTollParams), a mezők szerkeszthetők; opcionálisan a járműre menthetők.
+  var TOLL_FIELDS = [
+    ['grossWeight', 'gtr.toll.gw', 'Masă totală (kg)', 'weight_kg'],
+    ['height', 'gtr.toll.h', 'Înălțime (cm)', 'height_cm'],
+    ['length', 'gtr.toll.l', 'Lungime (cm)', 'length_cm'],
+    ['width', 'gtr.toll.w', 'Lățime (cm)', 'width_cm'],
+    ['weightPerAxle', 'gtr.toll.wpa', 'Sarcină/ax max (kg)', 'weight_per_axle_kg'],
+    ['axleCount', 'gtr.toll.ax', 'Axe totale', 'axle_count'],
+    ['trailerCount', 'gtr.toll.tr', 'Remorci', 'trailer_count'],
+  ];
+  var _toll = { plate: null, from: null, to: null, info: null, seq: 0 };
+
+  function eur(v) { return v == null ? '—' : Number(v).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+
+  function renderTollCard(plate, from, to, hasDays) {
+    var el = document.getElementById('gtrToll');
+    if (!el) return;
+    var samePlate = _toll.plate === plate && _toll.info;
+    _toll.from = from; _toll.to = to;
+    if (!hasDays) { el.innerHTML = ''; return; }
+    if (samePlate) { drawTollForm(el); return; }
+    _toll.plate = plate; _toll.info = null;
+    var seq = ++_toll.seq;
+    el.innerHTML = '<div class="gtr-sum gtr-toll"><div class="gtr-sum-h">🛣️ ' + esc(tt('gtr.toll.title', 'Taxe de drum pe traseul GPS (HERE)')) + '</div>' +
+      '<div class="gtr-hint">⏳</div></div>';
+    _gas('gpsTollParams', [{ rendszam: plate }]).then(function (r) {
+      if (seq !== _toll.seq) return;
+      if (!r || !r.ok) { el.innerHTML = ''; return; }
+      _toll.info = r;
+      drawTollForm(el);
+    }).catch(function () { if (seq === _toll.seq) el.innerHTML = ''; });
+  }
+
+  function drawTollForm(el) {
+    var info = _toll.info, p = info.params || {}, fv = info.from_vehicle || {};
+    var fields = TOLL_FIELDS.map(function (f) {
+      var src = fv[f[0]] != null ? 'veh' : 'def';
+      return '<label class="gtr-tf"><span>' + esc(tt(f[1], f[2])) +
+        ' <i class="gtr-src ' + src + '" title="' + esc(src === 'veh' ? tt('gtr.toll.srcVeh', 'din datele vehiculului') : tt('gtr.toll.srcDef', 'implicit (planificator rută)')) + '">' + (src === 'veh' ? '🚚' : '⚙') + '</i></span>' +
+        '<input class="input" type="number" data-gtr-tp="' + f[0] + '" value="' + esc(p[f[0]] != null ? p[f[0]] : '') + '"></label>';
+    }).join('');
+    var ecOpts = '<option value="">' + esc(tt('gtr.toll.ecNone', '— nespecificat —')) + '</option>' +
+      (info.emission_classes || []).slice().reverse().map(function (c) {
+        return '<option value="' + esc(c) + '"' + (p.emissionClass === c ? ' selected' : '') + '>' + esc(c.replace('EURO', 'EURO ')) + '</option>';
+      }).join('');
+    el.innerHTML = '<div class="gtr-sum gtr-toll">' +
+      '<div class="gtr-sum-h">🛣️ ' + esc(tt('gtr.toll.title', 'Taxe de drum pe traseul GPS (HERE)')) + '</div>' +
+      '<div class="gtr-hint">' + esc(tt('gtr.toll.sub', 'Taxa se calculează pe traseul real înregistrat de GPS între cele două date.')) + '</div>' +
+      (info.has_here_key ? '' : '<div class="gtr-note">' + esc(tt('gtr.toll.noKey', 'Firma nu are cheie HERE — se afișează doar estimarea pe tarife (fără HERE).')) + '</div>') +
+      '<details class="gtr-tdet"' + (p.emissionClass ? '' : ' open') + '><summary>⚙️ ' + esc(tt('gtr.toll.params', 'Parametri camion')) + '</summary>' +
+        '<div class="gtr-tgrid">' + fields +
+          '<label class="gtr-tf"><span>' + esc(tt('gtr.toll.ec', 'Clasă EURO')) + ' <i class="gtr-src ' + (fv.emissionClass ? 'veh' : 'def') + '">' + (fv.emissionClass ? '🚚' : '⚙') + '</i></span>' +
+          '<select class="select" data-gtr-tp="emissionClass">' + ecOpts + '</select></label>' +
+        '</div>' +
+        '<div class="gtr-hint">🚚 ' + esc(tt('gtr.toll.srcVeh', 'din datele vehiculului')) + ' · ⚙ ' + esc(tt('gtr.toll.srcDef', 'implicit (planificator rută)')) + '</div>' +
+        (info.vehicle ? '<label class="gtr-tsave"><input type="checkbox" id="gtrTollSave"> ' + esc(tt('gtr.toll.save', 'Salvează parametrii pe vehicul')) + '</label>' : '') +
+      '</details>' +
+      '<button type="button" class="btn primary" id="gtrTollBtn">🛣️ ' + esc(tt('gtr.toll.calc', 'Calculează taxa de drum')) + '</button>' +
+      '<div id="gtrTollRes"></div>' +
+      '</div>';
+    document.getElementById('gtrTollBtn').addEventListener('click', calcToll);
+  }
+
+  function readTollParams() {
+    var out = {};
+    document.querySelectorAll('#gtrToll [data-gtr-tp]').forEach(function (n) {
+      var v = String(n.value || '').trim();
+      out[n.getAttribute('data-gtr-tp')] = v === '' ? null : v;
+    });
+    return out;
+  }
+
+  function saveParamsToVehicle(tp) {
+    var v = _toll.info && _toll.info.vehicle;
+    if (!v) return Promise.resolve();
+    var f = {};
+    TOLL_FIELDS.forEach(function (x) { if (tp[x[0]] != null) f[x[3]] = tp[x[0]]; });
+    f.emission_class = tp.emissionClass || '';
+    return _gas('vehicleUpdate', [v.id, f]).then(function (r) {
+      if (r && r.ok) {
+        _toll.info.from_vehicle = Object.assign({}, _toll.info.from_vehicle, tp);
+        if (typeof toast === 'function') toast(tt('gtr.toll.saved', 'Parametrii au fost salvați pe vehicul.'), 'ok');
+      } else if (typeof toast === 'function') toast((r && r.err) || tt('common.error', 'Eroare'), 'err');
+    });
+  }
+
+  function calcToll() {
+    var btn = document.getElementById('gtrTollBtn');
+    var out = document.getElementById('gtrTollRes');
+    var tp = readTollParams();
+    var save = document.getElementById('gtrTollSave');
+    if (_toll.info) _toll.info.params = Object.assign({}, _toll.info.params, tp);
+    btn.disabled = true; btn.textContent = '⏳ ' + tt('gtr.toll.calcing', 'Se calculează… (prima dată poate dura)');
+    out.innerHTML = '';
+    var pre = save && save.checked ? saveParamsToVehicle(tp) : Promise.resolve();
+    pre.then(function () {
+      return _gas('gpsTrackToll', [{ rendszam: _toll.plate, from: _toll.from, to: _toll.to, truck: tp }]);
+    }).then(function (r) {
+      btn.disabled = false; btn.textContent = '🛣️ ' + tt('gtr.toll.calc', 'Calculează taxa de drum');
+      if (!r || !r.ok) { out.innerHTML = '<div class="gtr-note">' + esc((r && r.err) || tt('common.error', 'Eroare')) + '</div>'; return; }
+      out.innerHTML = tollResultHtml(r);
+    }).catch(function () {
+      btn.disabled = false; btn.textContent = '🛣️ ' + tt('gtr.toll.calc', 'Calculează taxa de drum');
+      out.innerHTML = '<div class="gtr-note">' + esc(tt('common.error', 'Eroare')) + '</div>';
+    });
+  }
+
+  function tollResultHtml(r) {
+    var h = '';
+    var est = r.estimate;
+    if (r.source === 'here') {
+      h += row(tt('gtr.toll.total', 'Taxă drum (HERE)'), eur(r.total), true);
+      if (r.km) h += row(tt('gtr.toll.km', 'Km potriviți pe drum (HERE)'), km(r.km));
+      (r.breakdown || []).forEach(function (b) { h += row('  ' + b.country, eur(b.cost)); });
+      if ((r.passes || []).length) {
+        h += '<div class="gtr-note">🎫 ' + esc(tt('gtr.toll.passes', 'Viniete / abonamente pe traseu (nu sunt incluse în total):')) + '<br>' +
+          r.passes.map(function (p) { return esc(p.country + (p.name ? ' · ' + p.name : '') + ' · ' + eur(p.cost)); }).join('<br>') + '</div>';
+      }
+      if (r.errors) h += '<div class="gtr-note">⚠️ ' + esc(tt('gtr.toll.errDays', '{n} zi(le) nu au putut fi calculate de HERE — vezi lista de mai jos.', { n: r.errors })) + '</div>';
+    }
+    if (est) h += row(tt('gtr.toll.estimate', 'Estimare pe tarife (comparație)'), eur(est.total));
+    if (r.emission_missing) h += '<div class="gtr-note">ℹ️ ' + esc(tt('gtr.toll.ecMissing', 'Clasa EURO nu este setată — în DE/AT taxa poate diferi semnificativ.')) + '</div>';
+    if (r.missing_days > 0) h += '<div class="gtr-note">⏳ ' + esc(tt('gtr.toll.missing', '{n} zi(le) fără traseu GPS salvat — taxa lor lipsește.', { n: r.missing_days })) + '</div>';
+    if (r.source === 'here' && (r.days || []).length) {
+      h += '<details class="gtr-tdet"><summary>📅 ' + esc(tt('gtr.toll.perDay', 'Pe zile')) + '</summary>' +
+        r.days.map(function (d) {
+          return '<div class="gtr-row"><span>' + esc(dayLabel(d.day)) + (d.cached ? ' ✓' : '') + '</span><b>' +
+            (d.error ? '⚠️ ' + esc(d.error) : esc(eur(d.total))) + '</b></div>';
+        }).join('') +
+        '<div class="gtr-hint">✓ ' + esc(tt('gtr.toll.cached', 'din calculul salvat (fără cost HERE nou)')) + '</div></details>';
+    }
+    return '<div class="gtr-tres">' + h + '</div>';
   }
 
   window.loadGpsDailyTrack = function () {
