@@ -192,7 +192,8 @@
         S.open[id] = true;
         setTimeout(function () { if (document.getElementById('saBody')) reload(); }, 20000);
       }
-      else _toast(_t('sa.saved', 'Salvat'));
+      else if (r.total_waybills) _toast(_t('sa.savedWb', 'Salvat și pus pe foaia de parcurs') + ': ' + (r.waybills || 0));
+      else _toast(_t('sa.savedWbLater', 'Salvat — se va pune pe foaia de parcurs când aceasta este trimisă'));
       reload();
     });
   }

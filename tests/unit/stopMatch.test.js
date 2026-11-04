@@ -2,7 +2,8 @@
 jest.mock('../../db', () => require('../helpers/db-mock').pool);
 jest.mock('../../lib/featureEnabled', () => ({ featureEnabled: jest.fn() }));
 jest.mock('../../lib/audit', () => ({ fromReq: jest.fn() }));
-jest.mock('../../lib/stopMatchRunner', () => ({ matchOrder: jest.fn(), learnPlace: jest.fn(), reversePlace: jest.fn() }));
+jest.mock('../../lib/stopMatchRunner', () => ({ matchOrder: jest.fn(), learnPlace: jest.fn(), reversePlace: jest.fn(),
+  formatAddress: (...a) => jest.requireActual('../../lib/stopMatchRunner').formatAddress(...a) }));
 
 const sm = require('../../lib/stopMatch');
 const { pool, rows, reset } = require('../helpers/db-mock');
@@ -248,7 +249,7 @@ describe('handlers/stopMatch — térképes kiválasztás', () => {
     const r = await call('stopMatchDecide', ADMIN, { stop_id: 9, action: 'map', lat: 48.4361, lng: 17.0219, from: '2026-10-07T08:00:00Z', to: '2026-10-07T09:00:00Z' });
     expect(r.ok).toBe(true);
     const upd = pool.query.mock.calls.find((c) => /match_source='map'/.test(c[0]));
-    expect(upd[1].slice(0, 5)).toEqual([9, 7, 48.4361, 17.0219, 'Str. X 1, Malacky, SK']);
+    expect(upd[1].slice(0, 5)).toEqual([9, 7, 48.4361, 17.0219, 'Str. X 1, Malacky, SK (48.43610, 17.02190)']);
     expect(runner.learnPlace).toHaveBeenCalled();
     expect(runner.requeueOpen).toHaveBeenCalledWith(7, 'O9');   // már elvetett pontnál nincs dupla negatív visszajelzés
     expect(runner.recordFeedback).not.toHaveBeenCalled();
@@ -260,3 +261,4 @@ describe('handlers/stopMatch — térképes kiválasztás', () => {
     expect(pool.query.mock.calls[0][1]).toEqual([99, 7]);
   });
 });
+

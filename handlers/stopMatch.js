@@ -149,8 +149,8 @@ handlers.stopMatchDecide = async function (req, res, args) {
       const c = cands[parseInt(a.cand_idx, 10)];
       if (!c || !isFinite(c.lat) || !isFinite(c.lng)) return res.json({ result: { ok: false, err: 'Candidat invalid' } });
       let place = null;
-      try { place = c.address ? null : await runner.reversePlace(c.lat, c.lng); } catch (_) {}
-      const addr = c.address || (place && place.address) || null;
+      try { place = await runner.reversePlace(c.lat, c.lng); } catch (_) {}   // cache-elt, fojtott
+      const addr = place ? runner.formatAddress(place, c.lat, c.lng) : runner.formatAddress(c.address ? { address: c.address } : null, c.lat, c.lng);
       const city = c.city || (place && place.city) || null;
       await pool.query(
         `UPDATE order_stops SET actual_lat=$3, actual_lng=$4, actual_address=$5, actual_city=$6, gps_arrived_at=$7, gps_left_at=$8,
@@ -166,14 +166,8 @@ handlers.stopMatchDecide = async function (req, res, args) {
       const ts = (v) => { const t = Date.parse(v); return isFinite(t) ? new Date(t).toISOString() : null; };
       let place = null;
       try { place = await runner.reversePlace(lat, lng); } catch (_) {}
-      let addr = (place && place.address) || (lat.toFixed(5) + ', ' + lng.toFixed(5));
-      // ha a reverse-geokód nem ad cégnevet: a térképen már lekért közeli cégek közül a legközelebbi (csak cache-ből)
-      if (!(place && place.name)) {
-        try {
-          const nm = nearbyPlaces.closestName(await nearbyPlaces.nearby(lat, lng, { cacheOnly: true }), 50);
-          if (nm && addr.indexOf(nm) < 0) addr = nm + ', ' + addr;
-        } catch (_) {}
-      }
+      // cégnév nélkül, a pontos koordinátával (a környező cég neve gyakran nem az, ahol az autó állt)
+      const addr = runner.formatAddress(place, lat, lng);
       await pool.query(
         `UPDATE order_stops SET actual_lat=$3, actual_lng=$4, actual_address=$5, actual_city=$6, actual_country=$7,
                 gps_arrived_at=$8, gps_left_at=$9, match_score=NULL, match_source='map', match_status='confirmed', match_decided_by=$10
@@ -208,12 +202,15 @@ handlers.stopMatchDecide = async function (req, res, args) {
     } else {
       return res.json({ result: { ok: false, err: 'Acțiune invalidă' } });
     }
-    // ha a cím már rá volt téve a menetlevélre, a javított cím is oda kerül (elvetésnél vissza)
-    if (cur.waybill_apply) {
-      try { await wb.applyStop(cid, id, { revert: action === 'reject' }); } catch (e) { console.warn('[StopMatch] újra-rátétel hiba', e.message); }
+    // kézi megerősítés (elfogadás / jelölt / térkép / kézi cím) → a menetlevélre is rákerül (felülírja);
+    // elvetésnél, ha már rá volt téve, visszaáll az eredeti cím
+    let wbRes = null;
+    if (action !== 'reject' || cur.waybill_apply) {
+      try { wbRes = await wb.applyStop(cid, id, { revert: action === 'reject' }); } catch (e) { console.warn('[StopMatch] menetlevél-rátétel hiba', e.message); }
     }
-    audit.fromReq(req, 'order.stop_address.' + action, 'order', cur.order_id, { stop_id: id });
-    return res.json({ result: { ok: true } });
+    audit.fromReq(req, 'order.stop_address.' + action, 'order', cur.order_id, { stop_id: id, points: wbRes ? wbRes.points || 0 : 0 });
+    return res.json({ result: { ok: true, waybills: wbRes && wbRes.ok ? wbRes.waybills || 0 : 0,
+      total_waybills: wbRes && wbRes.ok ? wbRes.total_waybills || 0 : 0 } });
   } catch (err) {
     console.error('stopMatchDecide hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
