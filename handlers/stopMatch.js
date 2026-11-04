@@ -7,6 +7,7 @@
 //    stopMatchApplyBulk — az időszak elfogadott címei a menetlevelekre
 //    stopMatchSettingsGet / stopMatchSettingsSave — automatikus rátétel + küszöb
 //    stopMatchTrack    — a jármű útvonala + megállói egy napra (térképes kiválasztáshoz)
+//    stopMatchNearby   — a kijelölt pont körüli cégek + utcák neve (OSM)
 //    stopMatchProbe    — CargoTrack-eszköz nyers mezőinek felmérése
 //                        (tahográf / tengelysúly / ajtó jel van-e)
 //  CSAK Admin/Manager (a sofőr sehol nem kapja meg), company_id-szűrt,
@@ -19,6 +20,7 @@ const { decrypt } = require('../lib/crypto');
 const runner = require('../lib/stopMatchRunner');
 const wb = require('../lib/stopWaybill');
 const gt = require('../lib/gpsTrack');
+const nearbyPlaces = require('../lib/nearbyPlaces');
 
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
@@ -164,7 +166,14 @@ handlers.stopMatchDecide = async function (req, res, args) {
       const ts = (v) => { const t = Date.parse(v); return isFinite(t) ? new Date(t).toISOString() : null; };
       let place = null;
       try { place = await runner.reversePlace(lat, lng); } catch (_) {}
-      const addr = (place && place.address) || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+      let addr = (place && place.address) || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+      // ha a reverse-geokód nem ad cégnevet: a térképen már lekért közeli cégek közül a legközelebbi (csak cache-ből)
+      if (!(place && place.name)) {
+        try {
+          const nm = nearbyPlaces.closestName(await nearbyPlaces.nearby(lat, lng, { cacheOnly: true }), 50);
+          if (nm && addr.indexOf(nm) < 0) addr = nm + ', ' + addr;
+        } catch (_) {}
+      }
       await pool.query(
         `UPDATE order_stops SET actual_lat=$3, actual_lng=$4, actual_address=$5, actual_city=$6, actual_country=$7,
                 gps_arrived_at=$8, gps_left_at=$9, match_score=NULL, match_source='map', match_status='confirmed', match_decided_by=$10
@@ -321,6 +330,23 @@ const _isoDay = (v) => {
 const _pgDate = (v) => (v instanceof Date && !isNaN(v.getTime()))
   ? v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0')
   : _isoDay(v);
+
+// A térképen kijelölt pont körüli cégek + utcák neve (OSM / Overpass, szerveren cache-elve)
+handlers.stopMatchNearby = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const a = (args && args[0]) || {};
+    const lat = Number(a.lat), lng = Number(a.lng);
+    if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return res.json({ result: { ok: false, err: 'Coordonate invalide' } });
+    }
+    const r = await nearbyPlaces.nearby(lat, lng, { radius: a.radius });
+    return res.json({ result: { ok: true, available: r.ok !== false, places: r.places || [], streets: r.streets || [] } });
+  } catch (err) {
+    console.error('stopMatchNearby hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
 
 handlers.stopMatchTrack = async function (req, res, args) {
   try {

@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-04 — 🏢 Cím-térkép: a kijelölt pont körüli cégnevek + utcanevek (PR #593)
+- Ha a térképen pont van kijelölve (zöld „Kiválasztott hely", jelölt, állás vagy kattintás), a pont körüli ~200 m-ben lévő cégek/létesítmények neve feliratként megjelenik a térképen (lila pont + névcímke; rákattintva kiválasztható), a buborékban pedig lista: 🏢 közeli cégek (utca, házszám, távolság) + 🛣️ utcák.
+- Forrás: OpenStreetMap (Overpass API, ingyenes, kulcs nélkül), szerveren lekérve és cache-elve (`lib/nearbyPlaces.js`, `handlers/stopMatch.js` `stopMatchNearby`). Térképes mentéskor, ha a cím nem tartalmaz cégnevet, a legközelebbi (≤50 m) cég neve elé kerül.
+- i18n `sa.near*` (RO+HU), cache-bust `?v=20261104nearby`; teszt `tests/unit/nearbyPlaces.test.js`.
+
 ## 2026-11-04 — 🛰️ Térkép: megnyitáskor a találatra közelít + utcák és nevek a műholdképen (PR #592)
 - `public/stop-address.js`: a térkép-ablak megnyitáskor (🗺️ és 🛰️ egyaránt) egyből a kiválasztott pontra közelít (zoom 17); ha nincs, a legjobb jelöltre; csak ha egyik sincs, mutatja a teljes napot. Új ⤢ gomb: a nap teljes útvonala. Kézi napváltáskor a teljes nap látszik.
 - Hibrid nézet (mint a Google Térkép): a műholdképen Esri utak/utcanevek (`Reference/World_Transportation`) + település-/helynevek (`Reference/World_Boundaries_and_Places`), ki-be kapcsolható („Utcák és nevek"), + méretarány-vonalzó. Kulcs és díj nélkül, ugyanarról a hostról, mint a műholdkép.
