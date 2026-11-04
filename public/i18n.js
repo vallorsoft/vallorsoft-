@@ -1287,6 +1287,8 @@
     'sa.mapNoGps': { hu: 'Erre a napra nincs GPS-adat.', ro: 'Nu există date GPS pentru această zi.' },
     'sa.mapHint': { hu: 'Válassz egy állást (narancs), egy jelöltet (kék), vagy kattints bárhova, majd „Itt volt".', ro: 'Alege o staționare (portocaliu), un candidat (albastru) sau click oriunde pe hartă, apoi „Aici a fost".' },
     'sa.sig.map': { hu: 'térképen kiválasztva', ro: 'ales pe hartă' },
+    'sa.a.viewSat': { hu: 'Megnézés műholdas térképen', ro: 'Vezi pe harta satelit' },
+    'sa.mapChosen': { hu: 'Kiválasztott hely', ro: 'Locul ales' },
     'sa.detailTitle': { hu: 'Tényleges címek (GPS)', ro: 'Adrese reale (GPS)' },
     'sa.sig.memory': { hu: 'ismert hely', ro: 'loc cunoscut' },
     'sa.sig.firma': { hu: 'cég közel', ro: 'firma aproape' },

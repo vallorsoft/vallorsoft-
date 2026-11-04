@@ -330,6 +330,7 @@ handlers.stopMatchTrack = async function (req, res, args) {
     const id = parseInt(a.stop_id, 10);
     const st = (await pool.query(
       `SELECT s.id, s.kind, s.loc, s.firma, s.data, s.done_at, s.arrived_at, s.actual_lat, s.actual_lng, s.match_status, s.match_detail,
+              s.actual_address, s.gps_arrived_at, s.gps_left_at,
               o.rendszam_camion, o.data_incarcare, o.data_descarcare, o.fuvar_no, o.id AS order_id
          FROM order_stops s JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
         WHERE s.id=$1 AND s.company_id=$2`, [id, cid])).rows[0];
@@ -346,6 +347,11 @@ handlers.stopMatchTrack = async function (req, res, args) {
         ORDER BY day`, [cid, plate, lo, hi]);
     const days = dayRows.map((r) => r.day);
     let day = /^\d{4}-\d{2}-\d{2}$/.test(String(a.day || '')) && a.day >= lo && a.day <= hi ? a.day : null;
+    // a kiválasztott pont / jelölt napja (ha kérték), különben a tervezett nap
+    if (!day) {
+      const atDay = _isoDay(a.at) || (a.focus_actual ? _isoDay(st.gps_arrived_at) : null);
+      if (atDay && atDay >= lo && atDay <= hi) day = atDay;
+    }
     if (!day) day = days.includes(center) ? center : (days.find((d) => d >= center) || days[days.length - 1] || center);
     const row = (await pool.query(
       `SELECT points_json, segments FROM gps_track_days
@@ -367,7 +373,10 @@ handlers.stopMatchTrack = async function (req, res, args) {
     return res.json({ result: {
       ok: true, plate: st.rendszam_camion, fuvar_no: st.fuvar_no || st.order_id, day, days, center,
       planned: { kind: st.kind, loc: st.loc, firma: st.firma, data: _pgDate(st.data) },
-      actual: st.actual_lat != null ? { lat: st.actual_lat, lng: st.actual_lng, rejected: st.match_status === 'rejected' } : null,
+      actual: st.actual_lat != null ? { lat: st.actual_lat, lng: st.actual_lng, rejected: st.match_status === 'rejected',
+        address: st.actual_address || null, status: st.match_status || null,
+        from: st.gps_arrived_at ? new Date(st.gps_arrived_at).toISOString() : null,
+        to: st.gps_left_at ? new Date(st.gps_left_at).toISOString() : null } : null,
       candidates: Array.isArray(det.candidates) ? det.candidates.map((c) => ({ lat: c.lat, lng: c.lng, from: c.from, to: c.to, score: c.score, address: c.address })) : [],
       lines, stops } });
   } catch (err) {

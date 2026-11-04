@@ -142,7 +142,7 @@
         + '<div class="text-muted" style="font-size:12px;">' + _e(r.rendszam_camion || '') + (r.client ? ' · ' + _e(r.client) : '') + '</div></td>'
         + '<td><div>' + (r.kind === 'pickup' ? '⬆️ ' : '⬇️ ') + _e(r.loc || '—') + '</div>'
         + '<div class="text-muted" style="font-size:12px;">' + _e(r.firma || '') + (r.data ? ' · ' + _e(r.data) : '') + '</div></td>'
-        + '<td>' + (actual ? '<div>📍 ' + _e(actual) + (r.actual_lat != null ? ' <a href="' + osm(r.actual_lat, r.actual_lng) + '" target="_blank" rel="noopener">🗺️</a>' : '') + '</div>' : '<span class="text-muted">—</span>')
+        + '<td>' + (actual ? '<div>📍 ' + _e(actual) + (r.actual_lat != null ? ' <a href="javascript:void(0)" onclick="StopAddress.map(' + r.id + ',\'actual\')" title="' + _t('sa.a.viewSat', 'Vezi pe harta satelit') + '">🛰️</a>' : '') + '</div>' : '<span class="text-muted">—</span>')
         + (r.gps_arrived_at ? '<div class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(r.gps_arrived_at)) + ' – ' + _e(dt(r.gps_left_at)) + (dm != null ? ' (' + dur(dm) + ')' : '') + '</div>' : '')
         + (r.waybill_apply ? '<div style="margin-top:4px;"><span class="badge ok">📄 ' + (r.waybill_applied_at ? _t('sa.onWaybill', 'Pe foaia de parcurs') : _t('sa.wbWaiting', 'Se va pune pe foaia de parcurs')) + '</span></div>'
           : (r.wb_count ? '' : '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _t('sa.noWaybill', 'Încă fără foaie de parcurs') + '</div>'))
@@ -170,7 +170,7 @@
             return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid rgba(148,163,184,0.25);">'
               + '<span class="badge info">' + _e(c.score) + ' ' + _t('sa.points', 'pct') + '</span>'
               + (c.short ? '<span class="badge warn">' + _t('sa.shortStop', 'staționare scurtă') + '</span>' : '')
-              + '<span style="flex:1;min-width:200px;">📍 ' + _e(c.address || (c.lat + ', ' + c.lng)) + ' <a href="' + osm(c.lat, c.lng) + '" target="_blank" rel="noopener">🗺️</a></span>'
+              + '<span style="flex:1;min-width:200px;">📍 ' + _e(c.address || (c.lat + ', ' + c.lng)) + ' <a href="javascript:void(0)" onclick="StopAddress.map(' + r.id + ',' + i + ')" title="' + _t('sa.a.viewSat', 'Vezi pe harta satelit') + '">🛰️</a></span>'
               + '<span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(c.from)) + ' – ' + _e(dt(c.to)) + (m != null ? ' (' + dur(m) + ')' : '') + '</span>'
               + '<button class="btn" style="padding:4px 10px;" onclick="StopAddress.pick(' + r.id + ',' + i + ')">' + _t('sa.a.pick', 'Alege') + '</button>'
               + '</div>';
@@ -219,6 +219,7 @@
     el = document.createElement('div');
     el.className = 'modal-back';
     el.id = 'saMapModal';
+    el.style.zIndex = '1100';   // a fuvar-adatlap fölött is
     el.innerHTML = '<div class="modal glass vs-light-surface" style="width:min(1000px,100%);max-height:94vh;display:flex;flex-direction:column;gap:8px;">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<div id="saMapTitle" style="font-weight:800;flex:1;min-width:200px;"></div>'
@@ -232,6 +233,7 @@
       + '<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;" class="text-muted">'
       + '<span>━ ' + _t('sa.mapRoute', 'traseul camionului') + '</span>'
       + '<span>🟠 ' + _t('sa.mapStop', 'staționare (click pentru alegere)') + '</span>'
+      + '<span>🟢 ' + _t('sa.mapChosen', 'Locul ales') + '</span>'
       + '<span>🔵 ' + _t('sa.mapCand', 'candidat propus') + '</span>'
       + '<span>⚪ ' + _t('sa.mapRejected', 'loc respins') + '</span>'
       + '<span>👆 ' + _t('sa.mapAny', 'sau click oriunde pe hartă') + '</span>'
@@ -270,12 +272,24 @@
         .on('click', function (ev) { L.DomEvent.stopPropagation(ev); mapPickAt(s.lat, s.lng, s.from, s.to); });
       bounds.push([s.lat, s.lng]);
     });
+    var act = null;
     if (d.actual && d.actual.rejected) {
       L.circleMarker([d.actual.lat, d.actual.lng], { radius: 8, color: '#475569', weight: 2, fillColor: '#e2e8f0', fillOpacity: 0.9 })
         .addTo(M.layers).bindTooltip(_t('sa.mapRejected', 'loc respins'));
+    } else if (d.actual) {
+      // a (automatikusan vagy kézzel) kiválasztott pont — zöld, felül
+      act = L.circleMarker([d.actual.lat, d.actual.lng], { radius: 11, color: '#ffffff', weight: 3, fillColor: '#16a34a', fillOpacity: 0.95 }).addTo(M.layers);
+      act.bindPopup('<div style="min-width:200px;"><b>✓ ' + _e(_t('sa.mapChosen', 'Locul ales')) + '</b><br>📍 ' + _e(d.actual.address || (d.actual.lat + ', ' + d.actual.lng))
+        + (d.actual.from ? '<br><span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(d.actual.from)) + ' – ' + _e(dt(d.actual.to)) + '</span>' : '') + '</div>');
+      bounds.push([d.actual.lat, d.actual.lng]);
     }
-    if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+    var f = M.focus, fp = null;
+    if (f === 'actual' && d.actual) fp = [d.actual.lat, d.actual.lng];
+    else if (typeof f === 'number' && M.focusCand && M.focusCand.lat != null) fp = [M.focusCand.lat, M.focusCand.lng];
+    if (fp) M.map.setView(fp, 18);
+    else if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
     else M.map.setView([45.9, 24.9], 6);
+    if (fp && f === 'actual' && act) setTimeout(function () { act.openPopup(); }, 150);
     setTimeout(function () { M.map.invalidateSize(); }, 50);
   }
   function mapPickAt(lat, lng, from, to, addr) {
@@ -286,10 +300,11 @@
       + '<button class="btn primary" style="padding:5px 12px;" onclick="StopAddress.mapConfirm()">✓ ' + _t('sa.mapUse', 'Aici a fost') + '</button></div>';
     L.popup().setLatLng([lat, lng]).setContent(html).openOn(M.map);
   }
-  function mapLoad(day) {
+  function mapLoad(day, at) {
     var info = document.getElementById('saMapInfo');
     info.textContent = _t('sa.loading', 'Se încarcă…');
-    gas('stopMatchTrack', [{ stop_id: M.stopId, day: day || null }]).then(function (d) {
+    if (day && M.data && day !== M.data.day) M.focus = null;   // kézi napváltás: a teljes nap látszik
+    gas('stopMatchTrack', [{ stop_id: M.stopId, day: day || null, at: at || null, focus_actual: M.focus === 'actual' }]).then(function (d) {
       if (!d || !d.ok) { info.textContent = (d && d.err) || 'Eroare'; return; }
       M.data = d;
       var sel = document.getElementById('saMapDay');
@@ -351,11 +366,17 @@
         reload();
       });
     },
-    map: function (id) {
-      M.stopId = id; M.pick = null;
+    // focus: 'actual' (a kiválasztott pont) | jelölt-index | üres (teljes nap)
+    map: function (id, focus) {
+      M.stopId = id; M.pick = null; M.focus = (focus === undefined ? null : focus); M.focusCand = null;
+      if (typeof focus === 'number') {
+        var r = S.rows.find(function (x) { return x.id === id; });
+        var cands = (r && r.match_detail && Array.isArray(r.match_detail.candidates)) ? r.match_detail.candidates : [];
+        M.focusCand = cands[focus] || null;
+      }
       var el = ensureMapModal();
       el.classList.add('open');
-      mapLoad(null);
+      mapLoad(null, M.focusCand ? M.focusCand.from : null);
     },
     mapLoad: mapLoad,
     mapDay: function (delta) {
