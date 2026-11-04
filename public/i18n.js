@@ -1296,6 +1296,7 @@
     'gtr.fc.lvlVsCnt': { hu: 'a szint többet csökkent, mint amennyit a motor elfogyasztott', ro: 'nivelul a scăzut mai mult decât a consumat motorul' },
     'gtr.fc.consOk': { hu: 'A fogyasztás a szokásos határon belül van.', ro: 'Consumul este în limite normale.' },
     'gtr.fc.hint': { hu: 'Mindhárom ellenőrzés külön számol; egyetlen napon egy kis eltérés még nem feltétlenül probléma.', ro: 'Fiecare verificare se calculează separat; o diferență mică pe o singură zi nu înseamnă neapărat o problemă.' },
+    'gtr.matching': { hu: '{n} nap útra illesztése a háttérben fut — az oldal magától frissül.', ro: '{n} zi(le) se pun pe drum în fundal — pagina se actualizează singură.' },
     'gtr.losses': { hu: 'Üzemanyag-veszteség', ro: 'Pierderi de combustibil' },
     'gtr.lossTitle': { hu: 'Üzemanyag-veszteség (tartály-szintből)', ro: 'Pierdere de combustibil (din nivel rezervor)' },
     'gtr.lossHint': { hu: 'Hirtelen, a menet-fogyasztásnál nagyobb csökkenés — ellenőrizd (szivárgás, leeresztés).', ro: 'Scădere bruscă, peste consumul din mers — verificați (scurgere, golire).' },

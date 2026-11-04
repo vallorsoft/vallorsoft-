@@ -184,3 +184,32 @@ describe('gpsTrackPoint', () => {
     expect(r.body.result.ok).toBe(false);
   });
 });
+
+describe('gpsTrackRange — illesztés a háttérben', () => {
+  test('illesztetlen nap: a válasz NEM vár az OSRM-illesztésre', async () => {
+    setUser(ADMIN);
+    const gt = require('../../lib/gpsTrack');
+    let release;
+    const spy = jest.spyOn(gt, 'matchAndSaveDay').mockImplementation(() => new Promise((r) => { release = r; }));
+    const t0 = Date.parse('2026-10-01T05:00:00Z') / 1000;
+    const pts = [];
+    for (let i = 1; i <= 30; i++) pts.push([t0 + i * 60, 45.0 + i * 0.0015, 25.0, 60, 1, 1000 + i, null, 300 - i * 0.3]);
+    pool.query.mockImplementation(async (sql) => {
+      if (/FROM vehicle_gps_map/.test(sql)) return rows([{ rendszam: 'B104VLR', object_id: '7' }]);
+      if (/FROM gps_track_days/.test(sql) && /points_json/.test(sql)) return rows([{ company_id: CID, rendszam: 'B104VLR', day: '2026-10-01',
+        points_json: JSON.stringify(pts), point_count: pts.length, complete: true, segments: null, km_road: null, km_raw: 3,
+        match_source: null, matched_count: 0, matched_at: null }]);
+      return rows([]);
+    });
+    const r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2026-10-01', to: '2026-10-01' }]);
+    const res = r.body.result;
+    expect(res.ok).toBe(true);
+    expect(res.match_running).toBe(true);
+    expect(res.totals.pending_days).toBe(1);
+    expect(res.days[0].matched).toBe(false);
+    expect(spy).toHaveBeenCalledTimes(1);
+    release(null);
+    spy.mockRestore();
+  });
+});
+
