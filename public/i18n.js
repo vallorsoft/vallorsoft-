@@ -1273,7 +1273,7 @@
     'gtr.loss': { hu: 'Üzemanyag-veszteség', ro: 'Pierdere combustibil' },
     'gtr.losses': { hu: 'Üzemanyag-veszteség', ro: 'Pierderi de combustibil' },
     'gtr.lossTitle': { hu: 'Üzemanyag-veszteség (tartály-szintből)', ro: 'Pierdere de combustibil (din nivel rezervor)' },
-    'gtr.lossHint': { hu: 'Hirtelen, a menet-fogyasztásnál nagyobb csökkenés — ellenőrizd (lopás, szivárgás).', ro: 'Scădere bruscă, peste consumul din mers — verificați (furt, scurgere).' },
+    'gtr.lossHint': { hu: 'Hirtelen, a menet-fogyasztásnál nagyobb csökkenés — ellenőrizd (szivárgás, leeresztés).', ro: 'Scădere bruscă, peste consumul din mers — verificați (scurgere, golire).' },
     'gtr.loadingPt': { hu: 'Betöltés…', ro: 'Se încarcă…' },
     'gtr.ignOn': { hu: 'bekapcsolva', ro: 'pornit' },
     'gtr.ignOff': { hu: 'kikapcsolva', ro: 'oprit' },
