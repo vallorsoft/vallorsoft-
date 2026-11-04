@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-04 — 🗺️ Tényleges címek: több jelölt alacsony pontszámnál + kiválasztás térképen a napi útvonalról (PR #591)
+- **Kérés:** ha kevés pontszám jut egy helynek, több találatot adjon; ha elvetek egy találatot és nincs más javaslat, térképen lehessen kiválasztani, és mutassa, hol járt az autó az adott napon.
+- **Több jelölt** (`lib/stopMatchRunner.js`): nem „biztos" pontnál max. 8 jelölt, a rövidebb (≥ 8 perces) állásokból is (`buildCandidates` `minDwellSec`, `short` jelölés, max. 8 extra reverse-geokód / fuvar). Elvetéskor a fuvar a háttérben újraszámolódik, és az elvetett pont az elvetett hely NÉLKÜLI új jelölt-listát kapja (a döntés marad).
+- **Térképes kiválasztás:** új `stopMatchTrack` (Admin/Manager, `company_id`-szűrt) — a jármű adott napi útvonala (útra illesztett vagy ritkított nyers nyomvonal) + megállói + jelöltek + elvetett hely, napváltóval (a tervezett nap −3…+4, ★ = tervezett). A felületen 🗺️ gomb minden soron + a jelölt-panelben; narancs állás / kék jelölt / bárhova kattintás → „Itt volt" → `stopMatchDecide` `map` (koordináta-ellenőrzés, cím reverse-geokódból, az állás érkezés/távozás ideje, helymemória + tanulás).
+- i18n `sa.*` (RO+HU), cache-bust `?v=20261104map`. +3 teszt, 1962 Jest zöld; valódi Postgres 16 + headless Chromium: elvetés → térkép → állás kiválasztása → `confirmed`/`map`; kontraszt-audit 0 hiba.
+
 ## 2026-11-04 — 🧠 Tényleges cím-felismerés: tanul az iroda döntéseiből + azonos nevű települések + késői lerakás (PR #590)
 - **Kérés:** amit az iroda elfogad, abból tanuljon a rendszer a többi címnél is; van, amit csak másnap ismer fel → névegyezésnél is legyen találat; azonos nevű település (pl. Malacky SK / BG) esetén az számítson, ahol a jármű állt.
 - **Azonos nevű település** (`lib/stopMatch.js`): ha a jelölt hely neve egyezik a tervezett településsel, a geokódolt (esetleg rossz országba mutató) helytől mért távolság nem büntet (`homonym` jelzés); a reverse-geokódra választás (`prescore`) már nem a geokódolt helyre épít, így a valódi állás címe biztosan lekérődik. Névegyezés +20.

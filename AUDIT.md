@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 70. lépés — Térképes cím-kiválasztás (2026-11-04, PR #591) ✅ KÉSZ
+- Új olvasó végpont `stopMatchTrack` (Admin/Manager + `stop-address`/`gps-integracio` kapu): a pont és a fuvar `company_id`-szűrt JOIN-nal, a GPS-nap a fuvar saját rendszámára és ±3/4 napra korlátozva — más jármű/cég útvonala nem kérhető le. Új író akció `stopMatchDecide` `map`: koordináta-tartomány ellenőrzés, időbélyegek parse-olva, cím szerver-oldali reverse-geokódból, paraméteres SQL, audit. A háttér-újraszámolás csak a saját fuvarra fut.
+
 ### 69. lépés — Cím-felismerés tanulás (2026-11-04, PR #590) ✅ KÉSZ
 - Új táblák `stop_match_feedback` / `stop_match_bad_places` (`company_id`-horgony, nem személyes adat: jel-nevek, cég-telephely koordináta + normalizált cégnév). Írás csak a meglévő Admin/Manager döntés-úton (`stopMatchDecide`, tulajdon-ellenőrzés után), a jel-név 32 karakterre vágva, paraméteres SQL; az újraszámolás csak a saját cég fuvarjait állítja sorba (max. 300). Nincs új végpont.
 
