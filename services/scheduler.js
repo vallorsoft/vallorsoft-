@@ -1731,6 +1731,11 @@ function startStopMatchScheduler() {
         }
       }
       if (n) console.log('[StopMatch] feldolgozva', n, 'fuvar');
+      // régi formátumú címek (cégnévvel, koordináta nélkül) → új forma; egyszeri, idempotens
+      try {
+        const u = await runner.upgradeAddressFormat(200);
+        if (u.updated) console.log('[StopMatch] régi cím átírva', u.updated, '· menetlevél-pont', u.points);
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] régi cím átírás hiba', e.message); }
       // a rátételt kért címek a közben beküldött menetlevelekre is
       try {
         const wb = require('../lib/stopWaybill');

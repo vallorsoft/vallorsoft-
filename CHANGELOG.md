@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-04 — 🔁 Régi tényleges címek átírása koordinátás formára (PR #595)
+- A korábban felismert / megerősített címek (cégnévvel, koordináta nélkül) automatikusan az új formára íródnak: cégnév nélkül + „(lat, lng)" 5 tizedessel. Kézzel írt cím szövege megmarad, mögé kerül a koordináta. A megerősített (vagy menetlevélre kért) állomásnál a menetlevél pontja is frissül (az eredeti cím a `loc_planned`-ben marad; irodában kézzel átírt pont érintetlen).
+- `lib/stopMatchRunner.js` `upgradedAddress` + `upgradeAddressFormat` (csak a cache-elt reverse-geokódot használja, külső hívás nincs; idempotens — a már koordinátás címet nem fogja meg), a cím-felismerő ütemező minden körben lefuttatja (200/kör). Elvetett állomás kimarad. Teszt: `tests/unit/stopAddressFormat.test.js`.
+
 ## 2026-11-04 — 📄 Kézi megerősítés → menetlevél; cím cégnév helyett pontos koordinátával (PR #594)
 - A Tényleges címek fülön minden kézi megerősítés (✓ elfogadás, jelölt választása, térképes „Itt volt", kézi cím) azonnal a menetlevélre is rákerül (felülírja a pont címét; ha még nincs menetlevél, a később beküldöttre az ütemező teszi rá). Elvetésnél a már rátett cím visszaáll.
 - A felismert cím mostantól cégnév NÉLKÜL készül (a környező cég neve gyakran nem az, ahol az autó állt), helyette a pontos koordináta zárójelben: „Str. Fabricii 7, Cluj-Napoca, 400000, Cluj, RO (46.77120, 23.62360)". `lib/stopMatchRunner.js` `formatAddress`/`coordText` (a régi cache-sorokból is levágja a nevet); a térképes mentés már nem tesz elé közeli cégnevet.
