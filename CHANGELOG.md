@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-04 — 🛰️ Térkép: megnyitáskor a találatra közelít + utcák és nevek a műholdképen (PR #592)
+- `public/stop-address.js`: a térkép-ablak megnyitáskor (🗺️ és 🛰️ egyaránt) egyből a kiválasztott pontra közelít (zoom 17); ha nincs, a legjobb jelöltre; csak ha egyik sincs, mutatja a teljes napot. Új ⤢ gomb: a nap teljes útvonala. Kézi napváltáskor a teljes nap látszik.
+- Hibrid nézet (mint a Google Térkép): a műholdképen Esri utak/utcanevek (`Reference/World_Transportation`) + település-/helynevek (`Reference/World_Boundaries_and_Places`), ki-be kapcsolható („Utcák és nevek"), + méretarány-vonalzó. Kulcs és díj nélkül, ugyanarról a hostról, mint a műholdkép.
+- i18n `sa.mapLabels`/`sa.mapWhole` (RO+HU); cache-bust `?v=20261104hybrid`. Tisztán kliens-oldali.
+
 ## 2026-11-04 — 🗺️ Tényleges címek: több jelölt alacsony pontszámnál + kiválasztás térképen a napi útvonalról (PR #591)
 - **Kérés:** ha kevés pontszám jut egy helynek, több találatot adjon; ha elvetek egy találatot és nincs más javaslat, térképen lehessen kiválasztani, és mutassa, hol járt az autó az adott napon.
 - **Több jelölt** (`lib/stopMatchRunner.js`): nem „biztos" pontnál max. 8 jelölt, a rövidebb (≥ 8 perces) állásokból is (`buildCandidates` `minDwellSec`, `short` jelölés, max. 8 extra reverse-geokód / fuvar). Elvetéskor a fuvar a háttérben újraszámolódik, és az elvetett pont az elvetett hely NÉLKÜLI új jelölt-listát kapja (a döntés marad).

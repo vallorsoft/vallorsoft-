@@ -1283,6 +1283,8 @@
     'sa.mapCand': { hu: 'javasolt jelölt', ro: 'candidat propus' },
     'sa.mapRejected': { hu: 'elvetett hely', ro: 'loc respins' },
     'sa.mapAny': { hu: 'vagy kattints bárhova a térképen', ro: 'sau click oriunde pe hartă' },
+    'sa.mapLabels': { hu: 'Utcák és nevek', ro: 'Străzi și denumiri' },
+    'sa.mapWhole': { hu: 'A nap teljes útvonala', ro: 'Tot traseul zilei' },
     'sa.mapUse': { hu: 'Itt volt', ro: 'Aici a fost' },
     'sa.mapNoGps': { hu: 'Erre a napra nincs GPS-adat.', ro: 'Nu există date GPS pentru această zi.' },
     'sa.mapHint': { hu: 'Válassz egy állást (narancs), egy jelöltet (kék), vagy kattints bárhova, majd „Itt volt".', ro: 'Alege o staționare (portocaliu), un candidat (albastru) sau click oriunde pe hartă, apoi „Aici a fost".' },

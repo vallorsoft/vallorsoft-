@@ -226,6 +226,7 @@
       + '<button class="btn ghost" onclick="StopAddress.mapDay(-1)">‹</button>'
       + '<select class="select" id="saMapDay" style="width:auto;" onchange="StopAddress.mapLoad(this.value)"></select>'
       + '<button class="btn ghost" onclick="StopAddress.mapDay(1)">›</button>'
+      + '<button class="btn ghost" onclick="StopAddress.mapWhole()" title="' + _t('sa.mapWhole', 'Tot traseul zilei') + '">⤢</button>'
       + '<button class="btn" onclick="StopAddress.mapClose()">✕</button>'
       + '</div>'
       + '<div id="saMapInfo" class="text-muted" style="font-size:12px;"></div>'
@@ -250,6 +251,15 @@
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
         maxNativeZoom: 19, maxZoom: 20 }).addTo(M.map);
+      // hibrid nézet (mint a Google Térkép): utak + utcanevek + település-/helynevek a műholdkép fölött
+      var roads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+        maxNativeZoom: 19, maxZoom: 20, opacity: 0.9 });
+      var places = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+        maxNativeZoom: 19, maxZoom: 20 });
+      var labels = L.layerGroup([roads, places]).addTo(M.map);
+      var ov = {}; ov[_t('sa.mapLabels', 'Străzi și denumiri')] = labels;
+      L.control.layers(null, ov, { collapsed: false, position: 'topright' }).addTo(M.map);
+      L.control.scale({ imperial: false }).addTo(M.map);
       M.layers = L.layerGroup().addTo(M.map);
       M.map.on('click', function (e) { mapPickAt(e.latlng.lat, e.latlng.lng, null, null); });
     }
@@ -286,7 +296,17 @@
     var f = M.focus, fp = null;
     if (f === 'actual' && d.actual) fp = [d.actual.lat, d.actual.lng];
     else if (typeof f === 'number' && M.focusCand && M.focusCand.lat != null) fp = [M.focusCand.lat, M.focusCand.lng];
-    if (fp) M.map.setView(fp, 18);
+    else if (M.autoFocus) {
+      // megnyitáskor egyből a találatra: kiválasztott pont → legjobb jelölt → teljes nap
+      if (d.actual && !d.actual.rejected) { fp = [d.actual.lat, d.actual.lng]; f = 'actual'; }
+      else {
+        var c0 = (d.candidates || []).find(function (c) { return c.lat != null; });
+        if (c0) fp = [c0.lat, c0.lng];
+        else if (d.actual) fp = [d.actual.lat, d.actual.lng];
+      }
+    }
+    M.autoFocus = false;
+    if (fp) M.map.setView(fp, 17);
     else if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
     else M.map.setView([45.9, 24.9], 6);
     if (fp && f === 'actual' && act) setTimeout(function () { act.openPopup(); }, 150);
@@ -303,8 +323,8 @@
   function mapLoad(day, at) {
     var info = document.getElementById('saMapInfo');
     info.textContent = _t('sa.loading', 'Se încarcă…');
-    if (day && M.data && day !== M.data.day) M.focus = null;   // kézi napváltás: a teljes nap látszik
-    gas('stopMatchTrack', [{ stop_id: M.stopId, day: day || null, at: at || null, focus_actual: M.focus === 'actual' }]).then(function (d) {
+    if (day && M.data && day !== M.data.day) { M.focus = null; M.autoFocus = false; }   // kézi napváltás: a teljes nap látszik
+    gas('stopMatchTrack', [{ stop_id: M.stopId, day: day || null, at: at || null, focus_actual: M.focus === 'actual' || (M.autoFocus && M.focus == null) }]).then(function (d) {
       if (!d || !d.ok) { info.textContent = (d && d.err) || 'Eroare'; return; }
       M.data = d;
       var sel = document.getElementById('saMapDay');
@@ -368,7 +388,7 @@
     },
     // focus: 'actual' (a kiválasztott pont) | jelölt-index | üres (teljes nap)
     map: function (id, focus) {
-      M.stopId = id; M.pick = null; M.focus = (focus === undefined ? null : focus); M.focusCand = null;
+      M.stopId = id; M.pick = null; M.focus = (focus === undefined ? null : focus); M.focusCand = null; M.autoFocus = true;
       if (typeof focus === 'number') {
         var r = S.rows.find(function (x) { return x.id === id; });
         var cands = (r && r.match_detail && Array.isArray(r.match_detail.candidates)) ? r.match_detail.candidates : [];
@@ -384,6 +404,14 @@
       var i = sel.selectedIndex + delta;
       if (i < 0 || i >= sel.options.length) return;
       sel.selectedIndex = i; mapLoad(sel.value);
+    },
+    mapWhole: function () {
+      if (!M.map || !M.data) return;
+      var b = [];
+      (M.data.lines || []).forEach(function (ln) { b = b.concat(decodePl(ln.p)); });
+      (M.data.stops || []).forEach(function (s) { b.push([s.lat, s.lng]); });
+      if (M.data.actual) b.push([M.data.actual.lat, M.data.actual.lng]);
+      if (b.length) M.map.fitBounds(b, { padding: [30, 30], maxZoom: 17 });
     },
     mapClose: function () { var el = document.getElementById('saMapModal'); if (el) el.classList.remove('open'); if (M.map) M.map.closePopup(); },
     mapConfirm: function () {
