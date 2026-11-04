@@ -5852,3 +5852,8 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-hint,
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-row span,
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-day-sub { color: #a8b3c4; }
+#gpsDailyTrackBox .gtr-tday { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
+#gpsDailyTrackBox .gtr-tday span { color: #475569; }
+#gpsDailyTrackBox .gtr-tday.err b { color: #b91c1c; font-weight: 600; white-space: normal; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-tday span { color: #a8b3c4; }
+.main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-tday.err b { color: #fca5a5; }

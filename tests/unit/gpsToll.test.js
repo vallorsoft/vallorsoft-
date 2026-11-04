@@ -10,6 +10,7 @@ const maps = require('../../lib/mapsProvider');
 const { estimateFromPolyline } = require('../../lib/tollEstimate');
 const { featureEnabled } = require('../../lib/featureEnabled');
 const tp = require('../../lib/tollProvider');
+const gt = require('../../lib/gpsTrack');
 const h = require('../../handlers/gpsToll');
 
 function call(fn, user, arg) {
@@ -30,6 +31,8 @@ beforeEach(() => {
   maps.getConfig.mockReset(); maps.bump.mockReset();
   estimateFromPolyline.mockReset().mockResolvedValue({ total: 40, byCountry: [] });
   featureEnabled.mockReset().mockResolvedValue(true);
+  // az útra illesztés (OSRM) tesztben nem fut — alapból „nem sikerült"
+  jest.spyOn(gt, 'matchAndSaveDay').mockResolvedValue(null);
 });
 
 describe('gpsTollParams', () => {
@@ -119,5 +122,63 @@ describe('gpsTrackToll', () => {
     expect(r.errors).toBe(1);
     expect(r.days[0].error).toBe('Unauthorized');
     expect(maps.bump).toHaveBeenCalledTimes(1);
+  });
+
+  test('illesztett napnál az úthálózatra illesztett geometria megy a HERE-nek (nem a nyers pontok)', async () => {
+    const road = [[45.0, 25.0], [45.05, 25.02], [45.1, 25.05]];
+    pool.query
+      .mockResolvedValueOnce(GPSMAP).mockResolvedValueOnce(VEH)
+      .mockResolvedValueOnce(rows([{ day: '2026-10-01', points_json: JSON.stringify(pts(1790000000, 30)), point_count: 30,
+        matched_count: 30, segments: [{ p: gt.encodePolyline(road), k: 'm' }] }]))
+      .mockResolvedValue(rows([]));
+    maps.getConfig.mockResolvedValue({ vendor: 'here', key: 'K' });
+    const spy = jest.spyOn(tp, 'hereTollFromTrace').mockResolvedValue({ total: 5, km: 12, breakdown: [], passes: [], notices: [], calls: 2 });
+    const r = await call('gpsTrackToll', ADMIN, { rendszam: 'CV01ABC', from: '2026-10-01', to: '2026-10-01' });
+    expect(r.ok).toBe(true);
+    expect(gt.matchAndSaveDay).not.toHaveBeenCalled();
+    expect(spy.mock.calls[0][0]).toEqual(road);
+    expect(spy.mock.calls[0][3].depIso).toBe(new Date(1790000000 * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'));
+  });
+
+  test('még nem illesztett nap: előbb illeszt, és az eredményt használja', async () => {
+    const road = [[45.0, 25.0], [45.2, 25.2]];
+    gt.matchAndSaveDay.mockResolvedValue({ segments: [{ p: gt.encodePolyline(road), k: 'm' }] });
+    pool.query
+      .mockResolvedValueOnce(GPSMAP).mockResolvedValueOnce(VEH)
+      .mockResolvedValueOnce(rows([{ day: '2026-10-01', points_json: JSON.stringify(pts(1790000000, 30)), point_count: 30 }]))
+      .mockResolvedValue(rows([]));
+    maps.getConfig.mockResolvedValue({ vendor: 'here', key: 'K' });
+    const spy = jest.spyOn(tp, 'hereTollFromTrace').mockResolvedValue({ total: 5, km: 12, breakdown: [], passes: [], notices: [], calls: 2 });
+    await call('gpsTrackToll', ADMIN, { rendszam: 'CV01ABC', from: '2026-10-01', to: '2026-10-01' });
+    expect(gt.matchAndSaveDay).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toEqual(road);
+  });
+
+  test('nyers nyomvonalból készült cache-sor illesztés után újraszámolódik', async () => {
+    pool.query
+      .mockResolvedValueOnce(GPSMAP).mockResolvedValueOnce(VEH)
+      .mockResolvedValueOnce(rows([{ day: '2026-10-01', points_json: JSON.stringify(pts(1790000000, 30)), point_count: 30,
+        matched_count: 30, segments: [{ p: gt.encodePolyline([[45, 25], [45.1, 25.1]]), k: 'm' }] }]))
+      .mockResolvedValueOnce(rows([{ day: '2026-10-01', point_count: 30, total_eur: '1.00', km: '5', breakdown: [], passes: [], notices: ['vs:raw'] }]))
+      .mockResolvedValue(rows([]));
+    maps.getConfig.mockResolvedValue({ vendor: 'here', key: 'K' });
+    const spy = jest.spyOn(tp, 'hereTollFromTrace').mockResolvedValue({ total: 9, km: 12, breakdown: [], passes: [], notices: [], calls: 2 });
+    const r = await call('gpsTrackToll', ADMIN, { rendszam: 'CV01ABC', from: '2026-10-01', to: '2026-10-01' });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(r.total).toBe(9);
+    expect(r.cached_days).toBe(0);
+  });
+
+  test('közelítő (darabolt) nap jelölve; minden nap hibás → ok_days 0', async () => {
+    pool.query
+      .mockResolvedValueOnce(GPSMAP).mockResolvedValueOnce(VEH)
+      .mockResolvedValueOnce(rows([{ day: '2026-10-01', points_json: JSON.stringify(pts(1790000000, 30)), point_count: 30 }]))
+      .mockResolvedValue(rows([]));
+    maps.getConfig.mockResolvedValue({ vendor: 'here', key: 'K' });
+    jest.spyOn(tp, 'hereTollFromTrace').mockResolvedValue({ total: 3, km: 8, breakdown: [], passes: [], notices: ['importSplitRoute'], calls: 4, approx: true });
+    const r = await call('gpsTrackToll', ADMIN, { rendszam: 'CV01ABC', from: '2026-10-01', to: '2026-10-01' });
+    expect(r.approx_days).toBe(1);
+    expect(r.days[0].approx).toBe(true);
+    expect(r.ok_days).toBe(1);
   });
 });
