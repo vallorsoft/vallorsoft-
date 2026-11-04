@@ -144,3 +144,67 @@ describe('lib/tollProvider.hereTollFromTrace (ál-fetch)', () => {
     await expect(tp.hereTollFromTrace(line(5), 'KEY', null, { fetch })).rejects.toMatchObject({ message: 'Unauthorized', calls: 1 });
   });
 });
+
+describe('lib/tollProvider — sűrítés + darabolás (HERE Route Import)', () => {
+  const ok = (body) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
+  const tollResp = (v) => ({ routes: [{ sections: [{ summary: { length: 10000 }, tolls: [{ countryCode: 'HUN', fares: [{ price: { value: v, currency: 'EUR' } }] }] }] }] });
+
+  test('densifyTrace: legfeljebb ~25 m-es lépések, az álló ismétlés kiesik', () => {
+    const d = tp.densifyTrace([[45, 25], [45, 25], [45.01, 25]], { stepM: 25 });   // ~1,1 km
+    expect(d.length).toBeGreaterThan(40);
+    for (let i = 1; i < d.length; i++) {
+      const dm = Math.abs(d[i].lat - d[i - 1].lat) * 111320;
+      expect(dm).toBeLessThanOrEqual(26);
+    }
+    expect(d[d.length - 1]).toMatchObject({ lat: 45.01, lng: 25 });
+  });
+
+  test('az import a sűrített nyomvonalat kapja; az indulási idő a GPS-pontból jön', async () => {
+    let body = null, url = null;
+    const fetch = jest.fn((u, init) => {
+      if (u.includes('/v8/import')) { body = JSON.parse(init.body); url = u; return ok({ routes: [{ routeHandle: 'H' }] }); }
+      return ok(tollResp(3));
+    });
+    await tp.hereTollFromTrace([[1767225600, 45, 25], [1767225660, 45.01, 25]], 'K', null, { fetch });
+    expect(body.trace.length).toBeGreaterThan(40);
+    expect(url).toContain('departureTime=2026-01-01T00%3A00%3A00Z');
+  });
+
+  test('tartós importSplitRoute: felezés után a darabolt útvonalból számol, approx jelöléssel', async () => {
+    const fetch = jest.fn((u) => {
+      if (u.includes('/v8/import')) return ok({ notices: [{ code: 'importSplitRoute' }], routes: [{ routeHandle: 'HS' }] });
+      return ok(tollResp(4));
+    });
+    const r = await tp.hereTollFromTrace([[45, 25], [45.05, 25]], 'K', null, { fetch, maxDepth: 1 });
+    expect(r.approx).toBe(true);
+    expect(r.total).toBe(8);                 // 2 fél × 4
+    // 1 (egész, split) + 2 × [1 split + 1 import(elfogad) + 1 routes] = 7
+    expect(r.calls).toBe(7);
+    expect(r.notices).toContain('importSplitRoute');
+  });
+
+  test('nagy nyomvonal egymásba érő darabokban megy (maxPoints)', async () => {
+    const sizes = [];
+    const fetch = jest.fn((u, init) => {
+      if (u.includes('/v8/import')) { sizes.push(JSON.parse(init.body).trace.length); return ok({ routes: [{ routeHandle: 'H' }] }); }
+      return ok(tollResp(1));
+    });
+    const r = await tp.hereTollFromTrace([[45, 25], [45.05, 25]], 'K', null, { fetch, maxPoints: 100 });
+    expect(sizes.length).toBeGreaterThan(1);
+    sizes.forEach((n) => expect(n).toBeLessThanOrEqual(100));
+    expect(r.total).toBe(sizes.length);
+  });
+
+  test('beágyazott hiba esetén a hívásszám nem duplázódik', async () => {
+    let n = 0;
+    const fetch = jest.fn((u) => {
+      if (u.includes('/v8/import')) {
+        n++;
+        if (n === 1) return ok({ notices: [{ code: 'importSplitRoute' }], routes: [] });
+        return Promise.resolve({ ok: false, status: 400, json: () => Promise.resolve({ title: 'Bad' }) });
+      }
+      return ok(tollResp(1));
+    });
+    await expect(tp.hereTollFromTrace([[45, 25], [45.05, 25]], 'K', null, { fetch })).rejects.toMatchObject({ calls: 2 });
+  });
+});

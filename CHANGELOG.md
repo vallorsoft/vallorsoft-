@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-04 — 🛣️ FIX: GPS-útdíj „importSplitRoute" — sűrű, útra illesztett nyomvonal (PR #583)
+- **Gyökér:** a nyomvonal ~150 m-re ritkított nyers GPS-pontokból ment a HERE-nek; a HERE a nyomvonalat útvonal-geometriaként kezeli, a kanyart levágó ritka pontsort nem tudta egyben illeszteni → `importSplitRoute`, a nap elbukott, a felület mégis 0,00 €-t mutatott.
+- **Javítás:** a HERE a nap úthálózatra illesztett (OSRM, `gps_track_days.segments`) geometriáját kapja, ~25 m-re sűrítve (`densifyTrace`); még nem illesztett napot előbb illesztünk (`matchAndSaveDay`, max. 5/kérés); 20 000 pont fölött egymásba érő darabok; tartós split → felezés, végül a darabolt útvonalból számol `≈` közelítő jelöléssel. Cache-kulcs új számítási verzióval; a nyers nyomvonalas cache-sor illesztés után újraszámolódik.
+- **Hibák menet közben:** a `[lat,lng]` geometria-pontot a belső `_pt` `[idő,lat,lng]`-ként olvasta (minden pont kiesett volna); a beágyazott felezésnél a HERE-hívásszám duplán számolódott (túlszámlázás).
+- **Felület:** minden-nap-hibás esetben `—` a 0,00 € helyett, közelítő/hibás napok jelölése, érthető hibaszöveg (RO+HU), a „✓ mentett" sor csak tényleges cache-nél, „Pótkocsik száma (db, nem tengely)" felirat, mentés után frissülő 🚚/⚙ jelölők. Cache-bust `?v=20261104gtoll2`. 1983 Jest zöld (valós Postgres 16).
+
 ## 2026-11-04 — 🛣️ Útdíj a GPS-naplóból — HERE Route Import (PR #582)
 - Flotta → GPS útvonal: új „🛣️ Útdíj (HERE)" kártya — a jármű két dátum közti, GPS-ben rögzített TÉNYLEGES útvonalára számol útdíjat. `lib/tollProvider.js` `hereTollFromTrace`: `POST /v8/import` → `routeHandle` → `GET /v8/routes/{handle}?return=tolls`; ritkítás (~150 m, álló pontok ki), `importSplitRoute` esetén felezés.
 - Kamion-paraméterek: útvonaltervező szerelvény-alap (40 t, 400/1650/255 cm, 11 500 kg/tengely, 5 tengely, 1 pótkocsi) ← jármű adata ← kézi bevitel; opcionális mentés a járműre. Új `vehicles.emission_class` (EURO) → `tolls[emissionType]`, a jármű-szerkesztőben is.
