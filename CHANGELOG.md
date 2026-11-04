@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-11-04 — 🧠 Tényleges cím-felismerés: tanul az iroda döntéseiből + azonos nevű települések + késői lerakás (PR #590)
+- **Kérés:** amit az iroda elfogad, abból tanuljon a rendszer a többi címnél is; van, amit csak másnap ismer fel → névegyezésnél is legyen találat; azonos nevű település (pl. Malacky SK / BG) esetén az számítson, ahol a jármű állt.
+- **Azonos nevű település** (`lib/stopMatch.js`): ha a jelölt hely neve egyezik a tervezett településsel, a geokódolt (esetleg rossz országba mutató) helytől mért távolság nem büntet (`homonym` jelzés); a reverse-geokódra választás (`prescore`) már nem a geokódolt helyre épít, így a valódi állás címe biztosan lekérődik. Névegyezés +20.
+- **Késői lerakás:** az időablak +2 nap; névegyezésnél / ismert helynél a −1…+3 napos eltérés nem büntet.
+- **Tanulás** (`db/zz-order-stop-learning.sql`): `stop_match_feedback` — jelenként elfogadott/elvetett számláló → cégenkénti súly (0,5–1,5×, csak ≥5 döntés után, `weightsFromFeedback`); `stop_match_bad_places` — elvetett hely: ugyanannál a cégnél −45, máshol ismétlődés (≥2) esetén −20. Elfogadás / elvetés / másik jelölt / 📄 rátétel → visszajelzés; minden döntés után a cég többi nyitott javaslata újraszámolódik (`requeueOpen`, max. 300 fuvar, háttérben). A jelöltek a saját jeleikkel tárolódnak (másik jelölt választásánál azok tanulnak).
+- **Felület:** új jel-feliratok (korábban elvetve / gyakran elvetett hely / azonos nevű település) + 🧠 tanulás-magyarázat. Cache-bust `?v=20261104learn`.
+- **CargoTrack-mezőpróba eredménye** (a felhasználó képernyőképe): `weight`, `din1–4_working_time` üres, `temperature` = motor hőfok, tahográf nincs → nincs extra jel.
+- **Ellenőrzés:** +8 teszt, 1959 Jest zöld; valódi Postgres 16-on 145 migráció + homonim-eset (rossz országba geokódolt település → mégis találat) + elvetés → újrafuttatáskor az a hely nem jön.
+
 ## 2026-11-04 — 📄 GPS szerinti cím a menetlevélre: kézi + automatikus rátétel küszöbbel (PR #589)
 - **Kérés:** az iroda tehesse rá a felismert tényleges címet a menetlevélre, és legyen kapcsolható, hogy egy pontszám felett ez automatikusan megtörténjen.
 - **Új `lib/stopWaybill.js`:** a menetlevél-pont (`fuvarlevelek.puncte[i]`) `stopId`-vel kötődik az állomáshoz; régi pontnál `orderId`+`role`, de csak ha a fuvarnak abból a fajtából egy állomása van. Az eredeti cím a `loc_planned`-be kerül, `loc_source='gps'` jelzi; ↩ visszaállítható; az irodában kézzel átírt címhez nem nyúl. `order_stops.waybill_apply` → a később beküldött menetlevélre is rákerül (ütemező `applyPending`).

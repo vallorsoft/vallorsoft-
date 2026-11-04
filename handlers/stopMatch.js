@@ -85,6 +85,31 @@ handlers.stopMatchList = async function (req, res, args) {
   }
 };
 
+// Tanulás egy döntésből (best-effort): jel-súlyok + elvetett hely + a többi nyitott fuvar
+// újraszámolása. Az elfogadott hely a helymemóriába a learnPlace-szel kerül (külön).
+async function _learn(cid, cur, kind, picked) {
+  try {
+    const det = cur.match_detail || {};
+    const curSig = Array.isArray(det.signals) ? det.signals : [];
+    const near = (a, b) => a && b && a.lat != null && b.lat != null
+      && Math.abs(a.lat - b.lat) < 0.002 && Math.abs(a.lng - b.lng) < 0.003;
+    const curPos = cur.actual_lat != null ? { lat: cur.actual_lat, lng: cur.actual_lng } : null;
+    if (kind === 'accept') {
+      await runner.recordFeedback(cid, curSig, true);
+    } else if (kind === 'reject') {
+      await runner.recordFeedback(cid, curSig, false);
+      if (curPos) await runner.recordBadPlace(cid, curPos.lat, curPos.lng, cur.firma);
+    } else if (kind === 'pick' && picked) {
+      if (curPos && !near(curPos, picked)) {
+        await runner.recordFeedback(cid, curSig, false);
+        await runner.recordBadPlace(cid, curPos.lat, curPos.lng, cur.firma);
+      }
+      await runner.recordFeedback(cid, picked.signals || [], true);
+    }
+    await runner.requeueOpen(cid, cur.order_id);
+  } catch (e) { console.warn('[StopMatch] tanulás hiba', e.message); }
+}
+
 handlers.stopMatchDecide = async function (req, res, args) {
   try {
     const u = await _gate(req, res); if (!u) return;
@@ -100,10 +125,12 @@ handlers.stopMatchDecide = async function (req, res, args) {
     const action = a.action;
     if (action === 'reject') {
       await pool.query(`UPDATE order_stops SET match_status='rejected', match_decided_by=$3 WHERE id=$1 AND company_id=$2`, [id, cid, by]);
+      await _learn(cid, cur, 'reject');
     } else if (action === 'confirm') {
       if (cur.actual_lat == null && !cur.actual_address) return res.json({ result: { ok: false, err: 'Nu există adresă de confirmat' } });
       await pool.query(`UPDATE order_stops SET match_status='confirmed', match_decided_by=$3 WHERE id=$1 AND company_id=$2`, [id, cid, by]);
       try { await runner.learnPlace(cid, cur); } catch (e) { console.warn('[StopMatch] tanulás hiba', e.message); }
+      if (cur.match_status !== 'confirmed') await _learn(cid, cur, 'accept');
     } else if (action === 'pick') {
       const cands = (cur.match_detail && Array.isArray(cur.match_detail.candidates)) ? cur.match_detail.candidates : [];
       const c = cands[parseInt(a.cand_idx, 10)];
@@ -118,6 +145,7 @@ handlers.stopMatchDecide = async function (req, res, args) {
           WHERE id=$1 AND company_id=$2`,
         [id, cid, c.lat, c.lng, addr, city, c.from || null, c.to || null, c.score != null ? Math.round(c.score) : null, by]);
       try { await runner.learnPlace(cid, { ...cur, actual_lat: c.lat, actual_lng: c.lng, actual_address: addr, actual_city: city }); } catch (_) {}
+      await _learn(cid, cur, 'pick', c);
     } else if (action === 'edit') {
       const addr = String(a.address || '').trim().slice(0, 500);
       if (addr.length < 3) return res.json({ result: { ok: false, err: 'Adresa este prea scurtă' } });
@@ -131,6 +159,7 @@ handlers.stopMatchDecide = async function (req, res, args) {
       if (cur.match_status !== 'confirmed') {
         await pool.query(`UPDATE order_stops SET match_status='confirmed', match_decided_by=$3 WHERE id=$1 AND company_id=$2`, [id, cid, by]);
         try { await runner.learnPlace(cid, cur); } catch (_) {}
+        await _learn(cid, cur, 'accept');
       }
       const x = await wb.applyStop(cid, id);
       audit.fromReq(req, 'order.stop_address.apply', 'order', cur.order_id, { stop_id: id, points: x.points });

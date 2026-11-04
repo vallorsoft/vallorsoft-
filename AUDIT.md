@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 69. lépés — Cím-felismerés tanulás (2026-11-04, PR #590) ✅ KÉSZ
+- Új táblák `stop_match_feedback` / `stop_match_bad_places` (`company_id`-horgony, nem személyes adat: jel-nevek, cég-telephely koordináta + normalizált cégnév). Írás csak a meglévő Admin/Manager döntés-úton (`stopMatchDecide`, tulajdon-ellenőrzés után), a jel-név 32 karakterre vágva, paraméteres SQL; az újraszámolás csak a saját cég fuvarjait állítja sorba (max. 300). Nincs új végpont.
+
 ### 68. lépés — GPS-cím a menetlevélre (2026-11-04, PR #589) ✅ KÉSZ
 - Új író utak: `stopMatchDecide` `apply`/`unapply`, `stopMatchApplyBulk` (max. 500 pont), `stopMatchSettingsSave` (CSAK Admin; küszöb 30–200 közé szorítva) — Admin/Manager kapu + `stop-address` kapcsoló, a pont és a menetlevél is `company_id`-szűrt (`fuvarlevelek.company_id` horgony), paraméteres SQL, audit `order.stop_address.apply*`/`settings`. A menetlevélbe csak a felismert cím-szöveg kerül (500 karakter), az eredeti `loc_planned`-ben visszaállítható. Régi hiba javítva: az irodai menetlevél-szerkesztő eldobta a pontok rejtett kötés-mezőit (adat-integritás).
 
