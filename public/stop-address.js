@@ -33,6 +33,7 @@
     date: 'sa.sig.date', after_button: 'sa.sig.afterBtn', before_button: 'sa.sig.beforeBtn', duration: 'sa.sig.duration',
     short_dwell: 'sa.sig.short', maneuver: 'sa.sig.maneuver', offroad: 'sa.sig.offroad', night_rest: 'sa.sig.night',
     refuel: 'sa.sig.refuel', home_base: 'sa.sig.home',
+    rejected_before: 'sa.sig.rejBefore', rejected_place: 'sa.sig.rejPlace', homonym: 'sa.sig.homonym',
   };
 
   function shell() {
@@ -64,6 +65,7 @@
         + '<label style="display:flex;align-items:center;gap:6px;">' + _t('sa.minScore', 'peste') + ' <input type="number" class="input" id="saMin" min="30" max="200" step="5" style="width:90px;"> ' + _t('sa.points', 'pct') + '</label>'
         + '<button class="btn" id="saSaveSet" onclick="StopAddress.saveSettings()">💾 ' + _t('sa.saveSet', 'Salvează') + '</button>'
         + '<button class="btn" onclick="StopAddress.applyBulk()">📄 ' + _t('sa.applyBulk', 'Pune pe foile de parcurs toate confirmatele din perioadă') + '</button>'
+        + '<div class="text-muted" style="font-size:12px;flex-basis:100%;">🧠 ' + _t('sa.learnHint', 'Sistemul învață din deciziile tale: ce accepți devine loc cunoscut, ce respingi nu mai este propus pentru aceeași firmă; după fiecare decizie restul curselor se recalculează.') + '</div>'
         + '<div class="text-muted" style="font-size:12px;flex-basis:100%;">' + _t('sa.autoHint', 'Recomandat: 80+ pct. Adresa originală rămâne salvată și poate fi restaurată oricând (↩).') + '</div>'
         + '</div>'
         + '<div id="saProbe"></div>'
@@ -114,7 +116,8 @@
     if (!detail || !Array.isArray(detail.signals) || !detail.signals.length) return '';
     return '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">' + detail.signals.map(function (s) {
       var v = s[1];
-      return '<span class="badge ' + (v > 0 ? 'ok' : 'err') + '" style="font-weight:600;">' + _e(_t(SIG[s[0]] || s[0], s[0])) + ' ' + (v > 0 ? '+' : '') + v + '</span>';
+      var cls = v > 0 ? 'ok' : v < 0 ? 'err' : 'info';
+      return '<span class="badge ' + cls + '" style="font-weight:600;">' + _e(_t(SIG[s[0]] || s[0], s[0])) + (v ? ' ' + (v > 0 ? '+' : '') + v : '') + '</span>';
     }).join('') + '</div>';
   }
 
