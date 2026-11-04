@@ -106,6 +106,38 @@ describe('tartály-szint fogyasztás + legközelebbi pont', () => {
     for (let i = 0; i < 200; i++) { pts.push([t, 45 + i * 0.015, 25, 90, 1, 1000 + i, null, 500 - 0.5 * i, 0]); t += 60; }
     expect(gt.levelFuel(pts).losses).toHaveLength(0);
   });
+  // menet: percenként ~1 km, 0,3 L/km fogyasztás; a `bump` a szint-eltérés (lejtő/átfolyás)
+  const drive = (n, bump) => {
+    const pts = []; let t = 0, lvl = 600;
+    for (let i = 0; i < n; i++) { pts.push([t, 45 + i * 0.009, 25, 60, 1, 1000 + i, null, lvl + bump(i), 0]); t += 60; lvl -= 0.3; }
+    return pts;
+  };
+  test('levelFuel: lejtőn 25-30 L „átfolyás", ami sík úton visszaáll — nem veszteség, nem tankolás', () => {
+    const pts = drive(240, (i) => (i >= 60 && i < 90 ? -28 : (i >= 150 && i < 170 ? 30 : 0)));
+    const r = gt.levelFuel(pts);
+    expect(r.losses).toHaveLength(0);
+    expect(r.refuels).toHaveLength(0);
+  });
+  test('levelFuel: menet közbeni 30 L tartós esés a menet-küszöb (40 L) alatt — nem veszteség', () => {
+    const r = gt.levelFuel(drive(200, (i) => (i >= 80 ? -30 : 0)));
+    expect(r.losses).toHaveLength(0);
+  });
+  test('levelFuel: 50 L alatti emelkedés álló helyzetben sem tankolás', () => {
+    const pts = []; let t = 0;
+    for (let i = 0; i < 30; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 300, 0]); t += 60; }
+    for (let i = 0; i < 60; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 340, 0]); t += 60; }
+    expect(gt.levelFuel(pts).refuels).toHaveLength(0);
+  });
+  test('levelFuel: álló helyzetű 25 L-es leszívás veszteség, utána menet', () => {
+    const pts = []; let t = 0;
+    for (let i = 0; i < 40; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 400, 0]); t += 60; }
+    for (let i = 0; i < 40; i++) { pts.push([t, 45, 25, 0, 0, 1000, null, 375, 0]); t += 60; }
+    for (let i = 0; i < 80; i++) { pts.push([t, 45 + i * 0.009, 25, 60, 1, 1000 + i, null, 375 - 0.3 * i, 0]); t += 60; }
+    const r = gt.levelFuel(pts);
+    expect(r.losses).toHaveLength(1);
+    expect(r.losses[0].moving).toBe(false);
+    expect(r.losses[0].liters).toBeCloseTo(25, 0);
+  });
   test('nearestPoint', () => {
     const pts = [[0, 45, 25], [1, 45.01, 25], [2, 45.02, 25]];
     const n = gt.nearestPoint(pts, 45.011, 25);
