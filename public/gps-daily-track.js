@@ -253,7 +253,7 @@
         L.marker([f.lat, f.lng], { zIndexOffset: 500, icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin l">⚠️</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
           .bindPopup('<b>' + esc(tt('gtr.lossTitle', 'Pierdere de combustibil (din nivel rezervor)')) + '</b><br>' + esc(dayLabel(d.day)) + ' ' + hm(f.from_t || f.t) + ' – ' + hm(f.t) +
             '<br>−' + esc(num(f.liters, 'l')) + ' (' + esc(num(f.before, 'l')) + ' → ' + esc(num(f.after, 'l')) + ')' +
-            '<br><span style="color:#64748b;font-size:12px">' + esc(tt('gtr.lossHint', 'Scădere bruscă, peste consumul din mers — verificați (furt, scurgere).')) + '</span>')
+            '<br><span style="color:#64748b;font-size:12px">' + esc(tt('gtr.lossHint', 'Scădere bruscă, peste consumul din mers — verificați (scurgere, golire).')) + '</span>')
           .addTo(_layers);
       });
       d.stops.forEach(function (s) {
