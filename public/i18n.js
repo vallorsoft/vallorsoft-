@@ -1285,6 +1285,8 @@
     'sa.mapAny': { hu: 'vagy kattints bárhova a térképen', ro: 'sau click oriunde pe hartă' },
     'sa.mapLabels': { hu: 'Utcák és nevek', ro: 'Străzi și denumiri' },
     'sa.mapWhole': { hu: 'A nap teljes útvonala', ro: 'Tot traseul zilei' },
+    'sa.savedWb': { hu: 'Mentve és rátéve a menetlevélre', ro: 'Salvat și pus pe foaia de parcurs' },
+    'sa.savedWbLater': { hu: 'Mentve — a menetlevélre kerül, amikor beküldik', ro: 'Salvat — se va pune pe foaia de parcurs când aceasta este trimisă' },
     'sa.nearLoading': { hu: 'Közeli cégek és utcák…', ro: 'Firme și străzi din apropiere…' },
     'sa.nearFirms': { hu: 'Cégek a közelben', ro: 'Firme în apropiere' },
     'sa.nearStreets': { hu: 'Utcák', ro: 'Străzi' },

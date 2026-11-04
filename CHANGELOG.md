@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-04 — 📄 Kézi megerősítés → menetlevél; cím cégnév helyett pontos koordinátával (PR #594)
+- A Tényleges címek fülön minden kézi megerősítés (✓ elfogadás, jelölt választása, térképes „Itt volt", kézi cím) azonnal a menetlevélre is rákerül (felülírja a pont címét; ha még nincs menetlevél, a később beküldöttre az ütemező teszi rá). Elvetésnél a már rátett cím visszaáll.
+- A felismert cím mostantól cégnév NÉLKÜL készül (a környező cég neve gyakran nem az, ahol az autó állt), helyette a pontos koordináta zárójelben: „Str. Fabricii 7, Cluj-Napoca, 400000, Cluj, RO (46.77120, 23.62360)". `lib/stopMatchRunner.js` `formatAddress`/`coordText` (a régi cache-sorokból is levágja a nevet); a térképes mentés már nem tesz elé közeli cégnevet.
+- i18n `sa.savedWb`/`sa.savedWbLater` (RO+HU), cache-bust `?v=20261104coord`; teszt `tests/unit/stopAddressFormat.test.js`.
+
 ## 2026-11-04 — 🏢 Cím-térkép: a kijelölt pont körüli cégnevek + utcanevek (PR #593)
 - Ha a térképen pont van kijelölve (zöld „Kiválasztott hely", jelölt, állás vagy kattintás), a pont körüli ~200 m-ben lévő cégek/létesítmények neve feliratként megjelenik a térképen (lila pont + névcímke; rákattintva kiválasztható), a buborékban pedig lista: 🏢 közeli cégek (utca, házszám, távolság) + 🛣️ utcák.
 - Forrás: OpenStreetMap (Overpass API, ingyenes, kulcs nélkül), szerveren lekérve és cache-elve (`lib/nearbyPlaces.js`, `handlers/stopMatch.js` `stopMatchNearby`). Térképes mentéskor, ha a cím nem tartalmaz cégnevet, a legközelebbi (≤50 m) cég neve elé kerül.
