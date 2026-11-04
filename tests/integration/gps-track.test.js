@@ -87,6 +87,40 @@ describe('gpsTrackRange', () => {
     expect(res.totals.fuel).toBeCloseTo(18);
     expect(res.totals.avg_l100).toBeCloseTo(30);
     expect(pool.query.mock.calls[2][1]).toEqual([CID, 'B 104 VLR', '2026-10-01', '2026-10-01']);
+    // üzemanyag-ellenőrzés: mindhárom rész jelen van, akkor is, ha a DB-lekérés elbukik
+    const F = res.totals.fuel_check;
+    expect(F).toBeTruthy();
+    expect(F.stops.ok).toBe(true);
+    expect(F.receipts).toBeTruthy();
+    expect(F.consumption).toBeTruthy();
+  });
+
+  test('üzemanyag-ellenőrzés: menetlevél-bon bekerül, AdBlue és időszakon kívüli kimarad', async () => {
+    const t0 = Date.parse('2026-10-01T05:00:00Z') / 1000;
+    const pts = [];
+    for (let i = 1; i <= 60; i++) pts.push([t0 + i * 60, 45.0 + i * 0.0015, 25.0, 60, 1, 1000 + i, null, 300 - i * 0.3]);
+    pool.query.mockImplementation(async (sql) => {
+      if (/FROM vehicle_gps_map/.test(sql)) return rows([{ rendszam: 'B 104 VLR', object_id: '7' }]);
+      if (/FROM gps_track_days/.test(sql) && /points_json/.test(sql)) return rows([{ company_id: CID, rendszam: 'B 104 VLR', day: '2026-10-01',
+        points_json: JSON.stringify(pts), point_count: pts.length, complete: true, segments: [{ p: '_ibE_ibE', k: 'm' }], km_road: 9, km_raw: 9,
+        match_source: 'osrm', matched_count: pts.length, matched_at: '2026-10-02T00:00:00Z' }]);
+      if (/SELECT id, alimentari FROM fuvarlevelek/.test(sql)) return rows([{ id: 'FUV1', alimentari: [
+        { data: '2026-10-01', tip: 'Motorină', litru: '420', loc: 'MOL' },
+        { data: '2026-10-01', tip: 'AdBlue', litru: '40' },
+        { data: '2026-09-20', tip: 'Motorină', litru: '300' }] }]);
+      if (/SUM\(motorina_folosit\)/.test(sql)) return rows([{ l: 3000, km: 10000 }]);
+      if (/fuel_per_100km/.test(sql)) return rows([{ fuel_per_100km: 30 }]);
+      return rows([]);
+    });
+    const r = await call('gpsTrackRange', [{ rendszam: 'b104vlr', from: '2026-10-01', to: '2026-10-01' }]);
+    const F = r.body.result.totals.fuel_check;
+    expect(F.receipts.ok).toBe(true);
+    expect(F.receipts.count).toBe(1);
+    expect(F.receipts.items[0].receipt_l).toBe(420);
+    expect(F.receipts.items[0].status).toBe('not_measured');
+    expect(F.consumption.ok).toBe(true);
+    const wq = pool.query.mock.calls.find((c) => /SELECT id, alimentari FROM fuvarlevelek/.test(c[0]));
+    expect(wq[1]).toEqual([CID, 'B104VLR', '2026-10-01', '2026-10-01']);
   });
 });
 

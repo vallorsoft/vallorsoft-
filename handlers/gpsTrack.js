@@ -13,6 +13,7 @@ const pool = require('../db');
 const gt = require('../lib/gpsTrack');
 const { decrypt } = require('../lib/crypto');
 const { featureEnabled } = require('../lib/featureEnabled');
+const fc = require('../lib/fuelCheck');
 
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
@@ -45,6 +46,62 @@ async function reverseName(lat, lng) {
   if (_revCache.size > 2000) _revCache.clear();
   _revCache.set(k, name);
   return name;
+}
+
+// Üzemanyag-ellenőrzés (3 független mód) — bármelyik elbukhat, a többi akkor is számol
+const PLATE_SQL = "UPPER(REGEXP_REPLACE(COALESCE(numar_camion,''),'[^A-Za-z0-9]','','g'))";
+async function buildFuelCheck(cid, plate, from, to, all, lf, kmOdo, fuelCnt) {
+  plate = normPlate(plate);
+  const out = { stops: null, receipts: null, consumption: null };
+  const kmRef = kmOdo || (gt.sumKm(all) || 0);
+  const used = fuelCnt != null ? fuelCnt : (lf ? lf.used : null);
+  const lPerKm = used != null && kmRef > 50 ? used / kmRef : null;
+  try {
+    out.stops = { ok: true, ...fc.stopCheck(all, { lPerKm, refuels: lf ? lf.refuels : [] }) };
+  } catch (e) { console.warn('[FuelCheck] álló-ellenőrzés hiba', plate, e.message); out.stops = { ok: false }; }
+  let receiptL = 0;
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, alimentari FROM fuvarlevelek
+        WHERE company_id=$1 AND ${PLATE_SQL}=$2
+          AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= $3::date - 40
+          AND COALESCE(indulas_dt, erkezes_dt, data_completare) <= $4::date + 1`, [cid, plate, from, to]);
+    const receipts = [];
+    for (const w of rows) {
+      const arr = Array.isArray(w.alimentari) ? w.alimentari : [];
+      for (const a of arr) {
+        if (!a || /adblue/i.test(String(a.tip || '').replace(/\s+/g, ''))) continue;
+        const day = String(a.data || '').slice(0, 10);
+        const liters = parseFloat(String(a.litru || '').replace(',', '.'));
+        if (!gt.isDay(day) || day < from || day > to || !(liters > 0)) continue;
+        receipts.push({ day, liters, loc: a.loc ? String(a.loc).slice(0, 80) : '', waybill: w.id });
+      }
+    }
+    receiptL = receipts.reduce((s, r) => s + r.liters, 0);
+    out.receipts = { ok: true, count: receipts.length, ...fc.receiptCheck(receipts, lf ? lf.refuels : [], (t) => gt.localDay(t * 1000)) };
+  } catch (e) { console.warn('[FuelCheck] bon-ellenőrzés hiba', plate, e.message); out.receipts = { ok: false }; }
+  try {
+    let hist = null, nominal = null;
+    try {
+      const h = await pool.query(
+        `SELECT SUM(motorina_folosit)::float AS l, SUM(total_km)::float AS km FROM fuvarlevelek
+          WHERE company_id=$1 AND ${PLATE_SQL}=$2 AND total_km > 0 AND motorina_folosit > 0
+            AND COALESCE(erkezes_dt, indulas_dt, data_completare) BETWEEN $3::date - 180 AND $3::date - 1`, [cid, plate, from]);
+      const r = h.rows[0] || {};
+      if (r.km >= 1000) { const v = r.l / r.km * 100; if (v >= 15 && v <= 60) hist = v; }
+    } catch (_) { hist = null; }
+    try {
+      const v = await pool.query(
+        `SELECT fuel_per_100km FROM vehicles WHERE company_id=$1
+            AND UPPER(REGEXP_REPLACE(COALESCE(rendszam,''),'[^A-Za-z0-9]','','g')) = $2 LIMIT 1`, [cid, plate]);
+      nominal = parseFloat(v.rows[0] && v.rows[0].fuel_per_100km) || null;
+    } catch (_) { nominal = null; }
+    out.consumption = { ok: true, ...fc.consumptionCheck({
+      km: kmRef, used_level: lf ? lf.used : null, used_counter: fuelCnt,
+      start_level: lf ? lf.start : null, end_level: lf ? lf.end : null,
+      receipt_l: receiptL, hist_l100: hist, nominal_l100: nominal }) };
+  } catch (e) { console.warn('[FuelCheck] fogyasztás-ellenőrzés hiba', plate, e.message); out.consumption = { ok: false }; }
+  return out;
 }
 
 handlers.gpsTrackVehicles = async function (req, res) {
@@ -241,6 +298,10 @@ handlers.gpsTrackRange = async function (req, res, args) {
         start: { lat: first[1], lng: first[2], t: first[0], name: startLoc },
         end: { lat: last[1], lng: last[2], t: last[0], name: endLoc },
       };
+    }
+    if (totals) {
+      try { totals.fuel_check = await buildFuelCheck(cid, plate, from, to, all, gt.levelFuel(all), totals.km_odo, gt.fuelDelta(all, 0, all.length - 1, 20000)); }
+      catch (e) { console.warn('[FuelCheck] hiba', plate, e.message); totals.fuel_check = null; }
     }
     return res.json({ result: { ok: true, rendszam: plate, from, to, days, totals, live_error: liveErr, missing_days: missing, bg_running: bgRunning, history_days: HISTORY_DAYS } });
   } catch (err) {
