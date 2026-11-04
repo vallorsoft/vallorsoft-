@@ -21,7 +21,8 @@ const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 const MAX_DAYS = 62;
 const ONDEMAND_BACKFILL_DAYS = 6;         // kérésenként ennyi hiányzó múltbeli napot tölt le a HÁTTÉRBEN
 const HISTORY_DAYS = gt.HISTORY_DAYS;
-const ONDEMAND_MATCH_DAYS = 2;            // kérésenként ennyi még nem illesztett napot illeszt azonnal
+const BG_MATCH_DAYS = 6;                  // kérésenként ennyi még nem illesztett napot illeszt a HÁTTÉRBEN
+const _matchJobs = new Map();             // `${cid}|${plate}` -> futó háttér-illesztés
 const _liveRefresh = new Map();           // `${cid}|${plate}` -> utolsó élő frissítés ideje
 const _bgJobs = new Map();                 // `${cid}|${plate}` -> futó háttér-letöltés (Promise)
 const _upgradeTried = new Map();          // `${cid}|${plate}|${day}` -> utolsó formátum-frissítés ideje
@@ -235,16 +236,24 @@ handlers.gpsTrackRange = async function (req, res, args) {
       throw e;
     }
 
-    // még nem (vagy elavultan) illesztett napok: a legfrissebbek azonnal
-    let budget = ONDEMAND_MATCH_DAYS;
+    // még nem (vagy elavultan) illesztett napok: HÁTTÉRBEN illesztjük (egy nap OSRM-illesztése
+    // ~20–40 mp a fair-use szünetek miatt — ezt nem várhatja meg a felhasználói kérés).
+    // Addig a nap a nyers GPS-pontokból rajzolódik; a kliens magától újratölt.
     const needMatch = rows.filter((r) => r.point_count > 1 && (r.matched_count !== r.point_count) &&
       !(r.day === today && r.matched_at && now - new Date(r.matched_at).getTime() < 10 * 60000)).reverse();
-    for (const r of needMatch) {
-      if (budget-- <= 0) break;
-      try {
-        const m = await gt.matchAndSaveDay(r);
-        if (m) { r.segments = m.segments; r.km_road = m.km_road; r.km_raw = m.km_raw; r.match_source = m.source; r.matched_count = r.point_count; }
-      } catch (e) { console.warn('[GpsTrack] azonnali illesztés hiba', plate, r.day, e.message); }
+    const mk = cid + '|' + plate;
+    let matchRunning = _matchJobs.has(mk);
+    if (needMatch.length && !matchRunning) {
+      matchRunning = true;
+      const batch = needMatch.slice(0, BG_MATCH_DAYS);
+      _matchJobs.set(mk, (async () => {
+        try {
+          for (const r of batch) {
+            try { await gt.matchAndSaveDay(r); }
+            catch (e) { console.warn('[GpsTrack] háttér-illesztés hiba', plate, r.day, e.message); }
+          }
+        } finally { _matchJobs.delete(mk); }
+      })());
     }
 
     const days = [];
@@ -275,13 +284,14 @@ handlers.gpsTrackRange = async function (req, res, args) {
         drive_sec: drive, stop_sec: stopS, trips: tl.trips, stops: tl.stops, segments,
         first_at: pts[0][0], last_at: pts[pts.length - 1][0],
       });
-      all = all.concat(pts);
+      for (const p of pts) all.push(p);
     }
-    let totals = null;
+    let totals = null, lfAllOut = null, fuelCntOut = null;
     if (all.length) {
       const kmOdo = gt.odoDelta(all, 0, all.length - 1, 50000);
       const fuelCnt = gt.fuelDelta(all, 0, all.length - 1, 20000);
       const lfAll = gt.levelFuel(all);
+      lfAllOut = lfAll; fuelCntOut = fuelCnt;
       // a fogyasztás-számláló elsőbbséget élvez; ha az eszköz nem adja, a tartály-szintből
       const fuel = fuelCnt != null ? fuelCnt : (lfAll ? lfAll.used : null);
       const fuelSrc = fuelCnt != null ? 'counter' : (lfAll ? 'level' : null);
@@ -300,10 +310,10 @@ handlers.gpsTrackRange = async function (req, res, args) {
       };
     }
     if (totals) {
-      try { totals.fuel_check = await buildFuelCheck(cid, plate, from, to, all, gt.levelFuel(all), totals.km_odo, gt.fuelDelta(all, 0, all.length - 1, 20000)); }
+      try { totals.fuel_check = await buildFuelCheck(cid, plate, from, to, all, lfAllOut, totals.km_odo, fuelCntOut); }
       catch (e) { console.warn('[FuelCheck] hiba', plate, e.message); totals.fuel_check = null; }
     }
-    return res.json({ result: { ok: true, rendszam: plate, from, to, days, totals, live_error: liveErr, missing_days: missing, bg_running: bgRunning, history_days: HISTORY_DAYS } });
+    return res.json({ result: { ok: true, rendszam: plate, from, to, days, totals, live_error: liveErr, missing_days: missing, bg_running: bgRunning, match_running: matchRunning, history_days: HISTORY_DAYS } });
   } catch (err) {
     console.error('gpsTrackRange hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -359,4 +369,4 @@ handlers.gpsTrackPoint = async function (req, res, args) {
 module.exports = handlers;
 // Teszt-segéd — NEM RPC (nem-enumerable): megvárja a futó háttér-letöltéseket,
 // hogy a teszt ne érjen véget, mielőtt a háttér-feladat a mockolt DB-t hívja.
-Object.defineProperty(module.exports, '_bgIdle', { value: () => Promise.all([..._bgJobs.values()]), enumerable: false });
+Object.defineProperty(module.exports, '_bgIdle', { value: () => Promise.all([..._bgJobs.values(), ..._matchJobs.values()]), enumerable: false });

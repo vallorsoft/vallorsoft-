@@ -128,25 +128,43 @@
     if (!vehicles.length) document.getElementById('gtrStatus').textContent = tt('gtr.noVehicles', 'Niciun vehicul asociat cu GPS (CargoTrack). Asociază vehiculele la Integrări.');
   }
 
-  var _loadSeq = 0;
-  function load() {
+  var _loadSeq = 0, _autoTimer = null, _autoLeft = 0;
+  function load(opts) {
+    var silent = !!(opts && opts.silent);
+    if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
+    if (!silent) _autoLeft = 8;
     var plate = document.getElementById('gtrVehicle').value;
     var from = document.getElementById('gtrFrom').value, to = document.getElementById('gtrTo').value;
     var st = document.getElementById('gtrStatus');
     if (!plate) { st.textContent = tt('gtr.pickVehicleFirst', 'Alege mai întâi un vehicul.'); return; }
     if (!from || !to) return;
-    st.textContent = tt('gtr.loading', 'Se încarcă traseul… (prima afișare a unei zile poate dura câteva secunde — o punem pe drum)');
     var btn = document.getElementById('gtrLoad');
     var seq = ++_loadSeq;
-    btn.disabled = true; btn.classList.add('gtr-busy'); btn.textContent = '⏳ ' + tt('gtr.load', 'Afișează');
+    if (!silent) {
+      st.textContent = tt('gtr.loading', 'Se încarcă traseul… (prima afișare a unei zile poate dura câteva secunde — o punem pe drum)');
+      btn.disabled = true; btn.classList.add('gtr-busy'); btn.textContent = '⏳ ' + tt('gtr.load', 'Afișează');
+    }
     var done = function () { if (seq !== _loadSeq) return false; btn.disabled = false; btn.classList.remove('gtr-busy'); btn.textContent = tt('gtr.load', 'Afișează'); return true; };
     _gas('gpsTrackRange', [{ rendszam: plate, from: from, to: to }]).then(function (r) {
       if (!done()) return;
       if (!r || !r.ok) { st.textContent = (r && r.err) || tt('common.error', 'Eroare'); return; }
       _data = r;
       st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
-      renderSummary(r); renderFuelCheck(r); renderList(r); drawMap(r);
-      renderTollCard(plate, from, to, !!r.days.length);
+      renderSummary(r); renderFuelCheck(r); renderList(r); drawMap(r, silent);
+      if (!silent) renderTollCard(plate, from, to, !!r.days.length);
+      // a még nem illesztett napok a háttérben kerülnek útra — addig csendben újratöltünk
+      var pending = (r.totals && r.totals.pending_days) || 0;
+      if ((r.match_running || pending) && _autoLeft > 0) {
+        _autoLeft--;
+        st.textContent = '⏳ ' + tt('gtr.matching', '{n} zi(le) se pun pe drum în fundal — pagina se actualizează singură.', { n: pending || 1 });
+        _autoTimer = setTimeout(function () {
+          _autoTimer = null;
+          if (seq !== _loadSeq) return;
+          var cur = document.getElementById('gtrVehicle');
+          if (!cur || cur.value !== plate || document.getElementById('gtrFrom').value !== from || document.getElementById('gtrTo').value !== to) return;
+          load({ silent: true });
+        }, 25000);
+      }
       if (r.missing_days) {
         st.textContent = (st.textContent ? st.textContent + ' ' : '') + '⏳ ' + tt('gtr.backfill', 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.', { n: r.missing_days });
       }
@@ -276,7 +294,7 @@
   }
   function findDay(day) { return (_data && _data.days || []).filter(function (d) { return d.day === day; })[0]; }
 
-  function drawMap(r) {
+  function drawMap(r, keepView) {
     if (!_map || !_layers) return;
     _layers.clearLayers();
     var bounds = [];
@@ -324,7 +342,7 @@
       L.marker([T.end.lat, T.end.lng], { icon: L.divIcon({ className: 'gtr-pin', html: '<div class="gtr-pin b">B</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) })
         .bindPopup('<b>' + esc(tt('gtr.endLoc', 'Locație oprire')) + '</b><br>' + esc(T.end.name || '')).addTo(_layers);
     }
-    if (bounds.length) { try { _map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] }); } catch (_) {} }
+    if (bounds.length && !keepView) { try { _map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] }); } catch (_) {} }
   }
 
   // Kattintott pont adatai (CargoTrack-szerű buborék)

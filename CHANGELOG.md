@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-04 — 🗺️ FIX: GPS útvonal hosszabb időszakra (1–2 hónap) nem töltött be (PR #587)
+- **Gyökér:** a `gpsTrackRange` a még nem útra illesztett napokat (kérésenként 2-t) a válasz ELŐTT illesztette az OSRM-mel; egy nap ~20–25 kérés 1,1 mp-es fair-use szünettel ≈ 30–40 mp, így egy 1–2 hónapos (visszatöltött előzményt tartalmazó) időszak 60–80 mp-ig állt → időtúllépés. A számítás maga 60 napra ~1,3 mp (mérve).
+- **Javítás:** az illesztés háttérbe került (`_matchJobs`, járművenként egy futó feladat, kérésenként max. 6 nap); a válasz azonnal megy, az illesztetlen nap addig a nyers GPS-pontokból rajzolódik (`pending_days`, új `match_running`). A kliens csendben, a térkép-nézet megtartásával újratölt 25 mp-enként (max. 8×), amíg az illesztés tart. Ráadás: a pontok összefűzése `push`-sal (nem négyzetes `concat`), az üzemanyag-ellenőrzés újrahasználja a már kiszámolt tartály-szint elemzést. **Szabály:** felhasználói kérésben OSRM-illesztést se await-elj. +1 teszt; 1930 Jest zöld.
+
 ## 2026-11-04 — 🔍 Üzemanyag-ellenőrzés a GPS-útvonalon: 3 független mód (PR #586)
 - **Kérés:** a kis (pl. 5 literes) hiány is derüljön ki; álló helyzetben is változhat a szint (légrugós tengely, külön emelhető szint); a sofőr által lefotózott tankolási bon legyen a valós adat; ha egy mód elbukik, a többi akkor is számoljon.
 - **Új `lib/fuelCheck.js`** (tiszta függvények) + `handlers/gpsTrack.js` `buildFuelCheck` → `totals.fuel_check` (mindhárom külön try/catch-ben):
