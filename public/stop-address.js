@@ -244,7 +244,10 @@
     if (typeof L === 'undefined') { document.getElementById('saMapCanvas').innerHTML = '<div style="padding:20px;">Leaflet lipsă</div>'; return; }
     if (!M.map) {
       M.map = L.map('saMapCanvas', { zoomControl: true });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(M.map);
+      // csak műholdas réteg (Esri World Imagery) — így az épületek, rámpák, udvarok is látszanak
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+        maxNativeZoom: 19, maxZoom: 20 }).addTo(M.map);
       M.layers = L.layerGroup().addTo(M.map);
       M.map.on('click', function (e) { mapPickAt(e.latlng.lat, e.latlng.lng, null, null); });
     }
@@ -253,7 +256,7 @@
     (d.lines || []).forEach(function (ln) {
       var ll = decodePl(ln.p); if (ll.length < 2) return;
       L.polyline(ll, { color: '#ffffff', weight: 7, opacity: 0.9, interactive: false }).addTo(M.layers);
-      L.polyline(ll, { color: ln.k === 'r' ? '#64748b' : '#2563eb', weight: 4, opacity: 0.95, interactive: false }).addTo(M.layers);
+      L.polyline(ll, { color: ln.k === 'r' ? '#fde047' : '#22d3ee', weight: 4, opacity: 0.95, interactive: false }).addTo(M.layers);
       bounds = bounds.concat(ll);
     });
     (d.candidates || []).forEach(function (c) {
@@ -271,7 +274,7 @@
       L.circleMarker([d.actual.lat, d.actual.lng], { radius: 8, color: '#475569', weight: 2, fillColor: '#e2e8f0', fillOpacity: 0.9 })
         .addTo(M.layers).bindTooltip(_t('sa.mapRejected', 'loc respins'));
     }
-    if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
     else M.map.setView([45.9, 24.9], 6);
     setTimeout(function () { M.map.invalidateSize(); }, 50);
   }
