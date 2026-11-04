@@ -229,3 +229,34 @@ describe('handlers/stopMatch — tanulás a döntésből', () => {
     expect(runner.recordBadPlace).toHaveBeenCalledWith(7, 42.7, 25.3, 'Beta');
   });
 });
+
+describe('handlers/stopMatch — térképes kiválasztás', () => {
+  beforeEach(() => {
+    reset(); featureEnabled.mockReset().mockResolvedValue(true);
+    runner.recordFeedback = jest.fn(); runner.recordBadPlace = jest.fn(); runner.requeueOpen = jest.fn();
+    runner.reversePlace.mockReset().mockResolvedValue({ address: 'Str. X 1, Malacky, SK', city: 'Malacky', country: 'SK' });
+    runner.learnPlace.mockReset();
+  });
+  test('érvénytelen koordináta elutasítva', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 9, order_id: 'O9', match_status: 'rejected' }]));
+    const r = await call('stopMatchDecide', ADMIN, { stop_id: 9, action: 'map', lat: 'x', lng: 200 });
+    expect(r.ok).toBe(false);
+  });
+  test('térképi pont mentése: cím reverse-geokódból, elfogadva, tanul', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 9, order_id: 'O9', firma: 'Beta', match_status: 'rejected', actual_lat: 42.7, actual_lng: 25.3 }]))
+      .mockResolvedValue(rows([]));
+    const r = await call('stopMatchDecide', ADMIN, { stop_id: 9, action: 'map', lat: 48.4361, lng: 17.0219, from: '2026-10-07T08:00:00Z', to: '2026-10-07T09:00:00Z' });
+    expect(r.ok).toBe(true);
+    const upd = pool.query.mock.calls.find((c) => /match_source='map'/.test(c[0]));
+    expect(upd[1].slice(0, 5)).toEqual([9, 7, 48.4361, 17.0219, 'Str. X 1, Malacky, SK']);
+    expect(runner.learnPlace).toHaveBeenCalled();
+    expect(runner.requeueOpen).toHaveBeenCalledWith(7, 'O9');   // már elvetett pontnál nincs dupla negatív visszajelzés
+    expect(runner.recordFeedback).not.toHaveBeenCalled();
+  });
+  test('napi útvonal: idegen pont nem található', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    const r = await call('stopMatchTrack', ADMIN, { stop_id: 99 });
+    expect(r.ok).toBe(false);
+    expect(pool.query.mock.calls[0][1]).toEqual([99, 7]);
+  });
+});

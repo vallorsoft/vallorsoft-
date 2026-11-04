@@ -6,6 +6,7 @@
 //    stopMatchBackfill — visszamenőleges futtatás egy időszakra (sorba állítás)
 //    stopMatchApplyBulk — az időszak elfogadott címei a menetlevelekre
 //    stopMatchSettingsGet / stopMatchSettingsSave — automatikus rátétel + küszöb
+//    stopMatchTrack    — a jármű útvonala + megállói egy napra (térképes kiválasztáshoz)
 //    stopMatchProbe    — CargoTrack-eszköz nyers mezőinek felmérése
 //                        (tahográf / tengelysúly / ajtó jel van-e)
 //  CSAK Admin/Manager (a sofőr sehol nem kapja meg), company_id-szűrt,
@@ -17,6 +18,7 @@ const { featureEnabled } = require('../lib/featureEnabled');
 const { decrypt } = require('../lib/crypto');
 const runner = require('../lib/stopMatchRunner');
 const wb = require('../lib/stopWaybill');
+const gt = require('../lib/gpsTrack');
 
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
@@ -110,6 +112,14 @@ async function _learn(cid, cur, kind, picked) {
   } catch (e) { console.warn('[StopMatch] tanulás hiba', e.message); }
 }
 
+function _bgRerun(cid, oid) {
+  if (_running.has(oid)) return;
+  const p = Promise.resolve().then(() => runner.matchOrder(cid, oid))
+    .catch((e) => console.warn('[StopMatch] újrafuttatás hiba', oid, e.message))
+    .finally(() => _running.delete(oid));
+  _running.set(oid, p);
+}
+
 handlers.stopMatchDecide = async function (req, res, args) {
   try {
     const u = await _gate(req, res); if (!u) return;
@@ -126,6 +136,7 @@ handlers.stopMatchDecide = async function (req, res, args) {
     if (action === 'reject') {
       await pool.query(`UPDATE order_stops SET match_status='rejected', match_decided_by=$3 WHERE id=$1 AND company_id=$2`, [id, cid, by]);
       await _learn(cid, cur, 'reject');
+      _bgRerun(cid, cur.order_id);   // további jelöltek az elvetett hely nélkül (háttérben)
     } else if (action === 'confirm') {
       if (cur.actual_lat == null && !cur.actual_address) return res.json({ result: { ok: false, err: 'Nu există adresă de confirmat' } });
       await pool.query(`UPDATE order_stops SET match_status='confirmed', match_decided_by=$3 WHERE id=$1 AND company_id=$2`, [id, cid, by]);
@@ -146,6 +157,23 @@ handlers.stopMatchDecide = async function (req, res, args) {
         [id, cid, c.lat, c.lng, addr, city, c.from || null, c.to || null, c.score != null ? Math.round(c.score) : null, by]);
       try { await runner.learnPlace(cid, { ...cur, actual_lat: c.lat, actual_lng: c.lng, actual_address: addr, actual_city: city }); } catch (_) {}
       await _learn(cid, cur, 'pick', c);
+    } else if (action === 'map') {
+      // térképen kiválasztott pont (a jármű útvonaláról vagy bárhonnan)
+      const lat = Number(a.lat), lng = Number(a.lng);
+      if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 85 || Math.abs(lng) > 180) return res.json({ result: { ok: false, err: 'Coordonate invalide' } });
+      const ts = (v) => { const t = Date.parse(v); return isFinite(t) ? new Date(t).toISOString() : null; };
+      let place = null;
+      try { place = await runner.reversePlace(lat, lng); } catch (_) {}
+      const addr = (place && place.address) || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+      await pool.query(
+        `UPDATE order_stops SET actual_lat=$3, actual_lng=$4, actual_address=$5, actual_city=$6, actual_country=$7,
+                gps_arrived_at=$8, gps_left_at=$9, match_score=NULL, match_source='map', match_status='confirmed', match_decided_by=$10
+          WHERE id=$1 AND company_id=$2`,
+        [id, cid, lat, lng, addr.slice(0, 500), place ? (place.city || place.municipality || null) : null, place ? place.country : null,
+          a.from ? ts(a.from) : null, a.to ? ts(a.to) : null, by]);
+      try { await runner.learnPlace(cid, { ...cur, actual_lat: lat, actual_lng: lng, actual_address: addr }); } catch (_) {}
+      if (cur.match_status !== 'rejected') await _learn(cid, cur, 'pick', { lat, lng, signals: [] });
+      else { try { await runner.requeueOpen(cid, cur.order_id); } catch (_) {} }
     } else if (action === 'edit') {
       const addr = String(a.address || '').trim().slice(0, 500);
       if (addr.length < 3) return res.json({ result: { ok: false, err: 'Adresa este prea scurtă' } });
@@ -281,6 +309,78 @@ handlers.stopMatchSettingsSave = async function (req, res, args) {
     return res.json({ result: { ok: true, settings: st } });
   } catch (err) {
     console.error('stopMatchSettingsSave hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+const _isoDay = (v) => {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : gt.localDay(v.getTime());
+  const s = String(v); return /^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10)) ? s.slice(0, 10) : null;
+};
+const _pgDate = (v) => (v instanceof Date && !isNaN(v.getTime()))
+  ? v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0')
+  : _isoDay(v);
+
+handlers.stopMatchTrack = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const a = (args && args[0]) || {};
+    const cid = u.company_id;
+    const id = parseInt(a.stop_id, 10);
+    const st = (await pool.query(
+      `SELECT s.id, s.kind, s.loc, s.firma, s.data, s.done_at, s.arrived_at, s.actual_lat, s.actual_lng, s.match_status, s.match_detail,
+              s.actual_address, s.gps_arrived_at, s.gps_left_at,
+              o.rendszam_camion, o.data_incarcare, o.data_descarcare, o.fuvar_no, o.id AS order_id
+         FROM order_stops s JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
+        WHERE s.id=$1 AND s.company_id=$2`, [id, cid])).rows[0];
+    if (!st) return res.json({ result: { ok: false, err: 'Punctul nu a fost găsit' } });
+    const plate = String(st.rendszam_camion || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!plate) return res.json({ result: { ok: false, err: 'Cursa nu are camion asociat' } });
+    const today = gt.localDay(Date.now());
+    const center = _pgDate(st.data) || _isoDay(st.done_at) || _isoDay(st.arrived_at)
+      || _pgDate(st.kind === 'pickup' ? st.data_incarcare : st.data_descarcare) || today;
+    const lo = gt.addDays(center, -3), hi = gt.addDays(center, 4) > today ? today : gt.addDays(center, 4);
+    const { rows: dayRows } = await pool.query(
+      `SELECT day::text AS day, point_count FROM gps_track_days
+        WHERE company_id=$1 AND UPPER(REGEXP_REPLACE(rendszam,'[^A-Za-z0-9]','','g'))=$2 AND day BETWEEN $3::date AND $4::date AND point_count > 0
+        ORDER BY day`, [cid, plate, lo, hi]);
+    const days = dayRows.map((r) => r.day);
+    let day = /^\d{4}-\d{2}-\d{2}$/.test(String(a.day || '')) && a.day >= lo && a.day <= hi ? a.day : null;
+    // a kiválasztott pont / jelölt napja (ha kérték), különben a tervezett nap
+    if (!day) {
+      const atDay = _isoDay(a.at) || (a.focus_actual ? _isoDay(st.gps_arrived_at) : null);
+      if (atDay && atDay >= lo && atDay <= hi) day = atDay;
+    }
+    if (!day) day = days.includes(center) ? center : (days.find((d) => d >= center) || days[days.length - 1] || center);
+    const row = (await pool.query(
+      `SELECT points_json, segments FROM gps_track_days
+        WHERE company_id=$1 AND UPPER(REGEXP_REPLACE(rendszam,'[^A-Za-z0-9]','','g'))=$2 AND day=$3::date`, [cid, plate, day])).rows[0];
+    let pts = [];
+    try { pts = row ? JSON.parse(row.points_json || '[]') : []; } catch (_) { pts = []; }
+    let lines = (row && Array.isArray(row.segments)) ? row.segments.filter((x) => x && x.p).map((x) => ({ p: x.p, k: x.k || 'm' })) : [];
+    if (!lines.length && pts.length > 1) {
+      // még nincs útra illesztve: a nyers pontsor ritkítva
+      const thin = [pts[0]];
+      for (let i = 1; i < pts.length; i++) if (gt.distM(thin[thin.length - 1], pts[i]) >= 40) thin.push(pts[i]);
+      lines = [{ p: gt.encodePolyline(thin.map((x) => [x[1], x[2]])), k: 'r' }];
+    }
+    const stops = pts.length > 1 ? gt.detectStops(pts, pts[pts.length - 1][0]).map((x) => ({
+      lat: x.lat, lng: x.lng, from: new Date(x.from * 1000).toISOString(), to: new Date(x.to * 1000).toISOString(),
+      min: Math.round((x.to - x.from) / 60),
+    })) : [];
+    const det = st.match_detail || {};
+    return res.json({ result: {
+      ok: true, plate: st.rendszam_camion, fuvar_no: st.fuvar_no || st.order_id, day, days, center,
+      planned: { kind: st.kind, loc: st.loc, firma: st.firma, data: _pgDate(st.data) },
+      actual: st.actual_lat != null ? { lat: st.actual_lat, lng: st.actual_lng, rejected: st.match_status === 'rejected',
+        address: st.actual_address || null, status: st.match_status || null,
+        from: st.gps_arrived_at ? new Date(st.gps_arrived_at).toISOString() : null,
+        to: st.gps_left_at ? new Date(st.gps_left_at).toISOString() : null } : null,
+      candidates: Array.isArray(det.candidates) ? det.candidates.map((c) => ({ lat: c.lat, lng: c.lng, from: c.from, to: c.to, score: c.score, address: c.address })) : [],
+      lines, stops } });
+  } catch (err) {
+    console.error('stopMatchTrack hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

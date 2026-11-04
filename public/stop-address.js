@@ -142,7 +142,7 @@
         + '<div class="text-muted" style="font-size:12px;">' + _e(r.rendszam_camion || '') + (r.client ? ' · ' + _e(r.client) : '') + '</div></td>'
         + '<td><div>' + (r.kind === 'pickup' ? '⬆️ ' : '⬇️ ') + _e(r.loc || '—') + '</div>'
         + '<div class="text-muted" style="font-size:12px;">' + _e(r.firma || '') + (r.data ? ' · ' + _e(r.data) : '') + '</div></td>'
-        + '<td>' + (actual ? '<div>📍 ' + _e(actual) + (r.actual_lat != null ? ' <a href="' + osm(r.actual_lat, r.actual_lng) + '" target="_blank" rel="noopener">🗺️</a>' : '') + '</div>' : '<span class="text-muted">—</span>')
+        + '<td>' + (actual ? '<div>📍 ' + _e(actual) + (r.actual_lat != null ? ' <a href="javascript:void(0)" onclick="StopAddress.map(' + r.id + ',\'actual\')" title="' + _t('sa.a.viewSat', 'Vezi pe harta satelit') + '">🛰️</a>' : '') + '</div>' : '<span class="text-muted">—</span>')
         + (r.gps_arrived_at ? '<div class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(r.gps_arrived_at)) + ' – ' + _e(dt(r.gps_left_at)) + (dm != null ? ' (' + dur(dm) + ')' : '') + '</div>' : '')
         + (r.waybill_apply ? '<div style="margin-top:4px;"><span class="badge ok">📄 ' + (r.waybill_applied_at ? _t('sa.onWaybill', 'Pe foaia de parcurs') : _t('sa.wbWaiting', 'Se va pune pe foaia de parcurs')) + '</span></div>'
           : (r.wb_count ? '' : '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _t('sa.noWaybill', 'Încă fără foaie de parcurs') + '</div>'))
@@ -157,21 +157,25 @@
             ? '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'unapply\')" title="' + _t('sa.a.unapply', 'Scoate de pe foaia de parcurs (restaurează adresa planificată)') + '">↩</button> '
             : '<button class="btn" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'apply\')" title="' + _t('sa.a.apply', 'Pune pe foaia de parcurs') + '">📄</button> ') : '')
         + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.toggle(' + r.id + ')" title="' + _t('sa.a.details', 'Detalii / alt candidat') + '">' + (S.open[r.id] ? '▾' : '▸') + '</button> '
+        + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.map(' + r.id + ')" title="' + _t('sa.a.map', 'Alege pe hartă (unde a fost camionul)') + '">🗺️</button> '
         + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.edit(' + r.id + ')" title="' + _t('sa.a.edit', 'Adresă manuală') + '">✏️</button> '
         + '<button class="btn ghost" style="padding:5px 10px;" onclick="StopAddress.rerun(\'' + _e(r.order_id) + '\')" title="' + _t('sa.a.rerun', 'Recalculează cursa') + '">🔄</button>'
         + '</td></tr>';
       if (S.open[r.id]) {
         h += '<tr><td colspan="5" style="background:rgba(99,102,241,0.05);">'
           + '<div style="font-weight:700;margin-bottom:6px;">' + _t('sa.cands', 'Candidați din traseul GPS') + '</div>'
+          + (r.match_status !== 'auto' && r.match_status !== 'confirmed' && cands.length > 4 ? '<div class="text-muted" style="font-size:12px;margin-bottom:6px;">' + _t('sa.lowHint', 'Siguranță scăzută — afișăm mai mulți candidați, inclusiv staționări mai scurte (min. 8 min).') + '</div>' : '')
           + (cands.length ? cands.map(function (c, i) {
             var m = mins(c.from, c.to);
             return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid rgba(148,163,184,0.25);">'
               + '<span class="badge info">' + _e(c.score) + ' ' + _t('sa.points', 'pct') + '</span>'
-              + '<span style="flex:1;min-width:200px;">📍 ' + _e(c.address || (c.lat + ', ' + c.lng)) + ' <a href="' + osm(c.lat, c.lng) + '" target="_blank" rel="noopener">🗺️</a></span>'
+              + (c.short ? '<span class="badge warn">' + _t('sa.shortStop', 'staționare scurtă') + '</span>' : '')
+              + '<span style="flex:1;min-width:200px;">📍 ' + _e(c.address || (c.lat + ', ' + c.lng)) + ' <a href="javascript:void(0)" onclick="StopAddress.map(' + r.id + ',' + i + ')" title="' + _t('sa.a.viewSat', 'Vezi pe harta satelit') + '">🛰️</a></span>'
               + '<span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(c.from)) + ' – ' + _e(dt(c.to)) + (m != null ? ' (' + dur(m) + ')' : '') + '</span>'
               + '<button class="btn" style="padding:4px 10px;" onclick="StopAddress.pick(' + r.id + ',' + i + ')">' + _t('sa.a.pick', 'Alege') + '</button>'
               + '</div>';
           }).join('') : '<div class="text-muted">' + _t('sa.noCands', 'Nu s-a găsit nicio staționare potrivită (min. 20 min) în perioada cursei.') + '</div>')
+          + '<div style="margin-top:8px;"><button class="btn primary" style="padding:6px 12px;" onclick="StopAddress.map(' + r.id + ')">🗺️ ' + _t('sa.a.mapLong', 'Alege pe hartă — unde a fost camionul în ziua respectivă') + '</button></div>'
           + '</td></tr>';
       }
     });
@@ -183,8 +187,135 @@
     gas('stopMatchDecide', [a]).then(function (r) {
       if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
       if (action === 'apply') _toast(r.total_waybills ? _t('sa.applied', 'Pus pe foile de parcurs') + ': ' + r.waybills : _t('sa.appliedLater', 'Se va pune pe foaia de parcurs când aceasta este trimisă'));
+      else if (action === 'reject') {
+        _toast(_t('sa.rejectedMore', 'Respins — căutăm alți candidați; dacă nu apare niciunul potrivit, alege pe hartă.'));
+        S.open[id] = true;
+        setTimeout(function () { if (document.getElementById('saBody')) reload(); }, 20000);
+      }
       else _toast(_t('sa.saved', 'Salvat'));
       reload();
+    });
+  }
+
+  // ── Térképes kiválasztás: a jármű adott napi útvonala + megállói ──
+  var M = { stopId: null, map: null, layers: null, data: null, pick: null };
+  function decodePl(str) {
+    var idx = 0, lat = 0, lng = 0, out = [], f = 1e6;
+    str = String(str || '');
+    while (idx < str.length) {
+      var b, sh = 0, r = 0;
+      do { b = str.charCodeAt(idx++) - 63; r |= (b & 0x1f) << sh; sh += 5; } while (b >= 0x20 && idx < str.length);
+      lat += (r & 1) ? ~(r >> 1) : (r >> 1);
+      sh = 0; r = 0;
+      do { b = str.charCodeAt(idx++) - 63; r |= (b & 0x1f) << sh; sh += 5; } while (b >= 0x20 && idx < str.length);
+      lng += (r & 1) ? ~(r >> 1) : (r >> 1);
+      out.push([lat / f, lng / f]);
+    }
+    return out;
+  }
+  function ensureMapModal() {
+    var el = document.getElementById('saMapModal');
+    if (el) return el;
+    el = document.createElement('div');
+    el.className = 'modal-back';
+    el.id = 'saMapModal';
+    el.style.zIndex = '1100';   // a fuvar-adatlap fölött is
+    el.innerHTML = '<div class="modal glass vs-light-surface" style="width:min(1000px,100%);max-height:94vh;display:flex;flex-direction:column;gap:8px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + '<div id="saMapTitle" style="font-weight:800;flex:1;min-width:200px;"></div>'
+      + '<button class="btn ghost" onclick="StopAddress.mapDay(-1)">‹</button>'
+      + '<select class="select" id="saMapDay" style="width:auto;" onchange="StopAddress.mapLoad(this.value)"></select>'
+      + '<button class="btn ghost" onclick="StopAddress.mapDay(1)">›</button>'
+      + '<button class="btn" onclick="StopAddress.mapClose()">✕</button>'
+      + '</div>'
+      + '<div id="saMapInfo" class="text-muted" style="font-size:12px;"></div>'
+      + '<div id="saMapCanvas" style="height:min(62vh,560px);border-radius:12px;overflow:hidden;"></div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;" class="text-muted">'
+      + '<span>━ ' + _t('sa.mapRoute', 'traseul camionului') + '</span>'
+      + '<span>🟠 ' + _t('sa.mapStop', 'staționare (click pentru alegere)') + '</span>'
+      + '<span>🟢 ' + _t('sa.mapChosen', 'Locul ales') + '</span>'
+      + '<span>🔵 ' + _t('sa.mapCand', 'candidat propus') + '</span>'
+      + '<span>⚪ ' + _t('sa.mapRejected', 'loc respins') + '</span>'
+      + '<span>👆 ' + _t('sa.mapAny', 'sau click oriunde pe hartă') + '</span>'
+      + '</div></div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', function (e) { if (e.target === el) StopAddress.mapClose(); });
+    return el;
+  }
+  function mapRender(d) {
+    if (typeof L === 'undefined') { document.getElementById('saMapCanvas').innerHTML = '<div style="padding:20px;">Leaflet lipsă</div>'; return; }
+    if (!M.map) {
+      M.map = L.map('saMapCanvas', { zoomControl: true });
+      // csak műholdas réteg (Esri World Imagery) — így az épületek, rámpák, udvarok is látszanak
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+        maxNativeZoom: 19, maxZoom: 20 }).addTo(M.map);
+      M.layers = L.layerGroup().addTo(M.map);
+      M.map.on('click', function (e) { mapPickAt(e.latlng.lat, e.latlng.lng, null, null); });
+    }
+    M.layers.clearLayers();
+    var bounds = [];
+    (d.lines || []).forEach(function (ln) {
+      var ll = decodePl(ln.p); if (ll.length < 2) return;
+      L.polyline(ll, { color: '#ffffff', weight: 7, opacity: 0.9, interactive: false }).addTo(M.layers);
+      L.polyline(ll, { color: ln.k === 'r' ? '#fde047' : '#22d3ee', weight: 4, opacity: 0.95, interactive: false }).addTo(M.layers);
+      bounds = bounds.concat(ll);
+    });
+    (d.candidates || []).forEach(function (c) {
+      if (c.lat == null) return;
+      L.circleMarker([c.lat, c.lng], { radius: 9, color: '#1d4ed8', weight: 3, fillColor: '#3b82f6', fillOpacity: 0.85 })
+        .addTo(M.layers).on('click', function (ev) { L.DomEvent.stopPropagation(ev); mapPickAt(c.lat, c.lng, c.from, c.to, c.address); });
+    });
+    (d.stops || []).forEach(function (s) {
+      L.circleMarker([s.lat, s.lng], { radius: 7, color: '#c2410c', weight: 2, fillColor: '#f97316', fillOpacity: 0.9 })
+        .addTo(M.layers).bindTooltip(dt(s.from) + ' – ' + dt(s.to) + ' (' + dur(s.min) + ')')
+        .on('click', function (ev) { L.DomEvent.stopPropagation(ev); mapPickAt(s.lat, s.lng, s.from, s.to); });
+      bounds.push([s.lat, s.lng]);
+    });
+    var act = null;
+    if (d.actual && d.actual.rejected) {
+      L.circleMarker([d.actual.lat, d.actual.lng], { radius: 8, color: '#475569', weight: 2, fillColor: '#e2e8f0', fillOpacity: 0.9 })
+        .addTo(M.layers).bindTooltip(_t('sa.mapRejected', 'loc respins'));
+    } else if (d.actual) {
+      // a (automatikusan vagy kézzel) kiválasztott pont — zöld, felül
+      act = L.circleMarker([d.actual.lat, d.actual.lng], { radius: 11, color: '#ffffff', weight: 3, fillColor: '#16a34a', fillOpacity: 0.95 }).addTo(M.layers);
+      act.bindPopup('<div style="min-width:200px;"><b>✓ ' + _e(_t('sa.mapChosen', 'Locul ales')) + '</b><br>📍 ' + _e(d.actual.address || (d.actual.lat + ', ' + d.actual.lng))
+        + (d.actual.from ? '<br><span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(d.actual.from)) + ' – ' + _e(dt(d.actual.to)) + '</span>' : '') + '</div>');
+      bounds.push([d.actual.lat, d.actual.lng]);
+    }
+    var f = M.focus, fp = null;
+    if (f === 'actual' && d.actual) fp = [d.actual.lat, d.actual.lng];
+    else if (typeof f === 'number' && M.focusCand && M.focusCand.lat != null) fp = [M.focusCand.lat, M.focusCand.lng];
+    if (fp) M.map.setView(fp, 18);
+    else if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
+    else M.map.setView([45.9, 24.9], 6);
+    if (fp && f === 'actual' && act) setTimeout(function () { act.openPopup(); }, 150);
+    setTimeout(function () { M.map.invalidateSize(); }, 50);
+  }
+  function mapPickAt(lat, lng, from, to, addr) {
+    M.pick = { lat: lat, lng: lng, from: from, to: to };
+    var html = '<div style="min-width:200px;">'
+      + (addr ? '<div style="margin-bottom:4px;">📍 ' + _e(addr) + '</div>' : '<div style="margin-bottom:4px;">📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '</div>')
+      + (from ? '<div class="text-muted" style="font-size:12px;margin-bottom:6px;">⏱ ' + _e(dt(from)) + ' – ' + _e(dt(to)) + '</div>' : '')
+      + '<button class="btn primary" style="padding:5px 12px;" onclick="StopAddress.mapConfirm()">✓ ' + _t('sa.mapUse', 'Aici a fost') + '</button></div>';
+    L.popup().setLatLng([lat, lng]).setContent(html).openOn(M.map);
+  }
+  function mapLoad(day, at) {
+    var info = document.getElementById('saMapInfo');
+    info.textContent = _t('sa.loading', 'Se încarcă…');
+    if (day && M.data && day !== M.data.day) M.focus = null;   // kézi napváltás: a teljes nap látszik
+    gas('stopMatchTrack', [{ stop_id: M.stopId, day: day || null, at: at || null, focus_actual: M.focus === 'actual' }]).then(function (d) {
+      if (!d || !d.ok) { info.textContent = (d && d.err) || 'Eroare'; return; }
+      M.data = d;
+      var sel = document.getElementById('saMapDay');
+      var days = (d.days || []).slice();
+      if (days.indexOf(d.day) < 0) days.push(d.day);
+      days.sort();
+      sel.innerHTML = days.map(function (x) { return '<option value="' + x + '"' + (x === d.day ? ' selected' : '') + '>' + x + (x === d.center ? ' ★' : '') + '</option>'; }).join('');
+      document.getElementById('saMapTitle').textContent = (d.planned.kind === 'pickup' ? '⬆️ ' : '⬇️ ') + (d.planned.loc || '') + (d.planned.firma ? ' · ' + d.planned.firma : '') + ' — ' + (d.plate || '') + ' · ' + (d.fuvar_no || '');
+      info.textContent = (d.lines && d.lines.length ? '' : _t('sa.mapNoGps', 'Nu există date GPS pentru această zi.') + ' ')
+        + _t('sa.mapHint', 'Alege o staționare (portocaliu), un candidat (albastru) sau click oriunde pe hartă, apoi „Aici a fost".');
+      mapRender(d);
     });
   }
 
@@ -234,6 +365,32 @@
         _toast(_t('sa.applied', 'Pus pe foile de parcurs') + ': ' + r.waybills + ' · ' + r.points + ' ' + _t('sa.pointsWb', 'puncte'));
         reload();
       });
+    },
+    // focus: 'actual' (a kiválasztott pont) | jelölt-index | üres (teljes nap)
+    map: function (id, focus) {
+      M.stopId = id; M.pick = null; M.focus = (focus === undefined ? null : focus); M.focusCand = null;
+      if (typeof focus === 'number') {
+        var r = S.rows.find(function (x) { return x.id === id; });
+        var cands = (r && r.match_detail && Array.isArray(r.match_detail.candidates)) ? r.match_detail.candidates : [];
+        M.focusCand = cands[focus] || null;
+      }
+      var el = ensureMapModal();
+      el.classList.add('open');
+      mapLoad(null, M.focusCand ? M.focusCand.from : null);
+    },
+    mapLoad: mapLoad,
+    mapDay: function (delta) {
+      var sel = document.getElementById('saMapDay'); if (!sel) return;
+      var i = sel.selectedIndex + delta;
+      if (i < 0 || i >= sel.options.length) return;
+      sel.selectedIndex = i; mapLoad(sel.value);
+    },
+    mapClose: function () { var el = document.getElementById('saMapModal'); if (el) el.classList.remove('open'); if (M.map) M.map.closePopup(); },
+    mapConfirm: function () {
+      if (!M.pick) return;
+      var id = M.stopId, p = M.pick;
+      StopAddress.mapClose();
+      decide(id, 'map', { lat: p.lat, lng: p.lng, from: p.from || null, to: p.to || null });
     },
     probe: function () {
       var el = document.getElementById('saProbe'); if (!el) return;
