@@ -65,6 +65,7 @@ const handlers = Object.assign(
   require('../handlers/gpsDailyTrack'),
   require('../handlers/gpsTrack'),
   require('../handlers/gpsToll'),
+  require('../handlers/stopMatch'),
   require('../handlers/statsV2'),
   require('../handlers/statsInsights'),
   require('../handlers/statsReports'),

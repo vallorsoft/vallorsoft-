@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 67. lépés — Tényleges fel-/lerakási címek a GPS-ből (2026-11-04, PR #588) ✅ KÉSZ
+- Új végpontok: `stopMatchList`/`stopMatchDecide`/`stopMatchRerun`/`stopMatchBackfill`/`stopMatchProbe` — CSAK Admin/Manager, `gps-integracio` + `stop-address` kapu; minden lekérdezés `company_id`-szűrt, paraméteres; a döntés előtt a pont tulajdona ellenőrzött (idegen pont → „nem található"); akció-fehérlista, cím 500 karakter, időszak max. 400 nap; audit `order.stop_address.*`. A sofőr-nézetek (`getMySoferOrders`, fuvar-kártya) explicit mezőlistát adnak — az `actual_*`/`match_*` NEM kerül ki. A CargoTrack-kulcs csak szerver-oldalon (AES), a mezőpróba csak mezőneveket + a releváns jelek értékét adja vissza. Külső hívás: Nominatim reverse (nem személyes adat — koordináta), DB-cache + 1 kérés/1,1 mp fojtás; felhasználói kérésben nincs await. GDPR: a GPS-ből származó állomás-hely/-idő a cég-exportba került.
+
 ### 66. lépés — GPS-útdíj javítás (2026-11-04, PR #583) ✅ KÉSZ
 - Számlázási pontosság: a beágyazott felezésnél a HERE-hívásszám kétszer adódott hozzá a `maps_usage` számlálóhoz (túlszámlázás) — javítva, teszt őrzi. Az on-demand OSRM-illesztés kérésenként max. 5 nap (külső szolgáltató terhelése korlátozott). Új adat/végpont/jogosultság-változás nincs; a cégszűrés és a kulcskezelés változatlan.
 

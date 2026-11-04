@@ -65,6 +65,7 @@ function loadTab(name){
   if(name==='pdf-settings' && window.PdfSettings) PdfSettings.mount('pdfSettingsBox');
   if(name==='morning-digest' && typeof loadMorningDigest==='function') loadMorningDigest();
   if(name==='gps-daily-track' && typeof loadGpsDailyTrack==='function') loadGpsDailyTrack();
+  if(name==='stop-address' && typeof loadStopAddress==='function') loadStopAddress();
   if(name==='elofizetesek') loadElofizetesek();
   if(name==='internal-drivers') loadInternalDrivers();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }

@@ -25,6 +25,8 @@ handlers.exportCompanyData = async function (req, res) {
       clients: await rows('SELECT * FROM clients WHERE company_id = $1'),
       vehicles: await rows('SELECT * FROM vehicles WHERE company_id = $1'),
       orders: await rows('SELECT * FROM orders WHERE company_id = $1'),
+      // Állomások + a GPS-ből felismert tényleges hely/idő (a jármű GPS-éből származó adat → exportálandó)
+      order_stops: await rows('SELECT id, order_id, kind, loc, firma, data, arrived_at, done_at, actual_address, actual_lat, actual_lng, gps_arrived_at, gps_left_at, match_status, match_score FROM order_stops WHERE company_id = $1'),
       carriers: await rows('SELECT * FROM carriers WHERE company_id = $1'),
       // Portál-belépők (személyes adat: e-mail/név) — jelszó-hash és invite-token KIZÁRVA.
       client_portal_users: await rows('SELECT id, client_id, email, nev, activ, last_login, created_at FROM client_users WHERE company_id = $1'),
