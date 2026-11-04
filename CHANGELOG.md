@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-04 — 🛣️ Útdíj a GPS-naplóból — HERE Route Import (PR #582)
+- Flotta → GPS útvonal: új „🛣️ Útdíj (HERE)" kártya — a jármű két dátum közti, GPS-ben rögzített TÉNYLEGES útvonalára számol útdíjat. `lib/tollProvider.js` `hereTollFromTrace`: `POST /v8/import` → `routeHandle` → `GET /v8/routes/{handle}?return=tolls`; ritkítás (~150 m, álló pontok ki), `importSplitRoute` esetén felezés.
+- Kamion-paraméterek: útvonaltervező szerelvény-alap (40 t, 400/1650/255 cm, 11 500 kg/tengely, 5 tengely, 1 pótkocsi) ← jármű adata ← kézi bevitel; opcionális mentés a járműre. Új `vehicles.emission_class` (EURO) → `tolls[emissionType]`, a jármű-szerkesztőben is.
+- `handlers/gpsToll.js` (`gpsTollParams`/`gpsTrackToll`): napi cache `gps_toll_days` (`db/gps-toll-days.sql`), `maps_usage` számlálás, audit; HERE-kulcs nélkül ráta-alapú becslés.
+- `parseHereToll`: matrica/bérlet (`pass`) külön listában (nem a km-díjban), `convertedPrice` EUR elsőbbség — a fuvar „🎯 Pontos (HERE)" útdíja is pontosabb. Cache-bust `?v=20261104gtoll`. 1973 Jest zöld (valós Postgres 16).
+
 ## 2026-11-03 — 🛂 Határátlépés utólagos felvétele az irodából — AI-chatből is (PR #581)
 - Új `borderCrossingCreate` / `borderCrossingDelete` (Admin/Manager, saját cég sofőrje): irány-fehérlista, nem lehet jövőbeli vagy 400 napnál régebbi, ±2 perces duplikátum-őr, `added_by` jelölés (`db/border-crossings-added-by.sql`), audit `border.create`/`border.delete`. A sofőr GPS-sora nem törölhető, csak módosítható.
 - A nem kézzel felülírt menetlevelek diurnája újraszámolódik (közös `_applyWaybillRecalc`).

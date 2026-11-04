@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 65. lépés — Útdíj a GPS-naplóból (2026-11-04, PR #582) ✅ KÉSZ
+- Új olvasó/számoló végpontok: `gpsTollParams`, `gpsTrackToll` — Admin/Manager; a jármű a cég GPS-párosításán (`vehicle_gps_map` `company_id`) és `vehicles` `company_id`-szűrésén át oldódik fel, idegen rendszám → hiba; `toll-becsles` csomag-kapu; max. 31 nap. A HERE-kulcs csak szerver-oldalon (mapsProvider, AES), kliensbe nem kerül; minden HERE-hívás `maps_usage`-be számolva; audit `gps.toll` (csak összeg/hívásszám). A kamion-paraméterek fehérlistás tartomány-ellenőrzéssel (`normalizeTruck`), az EURO-osztály enum. Cache `gps_toll_days` `company_id`-horgonnyal, paraméteres SQL. Személyes adat nincs (jármű-pozíció a cég saját GPS-naplójából, ami eddig is tárolt) — GDPR-bekötés nem szükséges. `vehicleUpdate` `emission_class` enum-fehérlistával.
+
 ### 64. lépés — Határátlépés utólagos felvétele (2026-11-03, PR #581) ✅ KÉSZ
 - Új író végpontok: `borderCrossingCreate` (Admin/Manager; a cél-sofőr `users.company_id`-ja a saját cég kell legyen, a Sofer szerep szerver-oldalon elutasítva, irány-fehérlista, jövőbeli/400 napnál régebbi időpont tiltva, duplikátum-őr, helyszín 255 karakter, paraméteres SQL, audit `border.create`) és `borderCrossingDelete` (csak a saját cég és CSAK `added_by`-jal jelölt, iroda által felvett sor; a sofőr GPS-rögzítése nem törölhető; audit `border.delete`). A chat-tool `border.add` ugyanezeken a handlereken át, ✅ megerősítés után ír.
 
