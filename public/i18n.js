@@ -2044,6 +2044,9 @@
     // ── console-shared.js beágyazott feliratok ──
     // Útvonal-előnézet modal
     'cs.rm.title': { hu: '🗺️ Útvonal-előnézet', ro: '🗺️ Previzualizare rută' },
+    'cs.rm.srcHere': { hu: '🚛 HERE · kamion 40 t', ro: '🚛 HERE · camion 40 t' },
+    'cs.rm.srcFree': { hu: 'Ingyenes becslés (autós) — nincs HERE-kulcs', ro: 'Estimare gratuită (auto) — fără cheie HERE' },
+    'cs.rm.srcErr': { hu: 'Az útvonal nem számolható', ro: 'Traseul nu poate fi calculat' },
     'cs.rm.close': { hu: '✕ Bezár', ro: '✕ Închide' },
     'cs.rm.save': { hu: 'Útvonal mentése', ro: 'Salvează ruta' },
     'cs.rm.saved': { hu: 'Útvonal elmentve a fuvarra', ro: 'Ruta a fost salvată pe transport' },

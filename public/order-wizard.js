@@ -920,7 +920,8 @@
       '<span class="ocr-leg-km">' + Math.round(loaded + empty) + ' km</span></div>';
     return '<div class="ocr-legs">' +
       '<div class="ocr-legs-head">' + esc(T('oc.legsHead', 'Szakaszok (a bevitel sorrendjében)')) + ' — ' +
-        legs.length + ' ' + esc(T('oc.legsUnit', 'szakasz')) + '</div>' +
+        legs.length + ' ' + esc(T('oc.legsUnit', 'szakasz')) +
+        (st && st.source === 'here-truck' ? ' · ' + esc(T('cs.rm.srcHere', '🚛 HERE · camion 40 t')) : '') + '</div>' +
       rows + tot +
       '</div>';
   }

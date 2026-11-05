@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-06 — 🚛 Fuvar-kiírás: a km HERE 40 t-s kamionnal, látható jelzéssel (PR #606)
+- A fuvar-kiíró (és -szerkesztő) automata km-je a `orderRouteEstimate` → `routeChain` → `estimateRoute` úton **HERE kamion-routinggal, 40 t-val** számol (PR #605). Új: a km mező alatt jelzés — „🚛 HERE · kamion 40 t", HERE-kulcs nélkül „Ingyenes becslés (autós)", hibánál piros „⚠️ Az útvonal nem számolható: …" (eddig a hiba csendben elnyelődött).
+- Az ellenőrző lap (6. lépés) szakasz-fejlécén is ott a „🚛 HERE · kamion 40 t". `routeChain`/`orderRouteEstimate` visszaadja a `source`-t. 3 új i18n kulcs (`cs.rm.src*`), cache-bust `?v=20261106here40`; +2 teszt.
+
 ## 2026-11-06 — 🚛 Útvonal-becslés kizárólag HERE-rel, 40 t-s kamionra (PR #605)
 - **`lib/routeEstimate.js` `estimateRoute`** (a közös becslő: fuvar km, több állomásos lánc, beérkező megrendelés, útdíj, menetlevél teljes útja, útvonal-eltérés terve, AI-chat): HERE-kulcsos cégnél **egyetlen HERE Routing v8 hívás `transportMode=truck`-kal, 40 t-s EU szerelvénnyel** (`tollProvider.TRUCK_DEFAULTS`: 40 000 kg, 4 m, 16,5 m, 2,55 m, 11,5 t/tengely, 5 tengely, 1 pótkocsi); a köztes pontok `via`-ként, a szakaszok = legek. **HERE-hibánál nincs autós (OSRM) tartalék** — a kamionra hibás km nem kerül be. OSRM csak HERE-kulcs nélküli cégnél fut. Válasz-mező `source: 'here-truck'|'osrm'`.
 - **Útvonal-eltérés** (`lib/routeDeviation.js` `plannedRoute`): a közös becslőt használja (a jármű saját súlya helyett is 40 t); a külön HERE-hívás + OSRM-tartalék megszűnt.
