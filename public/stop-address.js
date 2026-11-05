@@ -34,6 +34,7 @@
     short_dwell: 'sa.sig.short', maneuver: 'sa.sig.maneuver', offroad: 'sa.sig.offroad', night_rest: 'sa.sig.night',
     refuel: 'sa.sig.refuel', home_base: 'sa.sig.home',
     rejected_before: 'sa.sig.rejBefore', rejected_place: 'sa.sig.rejPlace', homonym: 'sa.sig.homonym',
+    rest_then_moved: 'sa.sig.restMoved', break_then_moved: 'sa.sig.breakMoved', after_rest: 'sa.sig.afterRest',
   };
 
   function shell() {
@@ -185,6 +186,8 @@
             return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid rgba(148,163,184,0.25);">'
               + '<span class="badge info">' + _e(c.score) + ' ' + _t('sa.points', 'pct') + '</span>'
               + (c.short ? '<span class="badge warn">' + _t('sa.shortStop', 'staționare scurtă') + '</span>' : '')
+              + (c.rest === 'daily' ? '<span class="badge warn">🛏️ ' + _t('sa.restDaily', 'odihnă zilnică') + '</span>' : c.rest === 'break' ? '<span class="badge warn">☕ ' + _t('sa.restBreak', 'pauză') + '</span>' : '')
+              + (c.hop ? '<span class="badge info">➡️ ' + _t('sa.afterRest', 'prima oprire după odihnă') + '</span>' : '')
               + '<span style="flex:1;min-width:200px;">📍 ' + _e(c.address || (c.lat + ', ' + c.lng)) + ' <a href="javascript:void(0)" onclick="StopAddress.map(' + r.id + ',' + i + ')" title="' + _t('sa.a.viewSat', 'Vezi pe harta satelit') + '">🛰️</a></span>'
               + '<span class="text-muted" style="font-size:12px;">⏱ ' + _e(dt(c.from)) + ' – ' + _e(dt(c.to)) + (m != null ? ' (' + dur(m) + ')' : '') + '</span>'
               + '<button class="btn" style="padding:4px 10px;" onclick="StopAddress.pick(' + r.id + ',' + i + ')">' + _t('sa.a.pick', 'Alege') + '</button>'
