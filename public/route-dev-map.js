@@ -8,7 +8,7 @@
 // ============================================================
 (function () {
   'use strict';
-  var C_PLAN = '#2563eb', C_ACT = '#16a34a', C_OFF = '#dc2626';
+  var C_PLAN = '#2563eb', C_ACT = '#16a34a', C_OFF = '#dc2626', C_EMPTY = '#64748b';
   var M = { map: null, layers: null, data: null, focus: null, args: null };
 
   function _t(k, fb, vars) {
@@ -48,6 +48,7 @@
       + '<div id="rdmSummary"></div>'
       + '<div class="rdm-legend">'
       + '<span><i style="border-top:4px dashed ' + C_PLAN + ';"></i>' + _e(_t('rdm.legPlan', 'Traseu planificat')) + '</span>'
+      + '<span id="rdmLegEmpty"><i style="border-top:4px dotted ' + C_EMPTY + ';"></i>' + _e(_t('rdm.legEmptyRun', 'Planificat — gol (fără marfă)')) + '</span>'
       + '<span><i style="border-top:4px solid ' + C_ACT + ';"></i>' + _e(_t('rdm.legAct', 'Traseu real (GPS)')) + '</span>'
       + '<span><i style="border-top:5px solid ' + C_OFF + ';"></i>' + _e(_t('rdm.legOff', 'Abatere de la plan (> {km} km)', { km: 1 })) + '</span>'
       + '<span>① ' + _e(_t('rdm.legStops', 'puncte de încărcare / descărcare')) + '</span></div>'
@@ -87,6 +88,39 @@
     var d = M.data, el = document.getElementById('rdmSummary');
     var it = M.focus != null ? d.items[M.focus] : null;
     var html = '<div class="rdm-kpis">';
+    var wr = (d.mode === 'waybill' && !it) ? (d.meta || {}).route : null;
+    if (d.mode === 'waybill' && !it && !wr) {
+      el.innerHTML = '<div class="rdm-sub">' + _e(_t('rdm.wbPending', 'Traseul complet al foii de parcurs (Plecare → Sosire) se calculează acum în fundal — redeschide harta peste un minut.')) + '</div>';
+      return;
+    }
+    if (wr) {
+      var ws = wr.stats || {};
+      var act = wr.odo_km != null ? wr.odo_km : wr.gps_km;
+      html += kpi(_t('rdm.k.wbPlanned', 'Planificat Plecare → Sosire'), _n(wr.planned_km) + ' km')
+        + kpi(_t('rdm.k.loaded', 'din care încărcat'), _n(wr.loaded_km) + ' km')
+        + kpi(_t('rdm.k.empty', 'din care gol'), _n(wr.empty_km) + ' km' + (wr.planned_km ? ' (' + _n(wr.empty_km / wr.planned_km * 100) + '%)' : ''), wr.empty_km > 0 ? 'warn' : '')
+        + kpi(_t('rdm.k.odo', 'Km odometru (foaie)'), _n(wr.odo_km) + ' km')
+        + kpi(_t('rdm.k.gps', 'Km GPS'), _n(wr.gps_km) + ' km')
+        + kpi(_t('rdm.k.diff', 'Diferență'), _sign(wr.diff_km) + ' km' + (wr.diff_pct != null ? ' (' + _sign(wr.diff_pct) + '%)' : ''), wr.status === 'deviation' ? 'warn' : wr.status === 'ok' ? 'ok' : '')
+        + kpi(_t('rdm.k.offKm', 'Km în afara traseului'), _n(ws.off_km) + ' km' + (ws.off_pct != null ? ' (' + _n(ws.off_pct) + '%)' : ''), ws.off_km > 0 ? 'warn' : '')
+        + kpi(_t('rdm.k.drive', 'Timp de mers'), _h(ws.drive_h) + (wr.planned_h != null ? ' / ' + _h(wr.planned_h) : ''))
+        + kpi(_t('rdm.k.stops', 'Opriri ≥ 5 min'), _n(ws.stops, 0) + ' · ' + _h(ws.stop_h));
+      html += '</div>';
+      if (act == null) html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.wbNoKm', 'Lipsesc km de pe odometru și datele GPS — se afișează doar traseul planificat.')) + '</div>';
+      var ll = wr.leg_list || [];
+      if (ll.length) {
+        html += '<div class="rdm-list" style="margin-top:8px;"><table><thead><tr><th>#</th><th>' + _e(_t('rdm.c.leg', 'Segment')) + '</th><th>Km</th><th></th></tr></thead><tbody>'
+          + ll.map(function (l, i) {
+            return '<tr><td>' + (i + 1) + '</td><td>' + _e(l.from || '?') + ' → ' + _e(l.to || '?') + '</td><td>' + _n(l.km) + '</td><td>'
+              + (l.empty ? '<span style="padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;color:#334155;background:#f1f5f9;border:1px dashed #64748b;">' + _e(_t('oc.legEmpty', 'gol')) + '</span>'
+                : '<span style="padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;color:#1e40af;background:#dbeafe;">' + _e(_t('oc.legLoaded', 'încărcat')) + '</span>') + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+      html += '<div style="margin-top:6px;"><button class="btn ghost" style="padding:5px 10px;" onclick="RouteDevMap.recheckWaybill()">🔄 ' + _e(_t('rdm.recalc', 'Recalculează')) + '</button>'
+        + ' <span class="rdm-sub">' + _e(_t('rdm.wbOrdersHint', 'Click pe o cursă din listă pentru detalii pe cursă.')) + '</span></div>';
+      el.innerHTML = html;
+      return;
+    }
     if (it) {
       var s = it.stats || {};
       html += kpi(_t('rdm.k.planned', 'Planificat'), _n(it.planned_km) + ' km')
@@ -119,6 +153,7 @@
 
   function renderList() {
     var d = M.data, el = document.getElementById('rdmList');
+    if (!d.items.length && d.mode === 'waybill') { el.innerHTML = ''; return; }
     if (!d.items.length) { el.innerHTML = '<div class="rdm-sub" style="padding:8px 0;">' + _e(_t('rdm.none', 'Nu există curse verificate în această selecție.')) + '</div>'; return; }
     el.innerHTML = '<div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>' + _e(_t('rdm.c.route', 'Traseu')) + '</th><th>'
       + _e(_t('rdm.k.planned', 'Planificat')) + '</th><th>' + _e(_t('rdm.k.actual', 'Parcurs (GPS)')) + '</th><th>'
@@ -163,6 +198,35 @@
     }
     M.layers.clearLayers();
     var d = M.data, bounds = [];
+    var wr = (d.mode === 'waybill' && M.focus == null) ? (d.meta || {}).route : null;
+    if (wr) {
+      var g = L.featureGroup().addTo(M.layers);
+      (wr.legs || []).forEach(function (l) {
+        if (!l.pts || l.pts.length < 2) return;
+        L.polyline(l.pts, l.empty ? { color: C_EMPTY, weight: 5, opacity: 0.9, dashArray: '2 9', lineCap: 'round' }
+          : { color: C_PLAN, weight: 5, opacity: 0.85, dashArray: '10 8' })
+          .bindTooltip((l.empty ? _t('oc.legEmpty', 'gol') : _t('oc.legLoaded', 'încărcat')) + ' · ' + _n(l.km) + ' km', { sticky: true }).addTo(g);
+        l.pts.forEach(function (p) { bounds.push(p); });
+      });
+      if (wr.actual && wr.actual.length > 1) L.polyline(wr.actual, { color: C_ACT, weight: 4, opacity: 0.9 }).addTo(g);
+      (wr.off || []).forEach(function (seg) { if (seg.length > 1) L.polyline(seg, { color: C_OFF, weight: 6, opacity: 0.9 }).addTo(g); });
+      (wr.actual || []).forEach(function (p) { bounds.push(p); });
+      var n = 0;
+      (wr.waypoints || []).forEach(function (w) {
+        if (w.lat == null || w.lng == null) return;
+        var lbl = w.type === 'plecare' ? 'P' : w.type === 'sosire' ? 'S' : String(++n);
+        var kind = w.type === 'loading' ? 'pickup' : w.type === 'unloading' ? 'delivery' : '';
+        L.marker([w.lat, w.lng], { icon: numIcon(lbl, kind) })
+          .bindTooltip(_e(w.tip || w.type || '') + ': ' + _e(w.loc || ''), { direction: 'top' }).addTo(g);
+        bounds.push([w.lat, w.lng]);
+      });
+      setTimeout(function () {
+        M.map.invalidateSize();
+        if (bounds.length) M.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
+        else M.map.setView([45.9, 24.9], 6);
+      }, 60);
+      return;
+    }
     d.items.forEach(function (it, i) {
       var dim = M.focus != null && M.focus !== i;
       var g = L.featureGroup();
@@ -189,7 +253,8 @@
     else { var it = d.items[0] || {}; title = '🗺️ ' + _t('rdm.titleOrder', 'Abatere de traseu') + ' — ' + _e(it.fuvar_no || it.order_id || '')
       + '<div class="rdm-sub">' + _e(it.loc_from || '?') + ' → ' + _e(it.loc_to || '?') + ' · ' + _e(it.rendszam || '') + '</div>'; }
     document.getElementById('rdmTitle').innerHTML = title;
-    document.getElementById('rdmAll').style.display = d.items.length > 1 ? '' : 'none';
+    document.getElementById('rdmAll').style.display = (d.items.length > 1 || d.mode === 'waybill') ? '' : 'none';
+    document.getElementById('rdmAll').title = d.mode === 'waybill' ? _t('rdm.wbWhole', 'Traseul complet al foii de parcurs') : _t('rdm.showAll', 'Toate cursele');
   }
 
   function render() { renderTitle(); renderSummary(); renderList(); renderMap(); }
@@ -205,15 +270,21 @@
       gas('routeDeviationMap', [M.args]).then(function (r) {
         if (!r || !r.ok) { document.getElementById('rdmTitle').textContent = (r && r.err) || _t('rdm.err', 'Eroare'); return; }
         M.data = r;
-        if (r.items.length === 1) M.focus = 0;
+        if (r.items.length === 1 && r.mode !== 'waybill') M.focus = 0;
         render();
       }).catch(function () { document.getElementById('rdmTitle').textContent = _t('rdm.err', 'Eroare'); });
     },
     focus: function (i) {
       if (!M.data) return;
-      if (M.data.items.length === 1) M.focus = 0;
+      if (M.data.items.length === 1 && M.data.mode !== 'waybill') M.focus = 0;
       else M.focus = (i == null || M.focus === i) ? null : i;
       renderSummary(); renderList(); renderMap();
+    },
+    recheckWaybill: function () {
+      if (!M.args || !M.args.waybill_id) return;
+      gas('routeDeviationRecheck', [{ waybill_id: M.args.waybill_id }]).then(function (r) {
+        if (typeof toast === 'function') toast(r && r.ok ? _t('rdm.recalcStarted', 'Recalcularea a pornit — redeschide harta peste un minut.') : ((r && r.err) || _t('rdm.err', 'Eroare')), r && r.ok ? 'ok' : 'err');
+      });
     },
     close: function () {
       var el = document.getElementById('rdmModal');

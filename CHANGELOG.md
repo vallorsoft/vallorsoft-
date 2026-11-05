@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-05 — 🛣️ Teljes km sorrendben: fuvar (első felrakó → utolsó lerakó, üres km-mel) + menetlevél (Plecare → Sosire) (PR #603)
+- **Fuvar km**: minden fel-/lerakó pont a fuvaron belüli sorrendben, az első felrakótól az utolsó lerakóig — benne a lerakó → következő felrakó üres szakasz is (pl. Ploiești fel → Copșa Mică le → Arad fel → Copșa Mică le). Szakaszonként rakott / üres jelzés, összesítve rakott és üres km (`orders.route_geo.legs/loaded_km/empty_km`). A fuvar `km`-je csak akkor íródik, ha üres vagy korábban is automata volt (kézi érték nyer).
+- Közös `lib/routeChain.js` (`classifyLegs` — több lerakós fuvarnál a lerakók közti szakasz rakott marad; `routeChain` — 20 pont fölött darabolva). A fuvar-kiírás ellenőrző lapján a szakaszok „rakott / üres" címkét kapnak + Σ sor.
+- Javítva: a mentett útvonal eddig max. 9 pontot tartott meg (`sanitizeRouteGeo`), az e-mailből jóváhagyott fuvar pedig csak az első felrakó → első lerakó km-ét számolta — most minden pont. Az útvonal-becslés 20 pont fölött is működik.
+- Új háttér-számítás `startOrderRouteKmScheduler` (`lib/orderRouteKm.js`): ahol az állomás-lista változott (CSV-import, chat, sablon, szerkesztés), ott újraszámol; geokód-hibánál 6 órás szünet.
+- **Menetlevél teljes útja** (`lib/waybillRoute.js`, `waybill_route_check`): Plecare → a menetlevél összes fel-/lerakója a rögzített sorrendben → Sosire; tervezett km rakott / üres bontással, összevetve a km-óra (záró − kezdő) és a GPS szerinti km-rel. A pont helye a GPS-ből felismert tényleges hely, ha van. A FUVARLEVELEK „🛣️ Útvonal" térképe ezt mutatja (rakott kék, üres szürke pontozott, valós zöld, szakasz-táblázat, 🔄 újraszámolás); a fuvarokra kattintva fuvaronkénti nézet. Teszt: `tests/unit/routeChainKm.test.js` (17 eset).
+
 ## 2026-11-05 — 🏁 Sofőr-verseny: útvonal-fegyelem a Statisztikában (többlet-km, többlet-idő, rangsor) (PR #602)
 - Statisztika 2.0 → 👥 Emberek → új „🛣️ Útvonal-verseny" fül: sofőrönként ellenőrzött fuvarok, eltéréses fuvarok (db / %), terv / GPS km, többlet-km, 100 tervezett km-re jutó többlet (sáv + eltérés a cég-átlagtól), megtakarított km, terven kívüli km aránya, többlet menetidő, becsült többlet-üzemanyag (jármű névleges fogyasztásával, alap 30 L/100 km), átlagsebesség.
 - Rangsor 🥇🥈🥉: 100 tervezett km-re jutó többlet-km (kevesebb = jobb), majd eltérés-arány; min. 3 ellenőrzött fuvar kell (kevesebbel „kevés adat", rang nélkül). Kiemelések: legjobb útvonal-fegyelem, legtöbbet a terven, legtöbb megtakarított km, eltérés nélküli sofőrök. Cég-szintű KPI-k, kereső, 🆚 összehasonlítás (max. 5 sofőr), CSV-export, sofőrönként 🗺️ az időszak fuvarjai térképen.

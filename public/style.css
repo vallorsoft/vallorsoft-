@@ -5878,3 +5878,11 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-fc-it.warn b { color: #fca5a5; }
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-fc-it.good { background: rgba(22,163,74,0.14); border-color: rgba(74,222,128,0.45); }
 .main-content[data-theme="dark"] #gpsDailyTrackBox .gtr-fc-ok { color: #86efac; }
+
+/* Fuvar-kiírás ellenőrző lap: rakott / üres szakasz (a lerakó → következő felrakó üres km is a fuvar km-je) */
+.ocr-leg-tag{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700; vertical-align:middle; }
+.ocr-leg-loaded{ background:#dbeafe; color:#1e40af; }
+.ocr-leg-empty{ background:#f1f5f9; color:#334155; border:1px dashed #64748b; }
+.main-content[data-theme="dark"] .ocr-leg-loaded{ background:rgba(59,130,246,0.18); color:#bfdbfe; }
+.main-content[data-theme="dark"] .ocr-leg-empty{ background:rgba(148,163,184,0.12); color:#e2e8f0; border-color:#94a3b8; }
+.ocr-leg-total{ border-top:1.5px solid #94a3b8 !important; font-weight:600; }

@@ -751,7 +751,8 @@ function buildRouteGeo(which){
   var st=_rmState[which];
   if(!_orderMapOn || !st || !st.waypoints || st.waypoints.length<2) return undefined;
   return { waypoints: st.waypoints.map(function(w){ return { type:w.type, address:(w.label||w.address||null), lat:w.lat, lng:w.lng }; }),
-           km: st.km, durationSeconds: st.dur };
+           km: st.km, durationSeconds: st.dur,
+           legs: (st.legs||[]).map(function(l){ return { from:l.fromLabel, to:l.toLabel, km:l.km, empty:!!l.empty }; }) };
 }
 function resetRouteState(which){
   _rmState[which]=_rmFresh();
@@ -2977,7 +2978,7 @@ function loadReceivedFuvarlevelek(){
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
         +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">${t('cs.editLong')}</button>`
-        +((window.RouteDevMap && Array.isArray(f.order_ids) && f.order_ids.length && !(window._vsFeatures && (window._vsFeatures['stop-address']===false || window._vsFeatures['gps-integracio']===false)))
+        +((window.RouteDevMap && !(window._vsFeatures && (window._vsFeatures['stop-address']===false || window._vsFeatures['gps-integracio']===false)))
           ? `<button class="btn ghost" style="padding:5px 10px;" title="${esc(t('cs.ol.mRouteDev'))}" onclick="RouteDevMap.open({waybill_id:'${f.id}'})">🛣️ ${t('cs.wbRouteDev')}</button>` : '')
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="WaybillDocs.openUpload('${f.id}')">${t('wbd.upload')}</button>`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="WaybillDocs.openManage('${f.id}')">${t('wbd.manage')}${f.doc_count?' <span style="display:inline-block;min-width:18px;padding:1px 6px;border-radius:999px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+f.doc_count+'</span>':''}</button>`

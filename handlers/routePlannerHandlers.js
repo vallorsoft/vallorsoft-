@@ -507,9 +507,12 @@ handlers.orderRouteEstimate = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'Calculul rutei pe harta nu este activat la aceasta firma.' } });
     }
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
-    const est = await estimateRoute(a.waypoints, cid);
+    // minden pont a megadott sorrendben (20 pont fölött darabolva), szakaszonként rakott / üres jelzéssel
+    const est = await require('../lib/routeChain').routeChain(cid, a.waypoints);
     return res.json({ result: { ok: true, km: est.km, durationSeconds: est.durationSeconds,
-      polyline: est.polyline, waypoints: est.waypoints, legs: est.legs || [] } });
+      polyline: est.polyline, waypoints: est.waypoints.map((w) => ({ type: w.type, lat: w.lat, lng: w.lng, label: w.address })),
+      legs: est.legs.map((l) => ({ fromLabel: l.from, toLabel: l.to, km: l.km, durationSeconds: l.sec, empty: l.empty })),
+      loaded_km: est.loaded_km, empty_km: est.empty_km } });
   } catch (err) {
     console.error('orderRouteEstimate hiba:', err);
     return res.json({ result: { ok: false, err: (err && err.message) || 'Eroare de server la calculul rutei.' } });

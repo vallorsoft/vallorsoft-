@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 76. lépés — Teljes km sorrendben (fuvar + menetlevél) (2026-11-05, PR #603) ✅ KÉSZ
+- Háttér-számítás (`lib/orderRouteKm.js`, `lib/waybillRoute.js`): minden lekérdezés és írás `company_id`-szűrt, paraméteres; a fuvar `km`-jét csak üres / korábban automata érték esetén írja (kézi érték védett). Az `order-route-map` kapcsolóval kikapcsolt cégnél nem fut. A menetlevél állomás-koordinátáit csak a saját cég `order_stops` soraiból veszi (`company_id` + id-lista). A `routeDeviationRecheck` menetlevél-ága tulajdon-ellenőrzéssel (Admin/Manager kapu, audit). A `sanitizeRouteGeo` a kliens által küldött szakaszokat is fehérlistázza és hosszra vágja.
+
 ### 75. lépés — Sofőr-verseny: útvonal-fegyelem (2026-11-05, PR #602) ✅ KÉSZ
 - Új olvasó végpont `routeDeviationDriverStats`: Admin/Manager + `stop-address`/`gps-integracio` kapu, cégre és időszakra szűrt, paraméteres, max. 10 000 sor; sofőr nem éri el. A `routeDeviationMap` `sofer_email` szűrője paraméterként, kisbetűsítve. A háttér-pótlás (`backfillStats`) csak a saját sorát frissíti (`order_id` + `company_id`), külső hívás nélkül. Személyes adat: sofőr neve/e-mailje csak a cég saját Admin/Manager felhasználóinak.
 
