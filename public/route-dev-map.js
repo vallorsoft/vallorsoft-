@@ -147,6 +147,7 @@
     }
     html += '</div>';
     if (it && it.status === 'not_checked') html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.notCheckedHint', 'Cursa nu a fost încă verificată — verificarea rulează acum în fundal, redeschide harta peste un minut.')) + '</div>';
+    if (it && it.source && it.source !== 'here' && it.status !== 'no_data') html += '<div class="rdm-sub" style="margin-top:6px;">⚠️ ' + _e(_t('rdm.osrmPlan', 'Planul a fost calculat cu OSRM (auto, fără restricții camion), nu cu HERE') + (it.free_reason && window.vsMapsReasonText ? ' — ' + window.vsMapsReasonText(it.free_reason) : '')) + '</div>';
     if (it && it.group && it.group.length > 1) html += '<div class="rdm-sub" style="margin-top:6px;">🔗 ' + _e(_t('rdm.tripGroup', 'Cursa face parte dintr-un drum cu mai multe curse — planul leagă toate punctele în ordinea orară, cu km goi dintre ele:') + ' ' + it.group.map(function (x) { return x.fuvar_no || x.id; }).join(' → ')) + '</div>';
     if (it && it.status === 'no_data') {
       var rk = { unreliable: ['rdm.ndUnreliable', 'Adresele reale ale punctelor nu sunt încă sigure (necesită confirmare) — abaterea nu se calculează.'],
@@ -172,7 +173,7 @@
         return '<tr class="rdm-row' + (M.focus === i ? ' rdm-on' : '') + '" onclick="RouteDevMap.focus(' + i + ')">'
           + '<td><b>' + _e(it.fuvar_no || it.order_id) + '</b><div class="m">' + _e(it.rendszam || '') + (it.sofer ? ' · ' + _e(it.sofer) : '') + '</div></td>'
           + '<td>' + _e(it.loc_from || '?') + ' → ' + _e(it.loc_to || '?') + '<div class="m">' + _e(_dt(it.from_at)) + (it.to_at ? ' – ' + _e(_dt(it.to_at)) : '') + '</div></td>'
-          + '<td>' + _n(it.planned_km) + ' km<div class="m">' + _e(it.source === 'here' ? 'HERE' : it.source ? 'OSRM' : '') + '</div></td>'
+          + '<td>' + _n(it.planned_km) + ' km<div class="m"' + (it.source && it.source !== 'here' && it.free_reason && window.vsMapsReasonText ? ' title="' + _e(window.vsMapsReasonText(it.free_reason)) + '"' : '') + '>' + _e(it.source === 'here' ? 'HERE' : it.source ? 'OSRM' : '') + '</div></td>'
           + '<td>' + _n(it.actual_km) + ' km<div class="m">' + _e(it.km_source === 'odo' ? _t('rdm.odo', 'odometru') : it.km_source ? 'GPS' : '') + '</div></td>'
           + '<td>' + _n(s.off_km) + ' km<div class="m">max ' + _n(s.max_off_km) + ' km</div></td>'
           + '<td>' + statusBadge(it.status) + (it.diff_km != null ? '<div style="margin-top:3px;">' + _sign(it.diff_km) + ' km (' + _sign(it.diff_pct) + '%)</div>' : '') + '</td></tr>';

@@ -512,7 +512,7 @@ handlers.orderRouteEstimate = async function (req, res, args) {
     return res.json({ result: { ok: true, km: est.km, durationSeconds: est.durationSeconds,
       polyline: est.polyline, waypoints: est.waypoints.map((w) => ({ type: w.type, lat: w.lat, lng: w.lng, label: w.address })),
       legs: est.legs.map((l) => ({ fromLabel: l.from, toLabel: l.to, km: l.km, durationSeconds: l.sec, empty: l.empty })),
-      loaded_km: est.loaded_km, empty_km: est.empty_km, source: est.source } });
+      loaded_km: est.loaded_km, empty_km: est.empty_km, source: est.source, free_reason: est.free_reason || null } });
   } catch (err) {
     console.error('orderRouteEstimate hiba:', err);
     return res.json({ result: { ok: false, err: (err && err.message) || 'Eroare de server la calculul rutei.' } });
