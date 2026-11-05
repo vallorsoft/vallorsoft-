@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-06 — 💾 HERE-útvonal egyszer számolva, tárolva + hiba esetén 3 mp-enként újra (PR #611)
+- **Tartós tárolás** (`db/zzz-here-route-cache.sql`, `here_route_cache`): a `lib/routeEstimate.js` `estimateRoute` minden sikeres HERE kamion-útvonalat (cég + pontok 5 tizedesig + kamion-paraméterek kulcsán, a szakaszok flexpolyline-kódolással) elment; ugyanarra a pont-sorozatra onnantól mindig a tároltat használja, új HERE-hívás nélkül (`cached: true`). Közös minden útvonal-számításnak: fuvar-km, útvonal-eltérés, menetlevél-terv, útdíj, AI-chat árajánlat, beérkező megrendelés.
+- **Újrapróbálás 3 mp-enként:** átmeneti hibánál (hálózat, időtúllépés, 429, 5xx) a háttér-számítás (fuvar-km, útvonal-eltérés, menetlevél) 3 mp múlva elölről kezdi, max. 10×; ha így sem sikerül, a következő ütemező-körben újra (a korábbi 6 órás szünet csak végleges hibánál marad, pl. „nincs kamion-útvonal"). A fuvar-kiírás km-mezője ugyanígy 3 mp-enként újrapróbál (max. 20×, kiírja: „újrapróbálás 3 mp múlva n/20"), amíg a pontok nem változnak.
+- Kulcs-hiba / „nincs útvonal" nem ismétlődik (felesleges HERE-költség nélkül). Tesztek: +5 eset; 2111 Jest zöld.
+
 ## 2026-11-06 — 🚫 OSRM-becslés teljesen kivéve: útvonal-km/terv KIZÁRÓLAG HERE kamionnal (PR #610)
 - **Ok:** az autós OSRM km/idő kamionra félrevezető — inkább ne legyen adat, mint rossz adat.
 - **`lib/routeEstimate.js`:** az `estimateRoute` HERE-kulcs nélkül `NO_HERE` hibát dob (RO üzenet az okkal), OSRM-hívás sehol; új `requireHere`/`noHereError`/`hereOnSql`. Az útvonaltervező (`rpPlanRoute`, régi `calculateRoute`) is HERE nélkül hibát ad (a `planOsrm`/`osrmLeg`/`orsLeg` törölve).

@@ -106,3 +106,57 @@ describe('OSRM-ok jelzése + HERE-re váltás utáni újraszámolás', () => {
     expect(r).toMatchObject({ km: 500, km_updated: true });
   });
 });
+
+describe('HERE: tartós tárolás + 3 mp-es újrapróbálás', () => {
+  const pool = require('../../db');
+  const SEC = { routes: [{ sections: [{ summary: { length: 300000, duration: 10800 }, polyline: poly([[44.9, 26.0], [46.2, 21.3]]) }] }] };
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    jest.spyOn(maps, 'getConfig').mockResolvedValue({ vendor: 'here', key: 'K' });
+    jest.spyOn(maps, 'bump').mockImplementation(() => {});
+    pool.query.mockReset();
+  });
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); delete global.fetch; });
+  const P = [{ lat: 44.9, lng: 26.0 }, { lat: 46.2, lng: 21.3 }];
+
+  test('tárolt útvonal → nincs HERE-hívás, a tárolt km-mel dolgozik', async () => {
+    pool.query.mockImplementation(async (sql) => /SELECT sections FROM here_route_cache/.test(sql)
+      ? { rows: [{ sections: [{ distance: 300000, duration: 10800, poly: SEC.routes[0].sections[0].polyline }] }] } : { rows: [] });
+    global.fetch = jest.fn();
+    const r = await est.estimateRoute(P, 7);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ km: 300, source: 'here-truck', cached: true });
+  });
+
+  test('első számítás után tárolja (INSERT here_route_cache)', async () => {
+    pool.query.mockResolvedValue({ rows: [] });
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => SEC }));
+    const r = await est.estimateRoute(P, 7);
+    expect(r.km).toBe(300);
+    expect(pool.query.mock.calls.some((c) => /INSERT INTO here_route_cache/.test(c[0]))).toBe(true);
+  });
+
+  test('átmeneti hiba (503) → 3 mp múlva elölről, majd sikerül', async () => {
+    pool.query.mockResolvedValue({ rows: [] });
+    let n = 0;
+    global.fetch = jest.fn(async () => (++n < 3 ? { ok: false, status: 503, json: async () => ({}) } : { ok: true, status: 200, json: async () => SEC }));
+    const p = est.estimateRoute(P, 7, { attempts: 10 });
+    for (let i = 0; i < 2; i++) { await Promise.resolve(); await new Promise((r) => setImmediate(r)); jest.advanceTimersByTime(est.RETRY_MS); }
+    const r = await p;
+    expect(n).toBe(3);
+    expect(r.km).toBe(300);
+  });
+
+  test('„nincs útvonal" → nem próbálja újra, nem újrapróbálható hibát ad', async () => {
+    pool.query.mockResolvedValue({ rows: [] });
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ routes: [] }) }));
+    await expect(est.estimateRoute(P, 7, { attempts: 10 })).rejects.toMatchObject({ noRoute: true, retryable: false });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('interaktív hívás (1 próba) 503-nál újrapróbálható jelzéssel tér vissza', async () => {
+    pool.query.mockResolvedValue({ rows: [] });
+    global.fetch = jest.fn(async () => ({ ok: false, status: 503, json: async () => ({}) }));
+    await expect(est.estimateRoute(P, 7)).rejects.toMatchObject({ retryable: true });
+  });
+});
