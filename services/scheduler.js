@@ -1747,6 +1747,8 @@ function startStopMatchScheduler() {
           try { await rd.checkOrder(q.company_id, q.id); }
           catch (e) { console.warn('[RouteDev] fuvar hiba', q.id, e.message); }
         }
+        // régebbi ellenőrzések mutatói (menetidő, letérés) — csak GPS-naplóból, külső hívás nélkül
+        if (Date.now() - t0 < BUDGET_MS) await rd.backfillStats(20);
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[RouteDev] sor hiba', e.message); }
       // havi pontosság-mérés (visszamérés az elfogadott címeken, írás nélkül): körönként 1 cég
       try {

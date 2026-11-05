@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-05 — 🏁 Sofőr-verseny: útvonal-fegyelem a Statisztikában (többlet-km, többlet-idő, rangsor) (PR #602)
+- Statisztika 2.0 → 👥 Emberek → új „🛣️ Útvonal-verseny" fül: sofőrönként ellenőrzött fuvarok, eltéréses fuvarok (db / %), terv / GPS km, többlet-km, 100 tervezett km-re jutó többlet (sáv + eltérés a cég-átlagtól), megtakarított km, terven kívüli km aránya, többlet menetidő, becsült többlet-üzemanyag (jármű névleges fogyasztásával, alap 30 L/100 km), átlagsebesség.
+- Rangsor 🥇🥈🥉: 100 tervezett km-re jutó többlet-km (kevesebb = jobb), majd eltérés-arány; min. 3 ellenőrzött fuvar kell (kevesebbel „kevés adat", rang nélkül). Kiemelések: legjobb útvonal-fegyelem, legtöbbet a terven, legtöbb megtakarított km, eltérés nélküli sofőrök. Cég-szintű KPI-k, kereső, 🆚 összehasonlítás (max. 5 sofőr), CSV-export, sofőrönként 🗺️ az időszak fuvarjai térképen.
+- Többlet menetidő: mért menetidő − tervezett menetidő (az új ellenőrzések a HERE/OSRM menetidejét is tárolják); régebbi fuvarnál a többlet-km-ből becsülve (≈ jelölés).
+- `lib/routeDeviation.js` `driverBoard`/`driverLeaderboard`/`extraHours`/`backfillStats` (a régebbi ellenőrzések mutatói a GPS-naplóból, háttérben, külső hívás nélkül); `routeDeviationDriverStats` RPC; `routeDeviationMap` új `sofer_email` szűrő. Teszt: `tests/unit/routeDevDriverBoard.test.js` (14 eset).
+
 ## 2026-11-05 — 🗺️ Útvonal-eltérés térképen: terv vs. valós út egymáson — fuvarra, menetlevélre, időszakra (PR #601)
 - Új `RouteDevMap.open(...)` ablak (`public/route-dev-map.js`): a tervezett útvonal kék szaggatott, a GPS szerinti valós út zöld, a tervtől > 1 km-re letért szakaszok piros vonallal; számozott fel-/lerakó pontok; mindig világos térkép.
 - Mutatók: tervezett / megtett km, különbség (km és %), km a terven kívül (+ arány), legnagyobb letérés, teljes időtartam, menetidő, megállások (≥ 5 perc, darab + idő), átlag / max. sebesség. Több fuvarnál összesítés: többlet-km (csak eltéréseseknél), megtakarított km, eltéréses fuvarok száma; a listában fuvarra kattintva arra közelít, a többi halványul.
