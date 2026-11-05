@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 72. lépés — Elfelejtett állomás-gomb pótlása GPS-ből + sofőr-átnézés (2026-11-05, PR #597) ✅ KÉSZ
+- Automatikus írás (`lib/stopAutoEvents.js`, a háttér-ütemező `matchOrder`-éből): csak `match_status='auto'` állomásra, csak belső sofőrös fuvaron (Alocat/In Curs/Finalizat), sorrendben, a sofőr gombnyomását sosem írja felül (`COALESCE`, `WHERE done_at IS NULL`), company_id-szűrt, paraméteres; cégenként kikapcsolható (`stop_match_settings.auto_events`, csak Admin).
+- Új sofőr-végpontok (`handlers/stopAutoEvents.js`): CSAK `Sofer`, minden lekérdezés `company_id` + `LOWER(o.email_sofer)` JOIN-nal (más sofőr / cég állomása nem érhető el), csak a még át nem nézett (`auto_ack_at IS NULL`) automatikus sorra írhat. Idő-javítás: parse + max. 45 nap múlt / +2 perc jövő, kész ≥ érkezés; a sofőr saját érkezését nem írja át. Térképes javítás: koordináta-tartomány ellenőrzés, a GPS-nap a fuvar saját rendszámára ±1 napra korlátozva; az idő a GPS-állásból jön (a kliens nem küld időt). A tényleges cím szövege a sofőrhöz nem megy ki (csak koordináta). Minden írás audit-naplózva (`order.stop_auto.*`), az eredeti értékek `auto_orig`-ban.
+
 ### 71. lépés — Közeli cégek + utcák a cím-térképen (2026-11-04, PR #593) ✅ KÉSZ
 - Új olvasó végpont `stopMatchNearby` (Admin/Manager + `stop-address`/`gps-integracio` kapu): csak koordinátát fogad (tartomány-ellenőrzés), a külső hívás (Overpass/OSM, `lib/nearbyPlaces.js`) KIZÁRÓLAG szerveren, sorosítva (≥1 mp szünet), 18 mp timeouttal, ~11 m-es rácson 24 órás memória-cache-sel (max. 500 kulcs) — a kliens nem hív külső szolgáltatót, és cég-adat nem megy ki (csak a koordináta). A sugár 50–400 m-re szorítva. Hiba → üres lista, stack nem szivárog. A `map` akció a cégnevet csak a cache-ből veszi (nincs új külső hívás a mentéskor).
 
