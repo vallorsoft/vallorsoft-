@@ -9,7 +9,7 @@
 // ============================================================
 (function () {
   'use strict';
-  var S = { from: null, to: null, status: 'pending', q: '', rows: [], open: {} };
+  var S = { from: null, to: null, status: 'pending', q: '', rows: [], open: {}, secOpen: {}, devStatus: 'deviation' };
 
   function _t(k, d) { try { var v = (typeof t === 'function') ? t(k) : null; return (v && v !== k) ? v : (d || k); } catch (e) { return d || k; } }
   function _e(s) { return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -72,6 +72,8 @@
         + '</div>'
         + '<div id="saProbe"></div>'
         + '</div>'
+        + '<div class="glass" style="padding:10px 12px;margin-bottom:12px;"><div id="saAcc"></div></div>'
+        + '<div class="glass" style="padding:10px 12px;margin-bottom:12px;"><div id="saDev"></div></div>'
         + '<div class="glass" style="padding:10px 12px;"><div id="saBody" style="overflow-x:auto;"></div></div>';
       var f = box.querySelector('#saFrom'), tt = box.querySelector('#saTo'), st = box.querySelector('#saStatus'), q = box.querySelector('#saQ');
       f.value = S.from; tt.value = S.to; st.value = S.status; q.value = S.q;
@@ -105,6 +107,86 @@
       }
       render();
     }).catch(function () { body.innerHTML = '<div class="text-muted" style="padding:14px;">Eroare de rețea</div>'; });
+    loadAcc();
+    loadDev();
+  }
+
+  // ── 📊 Pontosság (havi visszamérés) ──
+  function _secHead(key, title, extra) {
+    var open = !!S.secOpen[key];
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;" onclick="StopAddress.sec(\'' + key + '\')">'
+      + '<b style="flex:1;min-width:200px;">' + (open ? '▾ ' : '▸ ') + _e(title) + '</b>' + (extra || '') + '</div>';
+  }
+  function loadAcc() {
+    var el = document.getElementById('saAcc'); if (!el) return;
+    gas('stopMatchAccuracyList', []).then(function (r) {
+      if (!r || !r.ok) { el.innerHTML = ''; return; }
+      S.acc = r;
+      renderAcc();
+    }).catch(function () {});
+  }
+  function renderAcc() {
+    var el = document.getElementById('saAcc'), r = S.acc; if (!el || !r) return;
+    var last = (r.rows || [])[0], t0 = last ? last.totals || {} : null;
+    var badge = t0 ? '<span class="badge ' + ((t0.auto_wrong || 0) > 0 ? 'warn' : 'ok') + '" onclick="event.stopPropagation()">' + _e(t0.hit_pct != null ? t0.hit_pct + '%' : '—') + ' · ' + _t('sa.accAutoWrong', 'Sigur, dar greșit') + ': ' + (t0.auto_wrong || 0) + '</span>' : '';
+    var html = _secHead('acc', _t('sa.accTitle', 'Precizia recunoașterii adreselor'), badge);
+    if (S.secOpen.acc) {
+      html += '<div class="text-muted" style="font-size:12px;margin:8px 0;">' + _e(_t('sa.accHint', '')) + '</div>'
+        + '<button class="btn" ' + (r.running ? 'disabled' : '') + ' onclick="StopAddress.accRun()">' + (r.running ? '⏳ ' + _t('sa.accRunning', 'Măsurare în curs…') : _t('sa.accRun', '▶ Măsoară acum')) + '</button>';
+      if (!(r.rows || []).length) html += '<div class="text-muted" style="padding:10px 0;">' + _t('sa.accNone', 'Încă nu există măsurători.') + '</div>';
+      else {
+        html += '<div style="overflow-x:auto;margin-top:10px;"><table class="table"><thead><tr><th>' + _t('sa.accMonth', 'Luna') + '</th><th>' + _t('sa.accStops', 'Puncte')
+          + '</th><th>' + _t('sa.accHit', 'Corect') + '</th><th>' + _t('sa.accNoneFound', 'Negăsit') + '</th><th>' + _t('sa.accAutoWrong', 'Sigur, dar greșit') + '</th></tr></thead><tbody>'
+          + r.rows.map(function (x) {
+            var t = x.totals || {};
+            return '<tr><td>' + _e(x.period) + '</td><td>' + (t.stops || 0) + '</td><td><b>' + (t.hit || 0) + '</b>' + (t.hit_pct != null ? ' (' + t.hit_pct + '%)' : '') + '</td><td>' + (t.none || 0)
+              + '</td><td>' + ((t.auto_wrong || 0) > 0 ? '<span class="badge warn">' + t.auto_wrong + '</span>' : '0') + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  // ── 🛣️ Útvonal-eltérés ──
+  function loadDev() {
+    var el = document.getElementById('saDev'); if (!el) return;
+    gas('routeDeviationList', [{ from: S.from, to: S.to, status: S.devStatus || '' }]).then(function (r) {
+      if (!r || !r.ok) { el.innerHTML = ''; return; }
+      S.dev = r;
+      renderDev();
+    }).catch(function () {});
+  }
+  function renderDev() {
+    var el = document.getElementById('saDev'), r = S.dev; if (!el || !r) return;
+    var c = r.counts || {};
+    var badge = '<span class="badge ' + ((c.deviation || 0) ? 'warn' : 'ok') + '">' + _t('sa.devDeviation', 'Abatere') + ': ' + (c.deviation || 0) + '</span>'
+      + ' <span class="badge ok">' + _t('sa.devOk', 'În regulă') + ': ' + (c.ok || 0) + '</span>';
+    var html = _secHead('dev', _t('sa.devTitle', 'Abatere de traseu'), badge);
+    if (S.secOpen.dev) {
+      var st = S.devStatus || '';
+      html += '<div class="text-muted" style="font-size:12px;margin:8px 0;">' + _e(_t('sa.devHint', '')) + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'
+        + [['', _t('sa.f.all', 'Toate')], ['deviation', _t('sa.devDeviation', 'Abatere')], ['ok', _t('sa.devOk', 'În regulă')], ['no_data', _t('sa.devNoData', 'Fără date')]]
+          .map(function (o) { return '<button class="btn' + (st === o[0] ? ' primary' : ' ghost') + '" style="padding:5px 10px;" onclick="StopAddress.devFilter(\'' + o[0] + '\')">' + _e(o[1]) + '</button>'; }).join('')
+        + '</div>';
+      var rows = r.rows || [];
+      if (!rows.length) html += '<div class="text-muted" style="padding:8px 0;">' + _t('sa.devNone', 'Nu există curse verificate.') + '</div>';
+      else {
+        html += '<div style="overflow-x:auto;"><table class="table"><thead><tr><th>#</th><th>' + _t('sa.route', 'Traseu') + '</th><th>' + _t('sa.devPlanned', 'Planificat')
+          + '</th><th>' + _t('sa.devActual', 'GPS') + '</th><th>' + _t('sa.devDiff', 'Diferență') + '</th><th></th></tr></thead><tbody>'
+          + rows.map(function (x) {
+            var cls = x.status === 'deviation' ? 'warn' : x.status === 'ok' ? 'ok' : '';
+            var lab = x.status === 'deviation' ? _t('sa.devDeviation', 'Abatere') : x.status === 'ok' ? _t('sa.devOk', 'În regulă') : _t('sa.devNoData', 'Fără date');
+            return '<tr><td><b>' + _e(x.fuvar_no || x.order_id) + '</b><div class="text-muted" style="font-size:12px;">' + _e(x.rendszam_camion || '') + (x.nume_sofer ? ' · ' + _e(x.nume_sofer) : '') + '</div></td>'
+              + '<td style="font-size:12.5px;">' + _e(x.loc_incarcare || '?') + ' → ' + _e(x.loc_descarcare || '?') + '<div class="text-muted" style="font-size:12px;">' + _e(dt(x.from_at)) + ' – ' + _e(dt(x.to_at)) + '</div></td>'
+              + '<td>' + (x.planned_km != null ? _e(Number(x.planned_km)) + ' km' : '—') + '<div class="text-muted" style="font-size:11px;">' + _e(x.source === 'here' ? 'HERE' : x.source ? 'OSRM' : '') + '</div></td>'
+              + '<td>' + (x.actual_km != null ? _e(Number(x.actual_km)) + ' km' : '—') + '<div class="text-muted" style="font-size:11px;">' + _e(x.km_source === 'odo' ? 'km-óra / odometru' : x.km_source ? 'GPS' : '') + '</div></td>'
+              + '<td><span class="badge ' + cls + '">' + _e(lab) + '</span>' + (x.diff_km != null ? '<div style="font-size:12px;margin-top:3px;">' + (Number(x.diff_km) > 0 ? '+' : '') + _e(Number(x.diff_km)) + ' km (' + (Number(x.diff_pct) > 0 ? '+' : '') + _e(Number(x.diff_pct)) + '%)</div>' : '') + '</td>'
+              + '<td><button class="btn ghost" style="padding:5px 9px;" title="' + _t('sa.devRecheck', 'Reverifică') + '" onclick="StopAddress.devRecheck(\'' + _e(String(x.order_id)) + '\')">🔄</button></td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+    }
+    el.innerHTML = html;
   }
 
   // 🤖 a rendszer pótolta a sofőr elfelejtett gombját (GPS) — és mit szólt hozzá a sofőr
@@ -409,6 +491,22 @@
 
   var StopAddress = {
     load: function () { if (shell()) reload(); },
+    sec: function (k) { S.secOpen[k] = !S.secOpen[k]; if (k === 'acc') renderAcc(); else renderDev(); },
+    accRun: function () {
+      gas('stopMatchAccuracyRun', []).then(function (r) {
+        if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
+        if (S.acc) { S.acc.running = true; renderAcc(); }
+        setTimeout(loadAcc, 60000);
+      });
+    },
+    devFilter: function (st) { S.devStatus = st; loadDev(); },
+    devRecheck: function (oid) {
+      gas('routeDeviationRecheck', [{ order_id: oid }]).then(function (r) {
+        if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
+        _toast(_t('sa.devQueued', 'Reverificare pornită'));
+        setTimeout(loadDev, 15000);
+      });
+    },
     reload: reload,
     toggle: function (id) { S.open[id] = !S.open[id]; render(); },
     decide: decide,

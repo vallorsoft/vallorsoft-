@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-05 — 📊 Pontosság-mérés havonta + 🛣️ útvonal-eltérés + ⏱ tanult rakodási idő + 🧠 tanulás a sofőr javításaiból (PR #600)
+- **Havi pontosság-mérés** (`lib/stopMatchAccuracy.js`, `stop_match_accuracy`): a cím-felismerő ütemező havonta cégenként visszaméri a felismerést az elfogadott címeken (írás nélkül, tanult adatok nélkül), és eltárolja: találati arány, „biztos, de rossz", nem talált. Tényleges címek fülön 📊 kártya (havi táblázat + „▶ Mérés most", háttérben). A `scripts/stop-match-backtest.js` ugyanezt a modult használja.
+- **Útvonal-eltérés** (`lib/routeDeviation.js`, `order_route_deviation`): lezárt fuvaronként a tervezett km (HERE kamionos, HERE-kulcs nélkül OSRM) az első állomás elhagyásától az utolsóig, a köztes állomásokon át, összevetve a GPS-napló szerint megtett km-rel (km-óra, ha nincs: pont-távolság). Más út, de nem több km (5 km / 3% tűrés) = rendben; többlet = eltérés. A tervezett nyomvonal ritkítva eltárolva a későbbi térképes összevetéshez. 🛣️ kártya a Tényleges címek fülön (szűrő, 🔄 újraellenőrzés) + az anomália-központban (Statisztika → Áttekintés).
+- **Tanult rakodási / ürítési idő** (`lib/siteDwell.js`): partner-cégenként a GPS-állás medián ideje (min. 2 minta, pihenő és pillanatnyi megállás nélkül) → a tervezőtábla fuvar-sávjának buborékjában.
+- **Tanulás a sofőr döntéseiből** (`handlers/stopAutoEvents.js`): „Rendben" → a felismerés jelei elfogadott visszajelzést kapnak; térképes javítás máshová (≥ 250 m) → elutasított jelek + elvetett hely. Helymemóriát továbbra is csak az iroda ír.
+- Javítva a fejlesztés közben: `judge()`-ben a hiányzó GPS-km (JS `null >= 0` igaz) „rendben"-nek számított volna. Teszt: `tests/unit/routeDevAccDwell.test.js` (14 eset); 2107 teszt zöld valós Postgres 16-tal.
+
 ## 2026-11-05 — 🧪 Cím-felismerés: fuzz-teszt + visszamérés valós adaton + térkép előtöltés (PR #599)
 - `tests/unit/stopMatchRobust.test.js`: 400 véletlen, szándékosan hibás GPS-nap (null sebesség, hiányzó mezők, ismétlődő/hiányzó pontok, NaN) — a motor (`buildCandidates`/`align`), a gomb-pótlás (`planAutoFill`) és a térképes javítás (`dwellNear`) sosem dob, az eredmény mindig érvényes (sorrend, státusz, kész ≥ érkezés; pihenő utáni rövid állás tanult adat nélkül sosem „biztos"). Lefedi a napi pihenő / szünet / pihenő utáni ágakat is.
 - `scripts/stop-match-backtest.js` + `matchOrder(..., { dryRun, noMemory, cacheOnly })`: az iroda által elfogadott címeket „helyes válasznak" véve írás nélkül újrafuttatja a felismerést, és kiírja a találati arányt, illetve hányszor lett volna „biztos" egy ROSSZ helyre (ebből fut a gomb-pótlás — 0 felett nem-nulla kilépési kód).

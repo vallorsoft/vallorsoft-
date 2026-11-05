@@ -1736,6 +1736,35 @@ function startStopMatchScheduler() {
         const u = await runner.upgradeAddressFormat(200);
         if (u.updated) console.log('[StopMatch] régi cím átírva', u.updated, '· menetlevél-pont', u.points);
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] régi cím átírás hiba', e.message); }
+      // útvonal-eltérés: tervezett (HERE/OSRM) km vs. GPS szerint megtett km, lezárt fuvaronként
+      try {
+        const rd = require('../lib/routeDeviation');
+        let k = 0;
+        for (const q of await rd.pickQueue(20)) {
+          if (k >= 5 || Date.now() - t0 > BUDGET_MS) break;
+          if (!(await allowed(q.company_id))) continue;
+          k++;
+          try { await rd.checkOrder(q.company_id, q.id); }
+          catch (e) { console.warn('[RouteDev] fuvar hiba', q.id, e.message); }
+        }
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[RouteDev] sor hiba', e.message); }
+      // havi pontosság-mérés (visszamérés az elfogadott címeken, írás nélkül): körönként 1 cég
+      try {
+        if (Date.now() - t0 < BUDGET_MS) {
+          const { rows: due } = await pool.query(
+            `SELECT DISTINCT s.company_id FROM order_stops s
+              WHERE s.match_status='confirmed' AND s.actual_lat IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM stop_match_accuracy a WHERE a.company_id=s.company_id
+                                 AND a.period = to_char(NOW() AT TIME ZONE 'Europe/Bucharest','YYYY-MM'))
+              LIMIT 5`);
+          for (const d of due) {
+            if (!(await allowed(d.company_id))) continue;
+            const r = await require('../lib/stopMatchAccuracy').measureAndStore(d.company_id, { days: 90, limit: 100, noMemory: true });
+            console.log('[StopMatch] havi pontosság cég', d.company_id, r.totals.hit + '/' + r.totals.stops, '· biztos-de-rossz', r.totals.auto_wrong);
+            break;
+          }
+        }
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] pontosság-mérés hiba', e.message); }
       // a rátételt kért címek a közben beküldött menetlevelekre is
       try {
         const wb = require('../lib/stopWaybill');

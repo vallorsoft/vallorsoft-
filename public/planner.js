@@ -28,6 +28,15 @@
   var _mDay = ymd(new Date());          // mobil: kiválasztott nap
   var _f = { q: '', status: '', driver: '', onlyBusy: false };
   var _dense = false;
+
+  // Tanult rakodási / ürítési idő (a partner-cégnél a GPS szerint, medián) a sáv buborékjába
+  function _fmtMin(m) { m = Math.round(Number(m) || 0); return m >= 60 ? Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : '') : m + 'm'; }
+  function _dwellTip(o) {
+    var s = '';
+    if (o && o.dwell_load) s += '\n⏱ ' + t('pl.dwellLoad') + ': ~' + _fmtMin(o.dwell_load.min) + ' (' + o.dwell_load.n + ')';
+    if (o && o.dwell_unload) s += '\n⏱ ' + t('pl.dwellUnload') + ': ~' + _fmtMin(o.dwell_unload.min) + ' (' + o.dwell_unload.n + ')';
+    return s;
+  }
   var _resize = null;                   // sáv-átméretezés állapota
 
   var RAIL_BASE = 168;
@@ -474,7 +483,7 @@
         html += '<div class="p2-bar' + (b.conflict ? ' conflict' : '') + (dim ? ' dim' : '') + (String(_selOid) === String(o.id) ? ' picked' : '') + '" '
           + 'draggable="true" data-oid="' + esc(String(o.id)) + '" '
           + 'style="left:' + left + 'px;width:' + width + 'px;top:' + (b.lane * laneH() + 4) + 'px;height:' + (laneH() - 7) + 'px;background:' + st.c + 'cc;" '
-          + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status + (b.conflict ? '\n⚠️ Átfedés: több fuvar ugyanazon a járművön (részrakomány is lehet)' : '')) + '" '
+          + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status + _dwellTip(o) + (b.conflict ? '\n⚠️ Átfedés: több fuvar ugyanazon a járművön (részrakomány is lehet)' : '')) + '" '
           + 'ondragstart="Planner._ds(event)" onclick="Planner.openPop(\'' + esc(String(o.id)) + '\',event)">'
           + (b.conflict ? '⚠️ ' : '') + icons + esc(String(o.id).replace('CMD-', '#')) + ' ' + esc((o.loc_descarcare || o.client || '').slice(0, 22))
           + (width > 150 ? ' <span class="sub">' + esc(o.nume_sofer || '') + '</span>' : '')
@@ -539,7 +548,7 @@
             html += '<div class="p2-bar' + (b.conflict ? ' conflict' : '') + (dim ? ' dim' : '') + (String(_selOid) === String(o.id) ? ' picked' : '') + '" '
               + 'draggable="true" data-oid="' + esc(String(o.id)) + '" '
               + 'style="left:' + left + 'px;width:' + width + 'px;top:' + (b.lane * laneH() + 4) + 'px;height:' + (laneH() - 7) + 'px;background:' + st.c + 'cc;border-color:rgba(165,180,252,0.5);" '
-              + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status) + '" '
+              + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status + _dwellTip(o)) + '" '
               + 'ondragstart="Planner._ds(event)" onclick="Planner.openPop(\'' + esc(String(o.id)) + '\',event)">'
               + icons + esc(String(o.id).replace('CMD-', '#')) + ' ' + esc((o.loc_descarcare || o.client || '').slice(0, 22))
               + (width > 150 ? ' <span class="sub">' + esc(o.nume_sofer || '') + '</span>' : '')

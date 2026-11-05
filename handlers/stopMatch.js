@@ -241,6 +241,94 @@ handlers.stopMatchRerun = async function (req, res, args) {
   }
 };
 
+// ── Pontosság-mérés (havi, tárolt) ─────────────────────────
+const _accRunning = new Set();   // company_id-k, ahol épp fut a mérés
+handlers.stopMatchAccuracyList = async function (req, res) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    let rows = [];
+    try {
+      rows = (await pool.query(
+        `SELECT period, totals, misses, measured_at FROM stop_match_accuracy
+          WHERE company_id=$1 ORDER BY period DESC LIMIT 12`, [u.company_id])).rows;
+    } catch (e) { if (!(e && e.code === '42P01')) throw e; }
+    return res.json({ result: { ok: true, rows, running: _accRunning.has(u.company_id) } });
+  } catch (err) {
+    console.error('stopMatchAccuracyList hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.stopMatchAccuracyRun = async function (req, res) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const cid = u.company_id;
+    if (!_accRunning.has(cid)) {
+      _accRunning.add(cid);
+      // háttérben — a mérés sok fuvaron fut, a válasz azonnal megy
+      require('../lib/stopMatchAccuracy').measureAndStore(cid, { days: 90, limit: 100, noMemory: true })
+        .catch((e) => console.warn('[StopMatch] kézi pontosság-mérés hiba', cid, e.message))
+        .finally(() => _accRunning.delete(cid));
+    }
+    audit.fromReq(req, 'order.stop_address.accuracy_run', 'company', String(cid), null);
+    return res.json({ result: { ok: true, running: true } });
+  } catch (err) {
+    console.error('stopMatchAccuracyRun hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Útvonal-eltérés (tervezett vs. GPS szerint megtett km) ──
+handlers.routeDeviationList = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const a = (args && args[0]) || {};
+    const to = isDay(a.to) ? a.to : new Date().toISOString().slice(0, 10);
+    const from = isDay(a.from) ? a.from : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const params = [u.company_id, from, to];
+    let where = '';
+    if (['ok', 'deviation', 'no_data'].includes(a.status)) { params.push(a.status); where = ' AND d.status = $' + params.length; }
+    let rows = [];
+    const counts = {};
+    try {
+      rows = (await pool.query(
+        `SELECT d.order_id, d.planned_km, d.actual_km, d.diff_km, d.diff_pct, d.status, d.source, d.km_source,
+                d.from_at, d.to_at, d.checked_at, o.fuvar_no, o.client, o.rendszam_camion, o.nume_sofer,
+                o.loc_incarcare, o.loc_descarcare
+           FROM order_route_deviation d
+           JOIN orders o ON o.id = d.order_id AND o.company_id = d.company_id
+          WHERE d.company_id = $1 AND COALESCE(d.from_at, d.checked_at)::date BETWEEN $2::date AND $3::date` + where + `
+          ORDER BY (d.status = 'deviation') DESC, d.diff_km DESC NULLS LAST, d.checked_at DESC
+          LIMIT 300`, params)).rows;
+      for (const r of (await pool.query(
+        `SELECT status, COUNT(*)::int AS n FROM order_route_deviation
+          WHERE company_id=$1 AND COALESCE(from_at, checked_at)::date BETWEEN $2::date AND $3::date GROUP BY status`,
+        [u.company_id, from, to])).rows) counts[r.status] = r.n;
+    } catch (e) { if (!(e && e.code === '42P01')) throw e; }
+    return res.json({ result: { ok: true, from, to, rows, counts } });
+  } catch (err) {
+    console.error('routeDeviationList hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.routeDeviationRecheck = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const oid = String(((args && args[0]) || {}).order_id || '').slice(0, 20);
+    const o = (await pool.query('SELECT id FROM orders WHERE id=$1 AND company_id=$2', [oid, u.company_id])).rows[0];
+    if (!o) return res.json({ result: { ok: false, err: 'Transportul nu a fost găsit' } });
+    // háttérben (külső útvonal-hívás) — a válasz azonnal megy
+    require('../lib/routeDeviation').checkOrder(u.company_id, oid)
+      .catch((e) => console.warn('[RouteDev] újraellenőrzés hiba', oid, e.message));
+    audit.fromReq(req, 'order.route_deviation.recheck', 'order', oid, null);
+    return res.json({ result: { ok: true, running: true } });
+  } catch (err) {
+    console.error('routeDeviationRecheck hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 handlers.stopMatchBackfill = async function (req, res, args) {
   try {
     const u = await _gate(req, res); if (!u) return;
