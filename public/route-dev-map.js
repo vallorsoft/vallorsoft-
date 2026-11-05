@@ -146,7 +146,14 @@
     }
     html += '</div>';
     if (it && it.status === 'not_checked') html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.notCheckedHint', 'Cursa nu a fost încă verificată — verificarea rulează acum în fundal, redeschide harta peste un minut.')) + '</div>';
-    if (it && it.status === 'no_data') html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.noDataHint', 'Lipsesc adresele reale ale punctelor sau datele GPS pentru această cursă.')) + '</div>';
+    if (it && it.status === 'no_data') {
+      var rk = { unreliable: ['rdm.ndUnreliable', 'Adresele reale ale punctelor nu sunt încă sigure (necesită confirmare) — abaterea nu se calculează.'],
+        time: ['rdm.ndTime', 'Ora din GPS a unui punct diferă cu peste 12 ore de ora apăsată de șofer — potrivire nesigură, abaterea nu se calculează.'],
+        overlap: ['rdm.ndOverlap', 'Între încărcare și descărcare camionul a efectuat și alte curse — km parcurși nu aparțin doar acestei curse:'] }[it.reason];
+      var msg = rk ? _t(rk[0], rk[1]) : _t('rdm.noDataHint', 'Lipsesc adresele reale ale punctelor sau datele GPS pentru această cursă.');
+      if (it.reason === 'overlap' && it.overlap && it.overlap.length) msg += ' ' + it.overlap.map(function (x) { return x.fuvar_no || x.id; }).join(', ');
+      html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(msg) + '</div>';
+    }
     if (!it && d.meta && d.meta.truncated) html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.truncated', 'Se afișează primele 40 de curse (abaterile cele mai mari).')) + '</div>';
     el.innerHTML = html;
   }
