@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-05 — 📍 Útvonaltervező: koordináta is beírható (HERE is felismeri) (PR #TBD)
+## 2026-11-05 — 📍 Útvonaltervező: koordináta is beírható (HERE is felismeri) (PR #596)
 - Az útvonaltervező (és minden cím-autocomplete) pont-mezőjébe koordináta is írható: `45.12345, 25.45678` · `45.123 N, 25.456 E` · `45°07'23"N 25°27'21"E` · tizedesvesszős `45,123 25,456` · Google/HERE/OSM térkép-link. A pont azonnal felkerül a térképre (kiválasztás nélkül is), a listában a cím „cím (lat, lng)" formában jelenik meg.
 - Közös felismerő `public/coord-parse.js` (kliens+szerver, `lib/coordParse.js`); a `mapsProvider.geocode` koordinátánál külső hívás és díj nélkül tér vissza, az új `reverseLabel` HERE-kulcsos cégnél HERE revgeocode-dal, egyébként Photonnal ad címet. Bekötve: `rpAcSearch`/`rpPlanRoute` (HERE routing a pontos koordinátát kapja), `mapsProvider.autocomplete`, `routeEstimate.geocodeCached`, `routePlannerHandlers.geocodeFree`. Csak-egész számpár (pl. házszám) nem koordináta. Teszt: `tests/unit/coordParse.test.js`.
 
@@ -2008,7 +2008,7 @@ A `/admin` és `/manager` konzol **Fuvar-kezelés** (`orders-list`) és **Fuvar-
 
 ---
 
-## 2026-08-25 — Sofőr jármű-kártya: márka helyett Online/Offline állapot-pirula + koppintásra újratölt (PR #TBD)
+## 2026-08-25 — Sofőr jármű-kártya: márka helyett Online/Offline állapot-pirula + koppintásra újratölt (PR #596)
 
 ### Miért
 A sofőr jelezte, hogy „pár perc után ha visszalépek, ki kell jelentkeznem és vissza, hogy élő adatot lássak". A meglévő védőháló (visibilitychange-alapú refresh + 8 órás session, offline overlay) csak akkor sül el, ha ténylegesen tab-váltás történik — telefonon PWA-ban, ha végig előtérben van, sosem futott. A sofőrnek NEM volt vizuális visszajelzése arról, hogy a kliens tudja-e érni a szervert, és NEM tudta explicit módon frissíteni kijelentkezés nélkül.
