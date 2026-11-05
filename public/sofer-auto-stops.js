@@ -9,7 +9,7 @@
 // ============================================================
 (function () {
   'use strict';
-  var S = { items: [], loading: false, editId: null, mapId: null, map: null, pick: null, pickMarker: null };
+  var S = { items: [], loading: false, editId: null, mapId: null, map: null, pick: null, pickMarker: null, mapData: {}, leaflet: null };
 
   function _t(k, d) { try { var v = window.t ? window.t(k) : k; return (v && v !== k) ? v : (d || k); } catch (_) { return d || k; } }
   function _e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -51,6 +51,33 @@
     S.editId = null; S.mapId = null;
     render();
     m.style.display = 'flex';
+    preload();
+  }
+
+  // Előtöltés: a térkép-könyvtár + az első tételek térkép-adata a háttérben,
+  // hogy a „Javítás térképen" azonnal nyíljon (nem várakoztat, hiba esetén csendes).
+  var PRELOAD_N = 8;
+  function _leaflet() {
+    if (!S.leaflet) S.leaflet = new Promise(function (res) { _ensureLeaflet(res); });
+    return S.leaflet;
+  }
+  function _mapData(id) {
+    if (!S.mapData[id]) {
+      S.mapData[id] = _gas('getAutoStopMap', [{ id: id }]).then(function (r) {
+        if (!r || !r.ok) delete S.mapData[id];   // hibás válasz ne ragadjon a cache-ben
+        return r;
+      }, function (e) { delete S.mapData[id]; throw e; });
+    }
+    return S.mapData[id];
+  }
+  function preload() {
+    var withGps = S.items.filter(function (x) { return x.has_gps; });
+    if (!withGps.length) return;
+    _leaflet();
+    // egymás után (a szervert ne terheljük párhuzamos kérésekkel)
+    withGps.slice(0, PRELOAD_N).reduce(function (p, it) {
+      return p.then(function () { return _mapData(it.id).catch(function () {}); });
+    }, Promise.resolve());
   }
 
   function close() {
@@ -96,6 +123,7 @@
   }
 
   function _remove(id) {
+    delete S.mapData[id];
     S.items = S.items.filter(function (x) { return x.id !== id; });
     if (!S.items.length) {
       close();
@@ -163,10 +191,10 @@
       + '<div id="asMap" class="as-map"><div class="as-map-load">⏳ ' + _t('sof.as.loading', 'Se încarcă…') + '</div></div>'
       + '<div class="as-btns"><button class="as-btn ghost" onclick="SoferAutoStops.backToList()">' + _t('sof.as.back', '← Înapoi la listă') + '</button>'
       + '<button class="as-btn ok" onclick="SoferAutoStops.saveMap()">' + _t('sof.as.mapSave', '💾 Corectează aici') + '</button></div>';
-    Promise.all([_gas('getAutoStopMap', [{ id: id }]), new Promise(function (res) { _ensureLeaflet(res); })]).then(function (arr) {
+    Promise.all([_mapData(id), _leaflet()]).then(function (arr) {
       var r = arr[0];
       if (S.mapId !== id) return;
-      if (!arr[1]) { _toast('Harta nu a putut fi încărcată — corectează ora', 'err'); return backToList(); }
+      if (!arr[1]) { S.leaflet = null; _toast('Harta nu a putut fi încărcată — corectează ora', 'err'); return backToList(); }
       if (!r || !r.ok) { _toast((r && r.err) || 'Eroare', 'err'); return backToList(); }
       var el = document.getElementById('asMap'); if (!el) return;
       el.innerHTML = '';
