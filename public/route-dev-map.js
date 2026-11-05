@@ -125,6 +125,7 @@
       var s = it.stats || {};
       html += kpi(_t('rdm.k.planned', 'Planificat'), _n(it.planned_km) + ' km')
         + kpi(_t('rdm.k.actual', 'Parcurs (GPS)'), _n(it.actual_km) + ' km')
+        + (it.empty_km != null ? kpi(_t('rdm.k.empty', 'din care gol'), _n(it.empty_km) + ' km', it.empty_km > 0 ? 'warn' : '') : '')
         + kpi(_t('rdm.k.diff', 'Diferență'), _sign(it.diff_km) + ' km' + (it.diff_pct != null ? ' (' + _sign(it.diff_pct) + '%)' : ''), it.status === 'deviation' ? 'warn' : it.status === 'ok' ? 'ok' : '')
         + kpi(_t('rdm.k.offKm', 'Km în afara traseului'), _n(s.off_km) + ' km' + (s.off_pct != null ? ' (' + _n(s.off_pct) + '%)' : ''), s.off_km > 0 ? 'warn' : '')
         + kpi(_t('rdm.k.maxOff', 'Abatere maximă'), _n(s.max_off_km) + ' km')
@@ -146,10 +147,11 @@
     }
     html += '</div>';
     if (it && it.status === 'not_checked') html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.notCheckedHint', 'Cursa nu a fost încă verificată — verificarea rulează acum în fundal, redeschide harta peste un minut.')) + '</div>';
+    if (it && it.group && it.group.length > 1) html += '<div class="rdm-sub" style="margin-top:6px;">🔗 ' + _e(_t('rdm.tripGroup', 'Cursa face parte dintr-un drum cu mai multe curse — planul leagă toate punctele în ordinea orară, cu km goi dintre ele:') + ' ' + it.group.map(function (x) { return x.fuvar_no || x.id; }).join(' → ')) + '</div>';
     if (it && it.status === 'no_data') {
       var rk = { unreliable: ['rdm.ndUnreliable', 'Adresele reale ale punctelor nu sunt încă sigure (necesită confirmare) — abaterea nu se calculează.'],
         time: ['rdm.ndTime', 'Ora din GPS a unui punct diferă cu peste 12 ore de ora apăsată de șofer — potrivire nesigură, abaterea nu se calculează.'],
-        overlap: ['rdm.ndOverlap', 'Între încărcare și descărcare camionul a efectuat și alte curse — km parcurși nu aparțin doar acestei curse:'] }[it.reason];
+        overlap: ['rdm.ndOverlap', 'Drumul conține și alte curse ale căror puncte nu sunt sigure (sau prea multe curse) — abaterea nu se calculează:'] }[it.reason];
       var msg = rk ? _t(rk[0], rk[1]) : _t('rdm.noDataHint', 'Lipsesc adresele reale ale punctelor sau datele GPS pentru această cursă.');
       if (it.reason === 'overlap' && it.overlap && it.overlap.length) msg += ' ' + it.overlap.map(function (x) { return x.fuvar_no || x.id; }).join(', ');
       html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(msg) + '</div>';

@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-06 — 🔗 Útvonal-eltérés: több fuvaros út egy tervbe fűzve, a köztes üres km-rel (PR #608)
+- **Probléma (CMD-2026-0053):** a kamion egy úton több fuvart vitt. A fuvar terve csak a saját állomásait kötötte össze, a lerakó → következő (más fuvarhoz tartozó) felrakó közti szakasz kimaradt. Így a terv 1724 km lett, a valós, helyes megtett km pedig 2842 km. A #607 ezt „Nincs adat"-ra tette — most helyesen számol.
+- **`lib/routeDeviation.js` `checkOrder` → `_collectTrip` + `tripStops`:** ha ugyanaz a kamion a fuvar ablakában más fuvar állomásán is járt, azt is az útba fűzi (az ablakot kiterjesztve, amíg nincs több átfedés, max. 12 fuvar). Az összes állomás IDŐRENDBEN, a köztes üres szakaszokkal együtt kerül a tervbe (`routeChain`, HERE kamion 40 t, 20 pont fölött darabolva). Az eredmény az út minden fuvarjára mentődik (`detail.group`, `group_key`, `loaded_km`/`empty_km`).
+- **Statisztika:** a sofőr-verseny (`driverBoard`) és az összesítés (`summarize`) az egy útba fűzött fuvarokat csak egyszer számolja.
+- Ha az út valamelyik másik fuvarjának állomása bizonytalan → továbbra is „Nincs adat" (`overlap`).
+- **Térkép:** „🔗 Cursa face parte dintr-un drum…" sor a fuvarszámokkal + „ebből üres" km.
+- **`CALC_VERSION` 3:** a régi eredmények automatikusan újraszámolódnak. Teszt `tests/unit/routeDevGuards.test.js` (7 eset), cache-bust `?v=20261106trip`.
+
 ## 2026-11-06 — 🛡️ Útvonal-eltérés: nincs hamis eltérés megbízhatatlan vagy átfedő fuvarnál (PR #607)
 - **Gyökér (CMD-2026-0053 eset):** a Ploiești → Copșa Mică fuvarra 155 órás ablak, 2842 km GPS-km és +64,9% „eltérés" jött ki. A fuvar első állomásának indulásától az utolsó érkezéséig mért GPS-km akkor is ehhez a fuvarhoz számított, ha a kamion közben más fuvarokat csinált, vagy egy állomás rossz napra lett párosítva.
 - **`lib/routeDeviation.js` `checkOrder` — három védőkorlát a HERE-hívás ELŐTT:**
