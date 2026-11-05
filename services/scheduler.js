@@ -1781,4 +1781,57 @@ function startStopMatchScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler };
+// Fuvar teljes km-je: minden állomás a fuvaron belüli sorrendben (első felrakó → utolsó lerakó,
+// benne az üres km), rakott / üres bontással. Csak ahol az állomás-lista változott.
+function startOrderRouteKmScheduler() {
+  const ork = require('../lib/orderRouteKm');
+  const MIN = Math.max(1, parseInt(process.env.ORDER_ROUTE_KM_INTERVAL_MIN, 10) || 3);
+  const PER_ROUND = Math.max(1, Math.min(50, parseInt(process.env.ORDER_ROUTE_KM_PER_ROUND, 10) || 10));
+  let running = false;
+  const featCache = new Map();
+  async function allowed(cid) {
+    const c = featCache.get(cid);
+    if (c && Date.now() - c.t < 10 * 60 * 1000) return c.v;
+    let v = true;
+    try {
+      const r = await pool.query("SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key='order-route-map'", [cid]);
+      v = !(r.rows.length && r.rows[0].enabled === false);
+    } catch (_) {}
+    featCache.set(cid, { v, t: Date.now() });
+    return v;
+  }
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      let n = 0;
+      for (const q of await ork.pickQueue(PER_ROUND * 3)) {
+        if (n >= PER_ROUND) break;
+        if (!(await allowed(q.company_id))) { ork.markFailed(q.id); continue; }
+        n++;
+        try { await ork.computeForOrder(q.company_id, q.id); }
+        catch (e) { ork.markFailed(q.id); console.warn('[OrderKm] fuvar hiba', q.id, e.message); }
+      }
+      // a menetlevelek teljes útvonala (Plecare → Sosire)
+      try {
+        const wr = require('../lib/waybillRoute');
+        let k = 0;
+        for (const w of await wr.pickQueue(15)) {
+          if (k >= 5) break;
+          if (!(await allowed(w.company_id))) { wr.markFailed(w.id); continue; }
+          k++;
+          try { await wr.checkWaybill(w.company_id, w.id); }
+          catch (e) { wr.markFailed(w.id); console.warn('[WaybillKm] menetlevél hiba', w.id, e.message); }
+        }
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillKm] sor hiba', e.message); }
+    } catch (e) {
+      if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[OrderKm] sor hiba', e.message);
+    } finally { running = false; }
+  }
+  setTimeout(tick, 90 * 1000);
+  const interval = setInterval(tick, MIN * 60 * 1000);
+  console.log('[OrderKm] Fuvar / menetlevél teljes km-számítás elindítva (' + MIN + ' perces ciklus).');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler };

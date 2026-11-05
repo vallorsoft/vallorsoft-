@@ -905,14 +905,23 @@
       var fromShort = _cityShort(leg.fromLabel);
       var toShort = _cityShort(leg.toLabel);
       var km = (leg.km != null) ? (leg.km + ' km') : '—';
+      var tag = leg.empty
+        ? '<span class="ocr-leg-tag ocr-leg-empty">' + esc(T('oc.legEmpty', 'gol')) + '</span>'
+        : '<span class="ocr-leg-tag ocr-leg-loaded">' + esc(T('oc.legLoaded', 'încărcat')) + '</span>';
       return '<div class="ocr-leg-row"><span class="ocr-leg-idx">#' + (i + 1) + '</span>' +
-        '<span class="ocr-leg-path">📍 ' + esc(fromShort) + ' → ' + esc(toShort) + '</span>' +
+        '<span class="ocr-leg-path">📍 ' + esc(fromShort) + ' → ' + esc(toShort) + ' ' + tag + '</span>' +
         '<span class="ocr-leg-km">' + esc(km) + '</span></div>';
     }).join('');
+    var loaded = 0, empty = 0;
+    legs.forEach(function (l) { var k = Number(l.km) || 0; if (l.empty) empty += k; else loaded += k; });
+    var tot = '<div class="ocr-leg-row ocr-leg-total"><span class="ocr-leg-idx">Σ</span>' +
+      '<span class="ocr-leg-path">' + esc(T('oc.legLoaded', 'încărcat')) + ': <b>' + Math.round(loaded) + ' km</b> · ' +
+      esc(T('oc.legEmpty', 'gol')) + ': <b>' + Math.round(empty) + ' km</b></span>' +
+      '<span class="ocr-leg-km">' + Math.round(loaded + empty) + ' km</span></div>';
     return '<div class="ocr-legs">' +
       '<div class="ocr-legs-head">' + esc(T('oc.legsHead', 'Szakaszok (a bevitel sorrendjében)')) + ' — ' +
         legs.length + ' ' + esc(T('oc.legsUnit', 'szakasz')) + '</div>' +
-      rows +
+      rows + tot +
       '</div>';
   }
   // A label első jelentős darabja (városnév) — a bontás olvashatóbb így.

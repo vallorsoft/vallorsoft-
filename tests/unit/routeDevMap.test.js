@@ -107,6 +107,10 @@ describe('handlers.routeDeviationMap', () => {
 
   test('menetlevél: a cég menetlevele, a fuvarjai sorban', async () => {
     pool.query.mockResolvedValueOnce(rows([{ id: 'W1', numar_fisa: 'MT-2026-0003', order_ids: ['A', 'B'] }]));
+    // a menetlevél teljes útja (Plecare → Sosire), már kiszámolva
+    pool.query.mockResolvedValueOnce(rows([{ status: 'ok', planned_km: 900, loaded_km: 580, empty_km: 320, odo_km: 905, gps_km: 898,
+      diff_km: 5, diff_pct: 0.6, planned_geo: [{ empty: true, km: 200, pts: [[45, 25], [44.9, 26]] }],
+      detail: { waypoints: [], legs: [{ from: 'Garaj', to: 'Ploiești', km: 200, empty: true }] }, numar_camion: null }]));
     pool.query.mockResolvedValueOnce(rows([{ id: 'A', status: 'Finalizat', dev_status: 'ok', planned_km: 100, actual_km: 98, diff_km: -2 }]));
     pool.query.mockResolvedValueOnce(rows([{ id: 'B', status: 'Finalizat', dev_status: 'deviation', planned_km: 50, actual_km: 70, diff_km: 20 }]));
     const r = await call(MGR, { waybill_id: 'W1' });
@@ -115,6 +119,9 @@ describe('handlers.routeDeviationMap', () => {
     expect(r.items.map((x) => x.order_id)).toEqual(['A', 'B']);
     expect(r.summary.extra_km).toBe(20); expect(r.summary.saved_km).toBe(2);
     expect(r.meta.numar_fisa).toBe('MT-2026-0003');
+    expect(r.meta.route.planned_km).toBe(900); expect(r.meta.route.empty_km).toBe(320);
+    expect(r.meta.route.leg_list[0].empty).toBe(true);
+    expect(pool.query.mock.calls[1][1]).toEqual(['W1', 7]);
   });
 
   test('idegen menetlevél → hiba', async () => {

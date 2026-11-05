@@ -283,17 +283,21 @@ async function approveInbound(req, inboundId, assign) {
         const fr = await pool.query(
           "SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key='order-route-map'", [company_id]);
         if (!(fr.rows.length && fr.rows[0].enabled === false)) {
-          const est = await estimateRoute([
-            { type: 'loading', address: loc_incarcare },
-            { type: 'unloading', address: loc_descarcare },
-          ], company_id);
-          if (est && est.km != null) {
-            const rg = {
-              waypoints: est.waypoints.map((w) => ({ type: w.type, address: w.label, lat: w.lat, lng: w.lng })),
-              km: est.km, durationSeconds: est.durationSeconds,
-            };
-            await pool.query('UPDATE orders SET route_geo=$1 WHERE id=$2 AND company_id=$3',
-              [JSON.stringify(rg), id, company_id]);
+          // az ÖSSZES fel-/lerakó pont a sorrendjében (benne az üres km); a beolvasott km-et nem írja felül
+          const r = await require('../lib/orderRouteKm').computeForOrder(company_id, id, { force: true });
+          if (r && r.skipped === 'stops') {
+            const est = await estimateRoute([
+              { type: 'loading', address: loc_incarcare },
+              { type: 'unloading', address: loc_descarcare },
+            ], company_id);
+            if (est && est.km != null) {
+              const rg = {
+                waypoints: est.waypoints.map((w) => ({ type: w.type, address: w.label, lat: w.lat, lng: w.lng })),
+                km: est.km, durationSeconds: est.durationSeconds,
+              };
+              await pool.query('UPDATE orders SET route_geo=$1 WHERE id=$2 AND company_id=$3',
+                [JSON.stringify(rg), id, company_id]);
+            }
           }
         }
       }

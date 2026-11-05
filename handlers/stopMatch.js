@@ -315,6 +315,15 @@ handlers.routeDeviationList = async function (req, res, args) {
 handlers.routeDeviationRecheck = async function (req, res, args) {
   try {
     const u = await _gate(req, res); if (!u) return;
+    const wid = String(((args && args[0]) || {}).waybill_id || '').slice(0, 64);
+    if (wid) {
+      const w = (await pool.query('SELECT id FROM fuvarlevelek WHERE id=$1 AND company_id=$2', [wid, u.company_id])).rows[0];
+      if (!w) return res.json({ result: { ok: false, err: 'Foaia de parcurs nu a fost găsită' } });
+      require('../lib/waybillRoute').checkWaybill(u.company_id, wid)
+        .catch((e) => console.warn('[WaybillKm] újraellenőrzés hiba', wid, e.message));
+      audit.fromReq(req, 'waybill.route.recheck', 'waybill', wid, null);
+      return res.json({ result: { ok: true, running: true } });
+    }
     const oid = String(((args && args[0]) || {}).order_id || '').slice(0, 20);
     const o = (await pool.query('SELECT id FROM orders WHERE id=$1 AND company_id=$2', [oid, u.company_id])).rows[0];
     if (!o) return res.json({ result: { ok: false, err: 'Transportul nu a fost găsit' } });
@@ -351,6 +360,15 @@ handlers.routeDeviationMap = async function (req, res, args) {
       if (!f) return res.json({ result: { ok: false, err: 'Foaia de parcurs nu a fost găsită' } });
       ids = (Array.isArray(f.order_ids) ? f.order_ids : []).map(String).filter(Boolean).slice(0, MAP_MAX_ORDERS);
       meta = { numar_fisa: f.numar_fisa, sofer: f.nume_sofer, rendszam: f.numar_camion, from: f.indulas_dt, to: f.erkezes_dt };
+      // a menetlevél teljes útja (Plecare → minden fel-/lerakó → Sosire)
+      const wr = require('../lib/waybillRoute');
+      try {
+        meta.route = await wr.mapData(cid, f.id);
+        if (!meta.route) {
+          meta.route_pending = true;
+          wr.checkWaybill(cid, f.id).catch((e) => console.warn('[WaybillKm] térképes ellenőrzés hiba', f.id, e.message));
+        }
+      } catch (e) { if (!(e && e.code === '42P01')) throw e; }
     } else {
       mode = 'period';
       const to = isDay(a.to) ? a.to : new Date().toISOString().slice(0, 10);

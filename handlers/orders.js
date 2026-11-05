@@ -108,7 +108,7 @@ function validateLoadTypeDims(o) {
 function sanitizeRouteGeo(rg) {
   if (!rg || typeof rg !== 'object') return null;
   let wps = Array.isArray(rg.waypoints) ? rg.waypoints : [];
-  wps = wps.slice(0, 9).map((w) => ({
+  wps = wps.slice(0, 25).map((w) => ({
     type: ['loading', 'unloading', 'waypoint'].includes(w && w.type) ? w.type : 'waypoint',
     address: (w && w.address != null) ? String(w.address).slice(0, 200) : null,
     lat: (w && w.lat != null && Number.isFinite(Number(w.lat))) ? Number(w.lat) : null,
@@ -117,7 +117,19 @@ function sanitizeRouteGeo(rg) {
   if (wps.length < 2) return null;
   const km = (rg.km != null && Number.isFinite(Number(rg.km))) ? Math.round(Number(rg.km)) : null;
   const dur = (rg.durationSeconds != null && Number.isFinite(Number(rg.durationSeconds))) ? Math.round(Number(rg.durationSeconds)) : null;
-  return { waypoints: wps, km, durationSeconds: dur };
+  const out = { waypoints: wps, km, durationSeconds: dur };
+  // szakaszok rakott / üres jelzéssel (a lerakó → következő felrakó üres km is a fuvar km-je)
+  if (Array.isArray(rg.legs)) {
+    out.legs = rg.legs.slice(0, 30).map((l) => ({
+      from: l && (l.from || l.fromLabel) != null ? String(l.from || l.fromLabel).slice(0, 120) : null,
+      to: l && (l.to || l.toLabel) != null ? String(l.to || l.toLabel).slice(0, 120) : null,
+      km: (l && Number.isFinite(Number(l.km))) ? Math.round(Number(l.km) * 10) / 10 : null,
+      empty: !!(l && l.empty),
+    }));
+    const sp = require('../lib/routeChain').splitKm(out.legs);
+    out.loaded_km = sp.loaded_km; out.empty_km = sp.empty_km;
+  }
+  return out;
 }
 
 // A radar a részrakomány-súly ellenőrzéséhez: egy standard/mega ponyvás

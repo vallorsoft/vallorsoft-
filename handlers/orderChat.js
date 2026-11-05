@@ -555,7 +555,7 @@ async function resolveDraft(cid, input, opts) {
         const wps = stops.map((s) => ({ type: s.kind === 'pickup' ? 'loading' : 'unloading', address: s.loc }));
         const r = await estimateRoute(wps, cid);
         d.route_km = r.km;
-        d.route_geo = { waypoints: r.waypoints.slice(0, 9).map((w) => ({ type: w.type, address: w.label, lat: w.lat, lng: w.lng })), km: r.km, durationSeconds: r.durationSeconds };
+        d.route_geo = { waypoints: r.waypoints.slice(0, 25).map((w) => ({ type: w.type, address: w.label, lat: w.lat, lng: w.lng })), km: r.km, durationSeconds: r.durationSeconds };
       } catch (_) { /* geokódolás nem sikerült → km kézzel */ }
     }
   } else if (!sig) { d.route_sig = null; d.route_km = null; d.route_geo = null; }
