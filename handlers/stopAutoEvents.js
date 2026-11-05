@@ -20,7 +20,20 @@ const MAX_BACK_MS = 45 * 24 * 3600 * 1000;
 const MAX_FUTURE_MS = 2 * 60 * 1000;
 const MAX_TRACK_PTS = 1500;
 
+const MOVED_M = 250;   // ennyinél messzebbi térképes javítás = a felismert hely rossz volt
+
 const _isSofer = (u) => u && u.pozicio === 'Sofer';
+
+// A sofőr döntéséből tanulunk (best-effort, a választ nem rontja el)
+async function _learn(cid, items) {
+  const runner = require('../lib/stopMatchRunner');
+  for (const it of items || []) {
+    try {
+      if (Array.isArray(it.signals) && it.signals.length) await runner.recordFeedback(cid, it.signals, it.ok === true);
+      if (it.bad) await runner.recordBadPlace(cid, it.bad.lat, it.bad.lng, it.bad.firma);
+    } catch (e) { console.warn('[StopAuto] tanulás hiba', e.message); }
+  }
+}
 const _err = (res, err) => res.json({ result: { ok: false, err } });
 
 function _parseTs(v) {
@@ -97,8 +110,10 @@ handlers.ackAutoStopEvents = async function (req, res, args) {
          FROM orders o
         WHERE s.id = ANY($1::bigint[]) AND s.company_id = $2 AND o.id = s.order_id AND o.company_id = s.company_id
           AND LOWER(o.email_sofer) = LOWER($3) AND s.auto_filled IS NOT NULL AND s.auto_ack_at IS NULL
-        RETURNING s.id`, [ids, u.company_id, u.email]);
+        RETURNING s.id, s.match_detail`, [ids, u.company_id, u.email]);
     audit.fromReq(req, 'order.stop_auto.ack', 'order_stop', ids.join(',').slice(0, 200), { count: r.rowCount });
+    // tanulás: a sofőr megerősítette a felismert helyet → a győztes jelek erősödnek (helymemóriát csak az iroda ír)
+    await _learn(u.company_id, (r.rows || []).map((x) => ({ signals: x.match_detail && x.match_detail.signals, ok: true })));
     return res.json({ result: { ok: true, acked: r.rowCount } });
   } catch (err) {
     console.error('ackAutoStopEvents hiba:', err.message);
@@ -192,6 +207,11 @@ handlers.correctAutoStopMap = async function (req, res, args) {
         WHERE id = $1 AND company_id = $2 AND auto_ack_at IS NULL`,
       [s.id, u.company_id, arr, toIso, d.lat, d.lng, runner.coordText(d.lat, d.lng), fromIso, JSON.stringify(orig)]);
     audit.fromReq(req, 'order.stop_auto.correct_map', 'order_stop', String(s.id), { order: s.order_id, orig, lat: d.lat, lng: d.lng, from: fromIso, to: toIso });
+    // tanulás: ha a sofőr MÁSHOL jelölte meg (≥ 250 m), a felismert hely rossz volt → jel-súly le + elvetett hely
+    if (s.actual_lat != null && gt.distM([0, s.actual_lat, s.actual_lng], [0, d.lat, d.lng]) >= MOVED_M) {
+      await _learn(u.company_id, [{ signals: s.match_detail && s.match_detail.signals, ok: false,
+        bad: { lat: s.actual_lat, lng: s.actual_lng, firma: s.firma } }]);
+    }
     _notifyOffice(u, s, 'hartă');
     // háttérben: cím a kijelölt pontra (cache-elt, fojtott) + menetlevél frissítése, ha kérték — nem várjuk meg
     const cid = u.company_id;

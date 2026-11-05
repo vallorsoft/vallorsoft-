@@ -1402,7 +1402,7 @@ handlers.getPlannerData = async function (req, res, args) {
     const ordR = await pool.query(
       `SELECT id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
               status, rendszam_camion, rendszam_remorca, nume_sofer, email_sofer,
-              handover_type, handover_loc
+              handover_type, handover_loc, firma_incarcare, firma_descarcare
        FROM orders
        WHERE company_id = $1 AND status <> 'Anulat'
          AND (
@@ -1414,6 +1414,16 @@ handlers.getPlannerData = async function (req, res, args) {
        LIMIT 400`,
       [cid, from, to]
     );
+    // tanult rakodási / ürítési idő a partner-cégnél (GPS-ből, medián) — best-effort
+    try {
+      const sd = require('../lib/siteDwell');
+      const dw = await sd.stats(cid);
+      for (const o of ordR.rows) {
+        const a = sd.lookup(dw, 'pickup', o.firma_incarcare), b = sd.lookup(dw, 'delivery', o.firma_descarcare);
+        if (a) o.dwell_load = a;
+        if (b) o.dwell_unload = b;
+      }
+    } catch (_) { /* nincs adat — a tervezőtábla enélkül is működik */ }
     return res.json({ result: { ok: true, vehicles: vehR.rows, orders: ordR.rows, carrierVehicles: carrierVehRows } });
   } catch (err) {
     console.error('getPlannerData hiba:', err);

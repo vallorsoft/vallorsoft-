@@ -335,6 +335,36 @@ async function _uitMissing(cid) {
   } catch (e) { return []; }
 }
 
+// ── Útvonal-eltérés (több km a tervezettnél, utolsó 30 nap) ─────
+async function _routeDeviation(cid) {
+  const out = [];
+  try {
+    const r = await pool.query(
+      `SELECT d.order_id, d.planned_km, d.actual_km, d.diff_km, d.diff_pct, o.fuvar_no
+         FROM order_route_deviation d
+         JOIN orders o ON o.id = d.order_id AND o.company_id = d.company_id
+        WHERE d.company_id=$1 AND d.status='deviation' AND d.checked_at > NOW() - INTERVAL '30 days'
+        ORDER BY d.diff_km DESC LIMIT 5`, [cid]);
+    r.rows.forEach((x) => {
+      const pct = Number(x.diff_pct) || 0;
+      out.push({
+        id: 'routedev-' + x.order_id,
+        area: 'ops',
+        severity: pct >= 15 ? 'danger' : 'warn',
+        icon: '🛣️',
+        key: 'route_deviation',
+        title: (x.fuvar_no || x.order_id) + ': +' + Number(x.diff_km) + ' km',
+        detail: 'Planificat ' + Number(x.planned_km) + ' km · GPS ' + Number(x.actual_km) + ' km (+' + pct + '%)',
+        value: Number(x.diff_km) || 0,
+        tab: 'ops',
+        entity_type: 'order',
+        entity_id: x.order_id,
+      });
+    });
+  } catch (e) { /* nincs order_route_deviation tábla */ }
+  return out;
+}
+
 // ═══════════════════════ FŐ handler ═══════════════════════
 handlers.getStatsInsights = async function (req, res, args) {
   try {
@@ -355,12 +385,14 @@ handlers.getStatsInsights = async function (req, res, args) {
           return rs[0].concat(rs[1]);
         })
       : [];
+    const routeDev = await _routeDeviation(cid);
 
     let insights = fuel
       .concat(service)
       .concat(expiry)
       .concat(uitExp)
       .concat(uitMiss)
+      .concat(routeDev)
       .concat(finance);
 
     // Rendezés (severity elöl, aztán value csökkenő)
