@@ -329,6 +329,70 @@ handlers.routeDeviationRecheck = async function (req, res, args) {
   }
 };
 
+// ── Útvonal-eltérés térképen: egy fuvar / egy menetlevél / időszak ──
+const MAP_MAX_ORDERS = 40;
+handlers.routeDeviationMap = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const cid = u.company_id;
+    const a = (args && args[0]) || {};
+    const rd = require('../lib/routeDeviation');
+    let ids = [], mode = 'order', meta = {};
+    if (a.order_id) {
+      ids = [String(a.order_id).slice(0, 40)];
+    } else if (a.waybill_id) {
+      mode = 'waybill';
+      const f = (await pool.query(
+        `SELECT f.id, f.numar_fisa, f.nume_sofer, f.numar_camion, f.order_ids, f.indulas_dt, f.erkezes_dt
+           FROM fuvarlevelek f
+          WHERE f.id = $1 AND (f.company_id = $2 OR (f.company_id IS NULL AND EXISTS
+                (SELECT 1 FROM users uu WHERE LOWER(uu.email) = LOWER(f.email_sofer) AND uu.company_id = $2)))`,
+        [String(a.waybill_id).slice(0, 40), cid])).rows[0];
+      if (!f) return res.json({ result: { ok: false, err: 'Foaia de parcurs nu a fost găsită' } });
+      ids = (Array.isArray(f.order_ids) ? f.order_ids : []).map(String).filter(Boolean).slice(0, MAP_MAX_ORDERS);
+      meta = { numar_fisa: f.numar_fisa, sofer: f.nume_sofer, rendszam: f.numar_camion, from: f.indulas_dt, to: f.erkezes_dt };
+    } else {
+      mode = 'period';
+      const to = isDay(a.to) ? a.to : new Date().toISOString().slice(0, 10);
+      const from = isDay(a.from) ? a.from : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const params = [cid, from, to];
+      let where = '';
+      if (['ok', 'deviation'].includes(a.status)) { params.push(a.status); where = ' AND d.status = $' + params.length; }
+      else where = " AND d.status IN ('ok','deviation')";
+      if (a.rendszam) {
+        params.push(String(a.rendszam).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20));
+        where += ` AND UPPER(REGEXP_REPLACE(COALESCE(o.rendszam_camion,''),'[^A-Za-z0-9]','','g')) = $` + params.length;
+      }
+      params.push(MAP_MAX_ORDERS + 1);
+      try {
+        ids = (await pool.query(
+          `SELECT d.order_id FROM order_route_deviation d
+             JOIN orders o ON o.id = d.order_id AND o.company_id = d.company_id
+            WHERE d.company_id = $1 AND COALESCE(d.from_at, d.checked_at)::date BETWEEN $2::date AND $3::date` + where + `
+            ORDER BY (d.status = 'deviation') DESC, d.diff_km DESC NULLS LAST LIMIT $` + params.length, params)).rows.map((r) => r.order_id);
+      } catch (e) { if (!(e && e.code === '42P01')) throw e; }
+      meta = { from, to, truncated: ids.length > MAP_MAX_ORDERS };
+      ids = ids.slice(0, MAP_MAX_ORDERS);
+    }
+    const maxPts = ids.length > 10 ? 250 : ids.length > 3 ? 450 : 900;
+    const items = [];
+    for (const id of ids) {
+      const it = await rd.mapItem(cid, id, { maxPts });
+      if (!it) continue;
+      items.push(it);
+      // lezárt, de még nem ellenőrzött fuvar → háttérben ellenőrizzük (a következő megnyitásra kész)
+      if (it.status === 'not_checked' && it.order_status === 'Finalizat') {
+        rd.checkOrder(cid, id).catch((e) => console.warn('[RouteDev] térképes ellenőrzés hiba', id, e.message));
+      }
+    }
+    if (mode === 'order' && !items.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost găsit' } });
+    return res.json({ result: { ok: true, mode, meta, items, summary: rd.summarize(items), off_km: rd.OFF_KM } });
+  } catch (err) {
+    console.error('routeDeviationMap hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 handlers.stopMatchBackfill = async function (req, res, args) {
   try {
     const u = await _gate(req, res); if (!u) return;

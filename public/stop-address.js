@@ -168,6 +168,7 @@
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'
         + [['', _t('sa.f.all', 'Toate')], ['deviation', _t('sa.devDeviation', 'Abatere')], ['ok', _t('sa.devOk', 'În regulă')], ['no_data', _t('sa.devNoData', 'Fără date')]]
           .map(function (o) { return '<button class="btn' + (st === o[0] ? ' primary' : ' ghost') + '" style="padding:5px 10px;" onclick="StopAddress.devFilter(\'' + o[0] + '\')">' + _e(o[1]) + '</button>'; }).join('')
+        + (window.RouteDevMap ? '<button class="btn ghost" style="padding:5px 10px;margin-left:auto;" onclick="RouteDevMap.open({from:\'' + _e(S.from) + '\',to:\'' + _e(S.to) + '\',status:\'' + _e(st === 'no_data' ? '' : st) + '\'})">🗺️ ' + _e(_t('sa.devMapPeriod', 'Hartă pentru perioadă')) + '</button>' : '')
         + '</div>';
       var rows = r.rows || [];
       if (!rows.length) html += '<div class="text-muted" style="padding:8px 0;">' + _t('sa.devNone', 'Nu există curse verificate.') + '</div>';
@@ -182,7 +183,8 @@
               + '<td>' + (x.planned_km != null ? _e(Number(x.planned_km)) + ' km' : '—') + '<div class="text-muted" style="font-size:11px;">' + _e(x.source === 'here' ? 'HERE' : x.source ? 'OSRM' : '') + '</div></td>'
               + '<td>' + (x.actual_km != null ? _e(Number(x.actual_km)) + ' km' : '—') + '<div class="text-muted" style="font-size:11px;">' + _e(x.km_source === 'odo' ? 'km-óra / odometru' : x.km_source ? 'GPS' : '') + '</div></td>'
               + '<td><span class="badge ' + cls + '">' + _e(lab) + '</span>' + (x.diff_km != null ? '<div style="font-size:12px;margin-top:3px;">' + (Number(x.diff_km) > 0 ? '+' : '') + _e(Number(x.diff_km)) + ' km (' + (Number(x.diff_pct) > 0 ? '+' : '') + _e(Number(x.diff_pct)) + '%)</div>' : '') + '</td>'
-              + '<td><button class="btn ghost" style="padding:5px 9px;" title="' + _t('sa.devRecheck', 'Reverifică') + '" onclick="StopAddress.devRecheck(\'' + _e(String(x.order_id)) + '\')">🔄</button></td></tr>';
+              + '<td style="white-space:nowrap;">' + (window.RouteDevMap && x.status !== 'no_data' ? '<button class="btn ghost" style="padding:5px 9px;" title="' + _t('sa.devMap', 'Hartă: plan vs. real') + '" onclick="RouteDevMap.open({order_id:\'' + _e(String(x.order_id)) + '\'})">🗺️</button> ' : '')
+              + '<button class="btn ghost" style="padding:5px 9px;" title="' + _t('sa.devRecheck', 'Reverifică') + '" onclick="StopAddress.devRecheck(\'' + _e(String(x.order_id)) + '\')">🔄</button></td></tr>';
           }).join('') + '</tbody></table></div>';
       }
     }

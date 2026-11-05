@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 74. lépés — Útvonal-eltérés térképen (2026-11-05, PR #601) ✅ KÉSZ
+- Új olvasó végpont `routeDeviationMap`: Admin/Manager + `stop-address`/`gps-integracio` kapu (`_gate`); a fuvar (`id AND company_id`), a menetlevél (`company_id`, régi soroknál a sofőr cégén át) és az időszakos lista is cégre szűrt, paraméteres; idegen fuvar/menetlevél → hiba. Max. 40 fuvar / kérés, a nyomvonal ritkítva (250–900 pont). Nincs külső hívás a kérésben; a még nem ellenőrzött fuvar ellenőrzése háttérben indul. A kliens minden szöveget escape-elve rajzol.
+
 ### 73. lépés — Pontosság-mérés, útvonal-eltérés, sofőr-tanulás (2026-11-05, PR #600) ✅ KÉSZ
 - Új végpontok `stopMatchAccuracyList`/`stopMatchAccuracyRun`/`routeDeviationList`/`routeDeviationRecheck`: Admin/Manager + `stop-address`/`gps-integracio` kapu (`_gate`), minden lekérdezés `company_id`-szűrt, paraméteres; a fuvar-azonosító tulajdona ellenőrizve az újraellenőrzés előtt. A mérés és az útvonal-számítás háttérben fut (felhasználói kérés nem vár külső hívásra), cégenként egyszerre egy mérés. A HERE-hívás szerver-oldali, a kulcs nem megy ki, minden hívás `maps.bump`-pal számolva. A mérés semmit nem ír a felismerési adatokba (`dryRun`). A sofőr-tanulás csak a saját, még nyitott automatikus állomására hat (a meglévő `_ownStop` ellenőrzéssel).
 

@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-05 — 🗺️ Útvonal-eltérés térképen: terv vs. valós út egymáson — fuvarra, menetlevélre, időszakra (PR #601)
+- Új `RouteDevMap.open(...)` ablak (`public/route-dev-map.js`): a tervezett útvonal kék szaggatott, a GPS szerinti valós út zöld, a tervtől > 1 km-re letért szakaszok piros vonallal; számozott fel-/lerakó pontok; mindig világos térkép.
+- Mutatók: tervezett / megtett km, különbség (km és %), km a terven kívül (+ arány), legnagyobb letérés, teljes időtartam, menetidő, megállások (≥ 5 perc, darab + idő), átlag / max. sebesség. Több fuvarnál összesítés: többlet-km (csak eltéréseseknél), megtakarított km, eltéréses fuvarok száma; a listában fuvarra kattintva arra közelít, a többi halványul.
+- Megnyitás: fuvar ⋯ menü „🛣️ Útvonal-eltérés térképen" (lezárt fuvaron), FUVARLEVELEK sor „🛣️ Útvonal" (a menetlevél összes fuvarja), Tényleges címek → útvonal-eltérés kártya (soronként 🗺️ + „Térkép az időszakra", a kártya dátum- és státusz-szűrőjével, max. 40 fuvar).
+- Szerver: `routeDeviationMap` (`handlers/stopMatch.js`) + `lib/routeDeviation.js` `mapItem`/`trackStats`/`distToLineKm`/`summarize` — a tárolt tervezett nyomvonalra és a GPS-naplóra épül, nincs új külső hívás; a még nem ellenőrzött lezárt fuvar ellenőrzése háttérben indul. Teszt: `tests/unit/routeDevMap.test.js` (13 eset).
+
 ## 2026-11-05 — 📊 Pontosság-mérés havonta + 🛣️ útvonal-eltérés + ⏱ tanult rakodási idő + 🧠 tanulás a sofőr javításaiból (PR #600)
 - **Havi pontosság-mérés** (`lib/stopMatchAccuracy.js`, `stop_match_accuracy`): a cím-felismerő ütemező havonta cégenként visszaméri a felismerést az elfogadott címeken (írás nélkül, tanult adatok nélkül), és eltárolja: találati arány, „biztos, de rossz", nem talált. Tényleges címek fülön 📊 kártya (havi táblázat + „▶ Mérés most", háttérben). A `scripts/stop-match-backtest.js` ugyanezt a modult használja.
 - **Útvonal-eltérés** (`lib/routeDeviation.js`, `order_route_deviation`): lezárt fuvaronként a tervezett km (HERE kamionos, HERE-kulcs nélkül OSRM) az első állomás elhagyásától az utolsóig, a köztes állomásokon át, összevetve a GPS-napló szerint megtett km-rel (km-óra, ha nincs: pont-távolság). Más út, de nem több km (5 km / 3% tűrés) = rendben; többlet = eltérés. A tervezett nyomvonal ritkítva eltárolva a későbbi térképes összevetéshez. 🛣️ kártya a Tényleges címek fülön (szűrő, 🔄 újraellenőrzés) + az anomália-központban (Statisztika → Áttekintés).

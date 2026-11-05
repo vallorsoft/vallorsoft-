@@ -2977,6 +2977,8 @@ function loadReceivedFuvarlevelek(){
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
         +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">${t('cs.editLong')}</button>`
+        +((window.RouteDevMap && Array.isArray(f.order_ids) && f.order_ids.length && !(window._vsFeatures && (window._vsFeatures['stop-address']===false || window._vsFeatures['gps-integracio']===false)))
+          ? `<button class="btn ghost" style="padding:5px 10px;" title="${esc(t('cs.ol.mRouteDev'))}" onclick="RouteDevMap.open({waybill_id:'${f.id}'})">🛣️ ${t('cs.wbRouteDev')}</button>` : '')
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="WaybillDocs.openUpload('${f.id}')">${t('wbd.upload')}</button>`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="WaybillDocs.openManage('${f.id}')">${t('wbd.manage')}${f.doc_count?' <span style="display:inline-block;min-width:18px;padding:1px 6px;border-radius:999px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+f.doc_count+'</span>':''}</button>`
       +`</td></tr>`).join('');
@@ -5944,6 +5946,13 @@ function renderFilteredOrders(list) {
       menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mRouteMap')+'" '+
         'onclick="window.open(\'/utvonaltervezes?order='+encodeURIComponent(c.id)+'\',\'_blank\');closeOrderActions()">'+
         '<span class="vs-act-ico">🗺️</span><span class="vs-act-lbl">'+t('cs.ol.mRouteMap')+'</span></button>';
+    }
+    // 🛣️ Útvonal-eltérés térképen (terv vs. GPS) — lezárt fuvarnál
+    if (window.RouteDevMap && c.status === 'Finalizat' && c.rendszam_camion
+        && !(window._vsFeatures && (window._vsFeatures['stop-address'] === false || window._vsFeatures['gps-integracio'] === false))) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mRouteDev')+'" '+
+        'onclick="RouteDevMap.open({order_id:\''+c.id+'\'});closeOrderActions()">'+
+        '<span class="vs-act-ico">🛣️</span><span class="vs-act-lbl">'+t('cs.ol.mRouteDev')+'</span></button>';
     }
     // 🧮 Költség-kalkuláció — a fuvar adataival előtöltve (Költség-kalkulátor modul)
     if (typeof window.vcalcOpenForOrder === 'function' && (!window._vsFeatures || window._vsFeatures['vcalc-run'] !== false)) {
