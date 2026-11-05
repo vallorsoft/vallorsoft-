@@ -737,7 +737,7 @@ function orderRouteRecalc(which){
   gas('orderRouteEstimate',[{waypoints:wps}]).then(function(r){
     if(!r||!r.ok){ _rmSrcBadge(which, null, (r&&r.err)||''); return; }  // a kézi km marad
     st.source=r.source||null;
-    _rmSrcBadge(which, st.source, null);
+    _rmSrcBadge(which, st.source, null, r.free_reason);
     st.km=r.km; st.dur=r.durationSeconds; st.polyline=r.polyline||[]; st.waypoints=r.waypoints||[]; st.legs=r.legs||[];
     var kmEl=document.getElementById(c.km);
     if(kmEl && (st.kmAuto || !String(kmEl.value||'').trim())){ kmEl.value=r.km; st.kmAuto=true; }
@@ -750,14 +750,22 @@ function orderRouteRecalc(which){
 
 // Forrás-jelzés a km mező alatt: „🚛 HERE · kamion 40 t" / ingyenes autós becslés /
 // hiba (HERE-only módban nincs autós tartalék — a hibát nem nyeljük le csendben).
-function _rmSrcBadge(which, source, err){
+// Miért nem HERE-rel számolt (mapsProvider.getConfig reason) → olvasható ok
+function vsMapsReasonText(code){
+  if(!code) return '';
+  var k={ 'no-row':'cs.rm.rNoRow', 'disabled':'cs.rm.rDisabled', 'vendor-free':'cs.rm.rVendorFree', 'no-credentials':'cs.rm.rNoKey',
+    'empty-key':'cs.rm.rNoKey', 'decrypt-failed':'cs.rm.rDecrypt', 'no-company':'cs.rm.rNoRow' }[code];
+  return k ? t(k) : t('cs.rm.rOther')+' ('+code+')';
+}
+window.vsMapsReasonText=vsMapsReasonText;
+function _rmSrcBadge(which, source, err, reason){
   var c=RM_CFG[which]; var kmEl=document.getElementById(c.km); if(!kmEl) return;
   var row=kmEl.closest('.vs-km-row')||kmEl.parentNode; var id=c.km+'Src';
   var el=document.getElementById(id);
   if(!el){ el=document.createElement('div'); el.id=id; el.className='vs-km-src'; row.parentNode.insertBefore(el,row.nextSibling); }
   if(err){ el.className='vs-km-src err'; el.textContent='⚠️ '+t('cs.rm.srcErr')+': '+err; return; }
   el.className='vs-km-src'+(source==='here-truck'?' here':'');
-  el.textContent=source==='here-truck'?t('cs.rm.srcHere'):t('cs.rm.srcFree');
+  el.textContent=source==='here-truck'?t('cs.rm.srcHere'):(t('cs.rm.srcOsrm')+(reason?' — '+vsMapsReasonText(reason):''));
 }
 
 // A fuvarra mentendő útvonal-metaadat (NEM tartalmaz megállókat).

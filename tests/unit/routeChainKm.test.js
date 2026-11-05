@@ -79,7 +79,7 @@ describe('orderRouteKm.computeForOrder', () => {
     expect(r.km_updated).toBe(true);
   });
   test('változatlan állomás-lista → nincs újraszámolás', async () => {
-    pool.query.mockResolvedValueOnce(rows(STOPS)).mockResolvedValueOnce(rows([{ km: 870, route_geo: { sig: ork.sigOf(STOPS) } }]));
+    pool.query.mockResolvedValueOnce(rows(STOPS)).mockResolvedValueOnce(rows([{ km: 870, route_geo: { sig: ork.sigOf(STOPS), src: 'here-truck' } }]));
     const r = await ork.computeForOrder(7, 'A', { estimate: fakeEstimate });
     expect(r.skipped).toBe('same'); expect(pool.query).toHaveBeenCalledTimes(2);
   });

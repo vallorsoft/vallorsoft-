@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-06 — 🚛 OSRM helyett HERE: a régi OSRM-eredmények újraszámolása + az OSRM-ok kiírása (PR #609)
+- **Gyökér:** a #605 óta az új számítás HERE kamionnal (40 t) megy, de a KORÁBBAN (OSRM-mel) kiszámolt fuvar-km (`orders.route_geo`) és menetlevél-terv (`waybill_route_check`) nem számolódott újra, mert az állomás-lista nem változott (`sig` azonos) → a régi OSRM-érték maradt.
+- **Újraszámolás:** az eredmény mostantól tárolja a forrását (`src`); HERE-kulcsos cégnél a nem HERE-rel készült régi eredményt az ütemező automatikusan újraszámolja (`lib/orderRouteKm.js` `pickQueue` + `computeForOrder`, `lib/waybillRoute.js` `pickQueue`). A kézzel beírt km-et továbbra sem írja felül. (Egyszeri HERE-hívás régi fuvaronként/menetlevelenként.)
+- **Miért OSRM?** — az `estimateRoute`/`routeChain` visszaadja az okot (`free_reason`: nincs HERE-kulcs / kikapcsolva / ingyenes szolgáltató / hiányzó kulcs / a kulcs nem olvasható). A fuvar-kiírás km-jelzése, az útvonal-eltérés térkép és lista kiírja.
+- Teszt: `tests/unit/routeEstimateHereTruck.test.js` (+2); cache-bust `?v=20261106osrm`.
+
 ## 2026-11-06 — 🔗 Útvonal-eltérés: több fuvaros út egy tervbe fűzve, a köztes üres km-rel (PR #608)
 - **Probléma (CMD-2026-0053):** a kamion egy úton több fuvart vitt. A fuvar terve csak a saját állomásait kötötte össze, a lerakó → következő (más fuvarhoz tartozó) felrakó közti szakasz kimaradt. Így a terv 1724 km lett, a valós, helyes megtett km pedig 2842 km. A #607 ezt „Nincs adat"-ra tette — most helyesen számol.
 - **`lib/routeDeviation.js` `checkOrder` → `_collectTrip` + `tripStops`:** ha ugyanaz a kamion a fuvar ablakában más fuvar állomásán is járt, azt is az útba fűzi (az ablakot kiterjesztve, amíg nincs több átfedés, max. 12 fuvar). Az összes állomás IDŐRENDBEN, a köztes üres szakaszokkal együtt kerül a tervbe (`routeChain`, HERE kamion 40 t, 20 pont fölött darabolva). Az eredmény az út minden fuvarjára mentődik (`detail.group`, `group_key`, `loaded_km`/`empty_km`).

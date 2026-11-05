@@ -63,3 +63,31 @@ describe('routeChain — forrás továbbadása a fuvar-kiírónak', () => {
     expect((await rc.routeChain(1, wps, { estimate: mk('osrm') })).source).toBe('osrm');
   });
 });
+
+describe('OSRM-ok jelzése + HERE-re váltás utáni újraszámolás', () => {
+  afterEach(() => { jest.restoreAllMocks(); delete global.fetch; });
+  test('HERE-kulcs nélkül a válasz megmondja, miért OSRM', async () => {
+    jest.spyOn(maps, 'getConfig').mockResolvedValue({ vendor: 'free', key: null, reason: 'decrypt-failed' });
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200,
+      json: async () => ({ code: 'Ok', routes: [{ distance: 1000, duration: 60, geometry: { coordinates: [[26, 44.9], [21.3, 46.2]] } }] }) }));
+    const r = await est.estimateRoute([{ lat: 44.9, lng: 26.0 }, { lat: 46.2, lng: 21.3 }], 7);
+    expect(r).toMatchObject({ source: 'osrm', free_reason: 'decrypt-failed' });
+  });
+
+  test('orderRouteKm: azonos állomás-lista, de régi OSRM-eredmény + van HERE → újraszámol', async () => {
+    const pool = require('../../db');
+    const ork = require('../../lib/orderRouteKm');
+    const rc = require('../../lib/routeChain');
+    jest.spyOn(maps, 'getConfig').mockResolvedValue({ vendor: 'here', key: 'K' });
+    const spy = jest.spyOn(rc, 'routeChain').mockResolvedValue({ km: 500, durationSeconds: 1, polyline: [], waypoints: [], legs: [],
+      loaded_km: 500, empty_km: 0, source: 'here-truck' });
+    const stops = [{ kind: 'pickup', loc: 'A' }, { kind: 'delivery', loc: 'B' }];
+    pool.query.mockReset();
+    pool.query.mockResolvedValueOnce({ rows: stops })
+      .mockResolvedValueOnce({ rows: [{ km: 480, route_geo: { sig: 'pickup|A > delivery|B', km: 480, src: 'osrm', waypoints: [] } }] })
+      .mockResolvedValue({ rows: [] });
+    const r = await ork.computeForOrder(7, 'O1');
+    expect(spy).toHaveBeenCalled();
+    expect(r).toMatchObject({ km: 500, km_updated: true });
+  });
+});
