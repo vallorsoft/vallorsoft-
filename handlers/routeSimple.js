@@ -555,46 +555,6 @@ async function planHere(waypoints, key, truck) {
   return primary;
 }
 
-// ── OSRM fallback + a cég toll_rates ráta táblájából útdíj-becslés ────────
-// (mint a fuvar-kiírásban — orszagonkénti €/km vagy vignette a
-// `toll_rates` táblából, alapértékek `DEFAULT_RATES`-ből)
-async function planOsrm(waypoints, companyId) {
-  const coords = waypoints.map((w) => w.lng + ',' + w.lat).join(';');
-  const url = 'https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson';
-  const data = await jsonGet(url);
-  const route = data.routes && data.routes[0];
-  if (!route) throw new Error('OSRM eroare: nu s-a returnat un traseu');
-  const points = (route.geometry.coordinates || []).map((c) => [c[1], c[0]]);
-  const bounds = computeBounds(points);
-
-  // Ország-bontás + útdíj a saját ráta-táblából (Photon reverse + toll_rates).
-  let byCountry = [];
-  let tollTotal = 0;
-  try {
-    const est = await tollEstimate.estimateFromPolyline(companyId, points);
-    // Az est.byCountry mezői: {cc, name, km, mode, cost}. A UI byCountry-alakja: {cc, km, tollCost}
-    byCountry = (est.byCountry || []).map((r) => ({ cc: r.cc, km: Math.round(r.km * 10) / 10, tollCost: r.cost, mode: r.mode }));
-    tollTotal = est.total || 0;
-  } catch (_) { /* ha a reverse-geokód nem elérhető, üres marad */ }
-
-  // Szakaszonkénti km/idő (pontpáronként) — az útvonaltervező szakasz-listájához
-  const legs = (route.legs || []).map((l) => ({
-    km: Math.round(((l.distance || 0) / 1000) * 10) / 10,
-    durationMin: Math.round((l.duration || 0) / 60),
-  }));
-
-  return {
-    polyline: points,
-    legs,
-    totalKm: Math.round(((route.distance || 0) / 1000) * 10) / 10,
-    durationMin: Math.round((route.duration || 0) / 60),
-    byCountry,
-    toll: { total: Math.round(tollTotal * 100) / 100, currency: 'EUR' },
-    bounds,
-    source: 'osrm',
-  };
-}
-
 function computeBounds(points) {
   if (!points.length) return null;
   let minLat = points[0][0], maxLat = points[0][0], minLng = points[0][1], maxLng = points[0][1];
@@ -640,10 +600,9 @@ async function rpPlanRoute(req, res, args) {
         return res.json({ result: { ok: false, err: 'HERE eroare: ' + (e.message || 'necunoscut') } });
       }
     }
-    // Nincs használható HERE-kulcs → OSRM + saját toll_rates-alapú útdíj-becslés
-    // (a `cfg.reason` mondja meg PONTOSAN, miért esett vissza — a UI-nak megmutatjuk)
-    const r = await planOsrm(pts, cid);
-    return res.json({ result: { ok: true, ...r, waypoints: pts, noHereKey: true, hereReason: cfg.reason || 'unknown' } });
+    // Nincs használható HERE-kulcs → NEM tervezünk (az autós OSRM km/útdíj kamionra félrevezető)
+    const { noHereError } = require('../lib/routeEstimate');
+    return res.json({ result: { ok: false, err: noHereError(cfg.reason).message, noHereKey: true, hereReason: cfg.reason || 'unknown' } });
   } catch (e) {
     return res.json({ result: { ok: false, err: e.message || 'Eroare de server' } });
   }

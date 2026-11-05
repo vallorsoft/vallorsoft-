@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-06 — 🚫 OSRM-becslés teljesen kivéve: útvonal-km/terv KIZÁRÓLAG HERE kamionnal (PR #610)
+- **Ok:** az autós OSRM km/idő kamionra félrevezető — inkább ne legyen adat, mint rossz adat.
+- **`lib/routeEstimate.js`:** az `estimateRoute` HERE-kulcs nélkül `NO_HERE` hibát dob (RO üzenet az okkal), OSRM-hívás sehol; új `requireHere`/`noHereError`/`hereOnSql`. Az útvonaltervező (`rpPlanRoute`, régi `calculateRoute`) is HERE nélkül hibát ad (a `planOsrm`/`osrmLeg`/`orsLeg` törölve).
+- **Ütemezők:** fuvar-km (`orderRouteKm`), útvonal-eltérés (`routeDeviation`), menetlevél-terv (`waybillRoute`) csak HERE-kulcsos cégnél fut; HERE nélkül „nincs adat — HERE kell" (`reason: no_here`) jelenik meg a térképen (a GPS-nyomvonalat sem tölti be feleslegesen).
+- **Migráció `db/zzz-drop-osrm-route-results.sql`** (idempotens, valós Postgres 16-on verifikálva): a tárolt nem-HERE eredmények törlése — útvonal-eltérés + menetlevél-terv → `no_data/no_here`, a fuvar automata OSRM-km-je törölve (kézi km marad; `prev_km` alapján a HERE-újraszámolás pótolja). HERE-kulcsos cégnél az ütemező HERE-rel újraszámol.
+- Az útdíj-becslés (`computeOrderToll`) is HERE-útvonalra épül — HERE nélkül hibát ad. A GPS-nyomvonal útra illesztése (valós megtett km mérése) változatlan.
+- Tesztek: `routeEstimateHereTruck` + `routeDevGuards` frissítve (NO_HERE eset, prev_km felülírás); 2106 Jest zöld.
+
 ## 2026-11-06 — 🚛 OSRM helyett HERE: a régi OSRM-eredmények újraszámolása + az OSRM-ok kiírása (PR #609)
 - **Gyökér:** a #605 óta az új számítás HERE kamionnal (40 t) megy, de a KORÁBBAN (OSRM-mel) kiszámolt fuvar-km (`orders.route_geo`) és menetlevél-terv (`waybill_route_check`) nem számolódott újra, mert az állomás-lista nem változott (`sig` azonos) → a régi OSRM-érték maradt.
 - **Újraszámolás:** az eredmény mostantól tárolja a forrását (`src`); HERE-kulcsos cégnél a nem HERE-rel készült régi eredményt az ütemező automatikusan újraszámolja (`lib/orderRouteKm.js` `pickQueue` + `computeForOrder`, `lib/waybillRoute.js` `pickQueue`). A kézzel beírt km-et továbbra sem írja felül. (Egyszeri HERE-hívás régi fuvaronként/menetlevelenként.)

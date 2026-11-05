@@ -12,13 +12,25 @@ const stop = (o) => Object.assign({ kind: 'pickup', loc: 'Ploiesti', actual_lat:
 const STOPS = [stop({ id: 1 }), stop({ id: 2, kind: 'delivery', actual_lat: 46.1, actual_lng: 24.3,
   gps_arrived_at: '2026-10-02T10:00:00Z', gps_left_at: '2026-10-02T12:00:00Z' })];
 
-beforeEach(() => { pool.query.mockReset(); });
+beforeEach(() => { pool.query.mockReset(); jest.spyOn(est, 'requireHere').mockResolvedValue('K'); });
+afterEach(() => { jest.restoreAllMocks(); });
 const savedDetail = () => {
   const c = pool.query.mock.calls.find((x) => /INSERT INTO order_route_deviation/.test(x[0]));
   return c ? JSON.parse(c[1][12]) : null;
 };
 
 describe('checkOrder védőkorlátok', () => {
+  test('HERE-kulcs nélkül nincs terv (OSRM nem) → no_data / no_here, GPS-t sem tölt', async () => {
+    est.requireHere.mockRejectedValue(est.noHereError('no-row'));
+    const ae = require('../../lib/stopAutoEvents');
+    const lp = jest.spyOn(ae, 'loadPoints');
+    pool.query.mockResolvedValueOnce(rows([ORDER])).mockResolvedValue(rows([]));
+    const r = await rd.checkOrder(7, 'O1');
+    expect(r).toMatchObject({ status: 'no_data', reason: 'no_here' });
+    expect(savedDetail()).toMatchObject({ reason: 'no_here', free_reason: 'no-row' });
+    expect(lp).not.toHaveBeenCalled();
+  });
+
   test('kézi megerősítésre váró állomás → no_data / unreliable, nincs HERE-hívás', async () => {
     const spy = jest.spyOn(est, 'estimateRoute');
     pool.query.mockResolvedValueOnce(rows([ORDER]))
