@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-06 — 🚛 Útvonal-becslés kizárólag HERE-rel, 40 t-s kamionra (PR #605)
+- **`lib/routeEstimate.js` `estimateRoute`** (a közös becslő: fuvar km, több állomásos lánc, beérkező megrendelés, útdíj, menetlevél teljes útja, útvonal-eltérés terve, AI-chat): HERE-kulcsos cégnél **egyetlen HERE Routing v8 hívás `transportMode=truck`-kal, 40 t-s EU szerelvénnyel** (`tollProvider.TRUCK_DEFAULTS`: 40 000 kg, 4 m, 16,5 m, 2,55 m, 11,5 t/tengely, 5 tengely, 1 pótkocsi); a köztes pontok `via`-ként, a szakaszok = legek. **HERE-hibánál nincs autós (OSRM) tartalék** — a kamionra hibás km nem kerül be. OSRM csak HERE-kulcs nélküli cégnél fut. Válasz-mező `source: 'here-truck'|'osrm'`.
+- **Útvonal-eltérés** (`lib/routeDeviation.js` `plannedRoute`): a közös becslőt használja (a jármű saját súlya helyett is 40 t); a külön HERE-hívás + OSRM-tartalék megszűnt.
+- **Útdíj „Pontos (HERE)"** (`lib/orderToll.js`): a HERE-hívás is 40 t-s kamion-paraméterekkel megy (eddig a HERE saját alapértékeivel).
+- **Útvonaltervező** (`rpPlanRoute`): mindig kamion-mód, alapból 40 t (a panelen módosítható); HERE-hibánál hibaüzenet, nincs autós tartalék. Teszt: `tests/unit/routeEstimateHereTruck.test.js` (3 eset).
+
 ## 2026-11-06 — 🔁 Tényleges címek heti újraellenőrzése 150 pontig + kézi megerősítés 10 próba után + heti pontosság-mérés (PR #604)
 - **Heti újraellenőrzés** (`lib/stopMatchRunner.js`): minden, az iroda által még el nem döntött állomást, amelynek pontszáma 150 alatt van, a rendszer hetente újraelemez (új GPS-adat, tanult helyek, frissebb cím-adatok). **10 sikertelen újraellenőrzés után kézi megerősítésre** kerül (`order_stops.needs_manual`); ilyenkor a „biztos" jelölés lekerül róla, így automatikus menetlevél-rátétel és gomb-pótlás sem épül rá. Ha közben eléri a 150 pontot, a jelzés magától lekerül. Küszöbök: `STOP_RECHECK_TARGET`/`_MAX`/`_DAYS` (alap 150 / 10 / 7 nap). Migráció `db/zz-stop-recheck.sql`.
 - **Ha egy cím helye érdemben változik** (> 50 m), a fuvar útvonal-eltérése és a fuvart tartalmazó menetlevelek teljes útja is újraszámolódik (`invalidateRoutes`).
