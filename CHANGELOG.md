@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-11-06 — 🛡️ Útvonal-eltérés: nincs hamis eltérés megbízhatatlan vagy átfedő fuvarnál (PR #607)
+- **Gyökér (CMD-2026-0053 eset):** a Ploiești → Copșa Mică fuvarra 155 órás ablak, 2842 km GPS-km és +64,9% „eltérés" jött ki. A fuvar első állomásának indulásától az utolsó érkezéséig mért GPS-km akkor is ehhez a fuvarhoz számított, ha a kamion közben más fuvarokat csinált, vagy egy állomás rossz napra lett párosítva.
+- **`lib/routeDeviation.js` `checkOrder` — három védőkorlát a HERE-hívás ELŐTT:**
+  - csak `auto`/`confirmed`/`suggested` és nem kézi megerősítésre váró állomásokból számol (`reason: 'unreliable'`);
+  - ha egy állomás GPS-ideje több mint 12 órával eltér a sofőr gombnyomásától → `reason: 'time'`;
+  - ha ugyanaz a kamion az ablakon belül más fuvar állomásán is járt → `reason: 'overlap'` + az érintett fuvarszámok (`_overlapping`).
+- Ilyenkor az állapot „Nincs adat", a térkép az okot írja ki (és nem rajzol félrevezető valós utat), és a fuvar nem kerül be a sofőr-versenybe.
+- **`CALC_VERSION` (2):** a `pickQueue` a régi számítású sorokat automatikusan újraellenőrzi → a hibás régi eredmények maguktól javulnak. 3 új i18n kulcs (`rdm.nd*`), cache-bust `?v=20261106devfix`; teszt `tests/unit/routeDevGuards.test.js` (5 eset).
+
 ## 2026-11-06 — 🚛 Fuvar-kiírás: a km HERE 40 t-s kamionnal, látható jelzéssel (PR #606)
 - A fuvar-kiíró (és -szerkesztő) automata km-je a `orderRouteEstimate` → `routeChain` → `estimateRoute` úton **HERE kamion-routinggal, 40 t-val** számol (PR #605). Új: a km mező alatt jelzés — „🚛 HERE · kamion 40 t", HERE-kulcs nélkül „Ingyenes becslés (autós)", hibánál piros „⚠️ Az útvonal nem számolható: …" (eddig a hiba csendben elnyelődött).
 - Az ellenőrző lap (6. lépés) szakasz-fejlécén is ott a „🚛 HERE · kamion 40 t". `routeChain`/`orderRouteEstimate` visszaadja a `source`-t. 3 új i18n kulcs (`cs.rm.src*`), cache-bust `?v=20261106here40`; +2 teszt.
