@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 75. lépés — Sofőr-verseny: útvonal-fegyelem (2026-11-05, PR #602) ✅ KÉSZ
+- Új olvasó végpont `routeDeviationDriverStats`: Admin/Manager + `stop-address`/`gps-integracio` kapu, cégre és időszakra szűrt, paraméteres, max. 10 000 sor; sofőr nem éri el. A `routeDeviationMap` `sofer_email` szűrője paraméterként, kisbetűsítve. A háttér-pótlás (`backfillStats`) csak a saját sorát frissíti (`order_id` + `company_id`), külső hívás nélkül. Személyes adat: sofőr neve/e-mailje csak a cég saját Admin/Manager felhasználóinak.
+
 ### 74. lépés — Útvonal-eltérés térképen (2026-11-05, PR #601) ✅ KÉSZ
 - Új olvasó végpont `routeDeviationMap`: Admin/Manager + `stop-address`/`gps-integracio` kapu (`_gate`); a fuvar (`id AND company_id`), a menetlevél (`company_id`, régi soroknál a sofőr cégén át) és az időszakos lista is cégre szűrt, paraméteres; idegen fuvar/menetlevél → hiba. Max. 40 fuvar / kérés, a nyomvonal ritkítva (250–900 pont). Nincs külső hívás a kérésben; a még nem ellenőrzött fuvar ellenőrzése háttérben indul. A kliens minden szöveget escape-elve rajzol.
 

@@ -669,3 +669,26 @@
 [data-pane="stats-v2"] .sv2-panel .table td {
   padding: 8px 10px; font-size: 13px;
 }
+
+/* ── 🛣️ Útvonal-verseny (Emberek → Sofőrök útvonal-fegyelme) ── */
+[data-pane="stats-v2"] .sv2-rt-awards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sv2-gap); margin-bottom: var(--sv2-gap);
+}
+[data-pane="stats-v2"] .sv2-rt-award {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border-radius: var(--sv2-radius); border: 1px solid rgba(250,204,21,0.35);
+  background: linear-gradient(135deg, rgba(250,204,21,0.12), rgba(99,102,241,0.08));
+}
+[data-pane="stats-v2"] .sv2-rt-aw-ico { font-size: 24px; }
+[data-pane="stats-v2"] .sv2-rt-aw-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; font-weight: 700; color: var(--text-muted); }
+[data-pane="stats-v2"] .sv2-rt-aw-val { font-size: 14px; font-weight: 800; color: var(--text-primary, #e9eef5); }
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-rt-award {
+  background: linear-gradient(135deg, #fffbeb, #eef2ff); border-color: #fcd34d;
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-rt-aw-lbl { color: #475569; }
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-rt-aw-val { color: #0f172a; }
+[data-pane="stats-v2"] .sv2-rt-good { color: #4ade80; }
+[data-pane="stats-v2"] .sv2-rt-bad { color: #fbbf24; }
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-rt-good { color: #15803d; }
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-rt-bad { color: #b45309; }

@@ -23,6 +23,8 @@
   var _subTab = 'drivers';
   var _lastData = null;
   var _searchFilter = '';
+  var _route = null;          // útvonal-verseny adat (lustán töltve)
+  var _routeLoading = false;
 
   function fnum(n, dec) {
     var v = parseFloat(n);
@@ -44,6 +46,7 @@
   function subTabsBar() {
     var tabs = [
       ['drivers',   '👤 ' + $t('sv2.pp.tDrivers')],
+      ['route',     '🛣️ ' + $t('sv2.rt.tab')],
       ['clients',   '🏢 ' + $t('sv2.pp.tClients')],
       ['carriers',  '🚚 ' + $t('sv2.pp.tCarriers')],
     ];
@@ -57,7 +60,9 @@
     if (window.VS_STATS_V2_CMP) {
       VS_STATS_V2_CMP.init('drivers');
       VS_STATS_V2_CMP.init('clients');
+      VS_STATS_V2_CMP.init('drvroute');
     }
+    _route = null;
     box.innerHTML = subTabsBar() + '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>';
     var apArgs = { from: state.range.from, to: state.range.to };
     Promise.all([
@@ -74,6 +79,7 @@
     if (!_lastData) return;
     var html = subTabsBar();
     if (_subTab === 'drivers') html += renderDrivers(_lastData);
+    else if (_subTab === 'route') html += renderRoute();
     else if (_subTab === 'clients') html += renderClients(_lastData);
     else html += renderCarriers(_lastData);
     box.innerHTML = html;
@@ -213,6 +219,151 @@
       +       '<th style="text-align:right;">' + $t('sv2.pp.cProfit') + '</th>'
       +     '</tr></thead>'
       +     '<tbody>' + rows + '</tbody></table></div>'
+      + '</div>';
+  }
+
+  // ── 1b. Útvonal-verseny (többlet-km, többlet-idő, terven kívül) ──
+  function loadRoute() {
+    if (_routeLoading || !_lastData) return;
+    _routeLoading = true;
+    var st = _lastData.state;
+    gas('routeDeviationDriverStats', [{ from: st.range.from, to: st.range.to }]).then(function (r) {
+      _route = r || { ok: false };
+    }).catch(function () { _route = { ok: false }; }).then(function () {
+      _routeLoading = false;
+      var box = document.getElementById('sv2Body');
+      if (box && _subTab === 'route') renderInto(box);
+    });
+  }
+
+  function hrs(v) {
+    if (v == null || !isFinite(v)) return '—';
+    var m = Math.round(Number(v) * 60);
+    return Math.floor(m / 60) + 'h ' + ('0' + (m % 60)).slice(-2) + 'm';
+  }
+  function medal(r) { return r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : (r ? '#' + r : '—'); }
+
+  function renderRoute() {
+    if (!_route) { loadRoute(); return '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>'; }
+    if (!_route.ok) return '<div class="sv2-empty">' + $esc(_route.err || $t('common.error')) + '</div>';
+    var c = _route.company || {};
+    var all = _route.drivers || [];
+    if (!all.length) return '<div class="sv2-panel text-muted" style="padding:18px;">' + $esc($t('sv2.rt.none')) + '</div>';
+    var filter = _searchFilter.toLowerCase();
+    var list = all.filter(function (d) {
+      return !filter || String(d.name || '').toLowerCase().indexOf(filter) >= 0 || String(d.email || '').toLowerCase().indexOf(filter) >= 0;
+    });
+    var avg100 = parseFloat(c.extra_per_100) || 0;
+    var maxPer = Math.max.apply(null, all.map(function (d) { return d.extra_per_100 || 0; }).concat([avg100, 0.1]));
+
+    if (window.VS_STATS_V2_CMP) {
+      VS_STATS_V2_CMP.setContext('drvroute', list.map(function (d) {
+        return { _id: String(d.email || d.name).toLowerCase(), _label: d.name, orders: d.orders, deviation_pct: d.deviation_pct,
+          extra_km: d.extra_km, extra_per_100: d.extra_per_100, saved_km: d.saved_km, off_pct: d.off_pct,
+          extra_h: d.extra_h, extra_l: d.extra_l, avg_kmh: d.avg_kmh || 0 };
+      }), [
+        { key: 'orders', label: $t('sv2.rt.cOrders'), higherIsBetter: true, dec: 0 },
+        { key: 'extra_per_100', label: $t('sv2.rt.cPer100'), higherIsBetter: false, dec: 1, unit: 'km' },
+        { key: 'deviation_pct', label: $t('sv2.rt.cDevPct'), higherIsBetter: false, dec: 1, unit: '%' },
+        { key: 'extra_km', label: $t('sv2.rt.cExtraKm'), higherIsBetter: false, dec: 1, unit: 'km' },
+        { key: 'saved_km', label: $t('sv2.rt.cSaved'), higherIsBetter: true, dec: 1, unit: 'km' },
+        { key: 'off_pct', label: $t('sv2.rt.cOffPct'), higherIsBetter: false, dec: 1, unit: '%' },
+        { key: 'extra_h', label: $t('sv2.rt.cExtraH'), higherIsBetter: false, dec: 1, unit: 'h' },
+        { key: 'extra_l', label: $t('sv2.rt.cExtraL'), higherIsBetter: false, dec: 0, unit: 'L' },
+      ]);
+    }
+
+    var kpi = '<div class="sv2-kpi-grid">'
+      + sv2Kpi('🛣️ ' + $t('sv2.rt.kExtraKm'), fnum(c.extra_km, 0) + ' <span style="font-size:12px;">km</span>',
+          $t('sv2.rt.kExtraKmSub', { n: fnum(c.extra_per_100, 1) }), '#f59e0b')
+      + sv2Kpi('⏱ ' + $t('sv2.rt.kExtraH'), hrs(c.extra_h), $t('sv2.rt.kExtraHSub'), '#ef4444')
+      + sv2Kpi('⛽ ' + $t('sv2.rt.kExtraL'), fnum(c.extra_l, 0) + ' <span style="font-size:12px;">L</span>', $t('sv2.rt.kExtraLSub'), '#8b5cf6')
+      + sv2Kpi('📊 ' + $t('sv2.rt.kDevRate'), fnum(c.deviation_pct, 1) + '%',
+          $t('sv2.rt.kDevRateSub', { d: fnum(c.deviation, 0), n: fnum(c.orders, 0) }), '#3b82f6')
+      + sv2Kpi('💚 ' + $t('sv2.rt.kSaved'), fnum(c.saved_km, 0) + ' <span style="font-size:12px;">km</span>', '', '#22c55e')
+      + '</div>';
+
+    var aw = _route.awards, awHtml = '';
+    if (aw) {
+      var chip = function (ico, lbl, val) {
+        return val ? '<div class="sv2-rt-award"><span class="sv2-rt-aw-ico">' + ico + '</span><div><div class="sv2-rt-aw-lbl">'
+          + $esc(lbl) + '</div><div class="sv2-rt-aw-val">' + $esc(val) + '</div></div></div>' : '';
+      };
+      awHtml = '<div class="sv2-rt-awards">'
+        + chip('🏆', $t('sv2.rt.awBest'), aw.best)
+        + chip('🎯', $t('sv2.rt.awOnRoute'), aw.least_off)
+        + chip('💚', $t('sv2.rt.awSaved'), aw.most_saved)
+        + chip('✨', $t('sv2.rt.awClean'), (aw.clean || []).slice(0, 4).join(', ') + ((aw.clean || []).length > 4 ? ' +' + (aw.clean.length - 4) : ''))
+        + '</div>';
+    }
+
+    var rows = list.map(function (d) {
+      var id = String(d.email || d.name).toLowerCase();
+      var chk = window.VS_STATS_V2_CMP ? VS_STATS_V2_CMP.chkHtml('drvroute', id) : '';
+      var delta = Math.round(((d.extra_per_100 || 0) - avg100) * 10) / 10;
+      var w = Math.round((d.extra_per_100 || 0) / maxPer * 100);
+      var barCol = d.rank == null ? '#94a3b8' : (delta <= 0 ? '#16a34a' : '#d97706');
+      var mapBtn = (window.RouteDevMap && d.email)
+        ? '<button class="btn ghost" style="padding:4px 8px;" title="' + $esc($t('sv2.rt.map')) + '" onclick="event.stopPropagation();RouteDevMap.open({from:\'' + $esc(_route.from) + '\',to:\'' + $esc(_route.to) + '\',sofer_email:\'' + $esc(d.email).replace(/'/g, '&#39;') + '\'})">🗺️</button>' : '';
+      return '<tr' + (d.rank == null ? ' style="opacity:.7;"' : '') + '>'
+        + '<td onclick="event.stopPropagation()" style="text-align:center;">' + chk + '</td>'
+        + '<td style="text-align:center;font-size:16px;font-weight:800;">' + medal(d.rank) + '</td>'
+        + '<td>' + avatar(d.name) + '<span style="margin-left:8px;font-weight:600;">' + $esc(d.name) + '</span>'
+        +   (d.rank == null ? '<div class="text-muted" style="font-size:11px;">' + $esc($t('sv2.rt.fewData', { n: _route.min_orders })) + '</div>' : '') + '</td>'
+        + '<td style="text-align:right;">' + fnum(d.orders, 0) + '</td>'
+        + '<td style="text-align:right;">' + fnum(d.deviation, 0) + ' <span class="text-muted" style="font-size:11px;">(' + fnum(d.deviation_pct, 0) + '%)</span></td>'
+        + '<td style="text-align:right;">' + fnum(d.planned_km, 0) + ' / ' + fnum(d.actual_km, 0) + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + fnum(d.extra_km, 1) + '</td>'
+        + '<td style="min-width:130px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:8px;border-radius:4px;background:rgba(148,163,184,.25);overflow:hidden;">'
+        +   '<div style="height:100%;width:' + w + '%;background:' + barCol + ';"></div></div><b style="font-size:12px;min-width:34px;text-align:right;">' + fnum(d.extra_per_100, 1) + '</b></div>'
+        +   (d.rank != null ? '<div class="' + (delta <= 0 ? 'sv2-rt-good' : 'sv2-rt-bad') + '" style="font-size:11px;font-weight:600;">' + (delta > 0 ? '+' : '') + fnum(delta, 1) + ' ' + $esc($t('sv2.rt.vsAvg')) + '</div>' : '') + '</td>'
+        + '<td style="text-align:right;">' + fnum(d.saved_km, 1) + '</td>'
+        + '<td style="text-align:right;">' + fnum(d.off_pct, 1) + '%</td>'
+        + '<td style="text-align:right;">' + (d.extra_h_est ? '≈ ' : '') + hrs(d.extra_h) + '</td>'
+        + '<td style="text-align:right;">' + fnum(d.extra_l, 0) + '</td>'
+        + '<td style="text-align:right;">' + (d.avg_kmh != null ? fnum(d.avg_kmh, 0) : '—') + '</td>'
+        + '<td>' + mapBtn + '</td></tr>';
+    }).join('');
+
+    var exportBtn = window.VS_STATS_V2_EXPORT ? VS_STATS_V2_EXPORT.button({
+      data: all.map(function (d) {
+        return { loc: d.rank || '', nume: d.name, curse: d.orders, abateri: d.deviation, abateri_pct: d.deviation_pct,
+          km_plan: d.planned_km, km_real: d.actual_km, km_extra: d.extra_km, km_extra_100: d.extra_per_100,
+          km_economisiti: d.saved_km, in_afara_pct: d.off_pct, ore_extra: d.extra_h, litri_extra: d.extra_l, viteza: d.avg_kmh };
+      }),
+      columns: [
+        { key: 'loc', label: 'Loc' }, { key: 'nume', label: 'Șofer' }, { key: 'curse', label: 'Curse verificate' },
+        { key: 'abateri', label: 'Curse cu abatere' }, { key: 'abateri_pct', label: 'Abateri %' },
+        { key: 'km_plan', label: 'Km planificat' }, { key: 'km_real', label: 'Km GPS' }, { key: 'km_extra', label: 'Km în plus' },
+        { key: 'km_extra_100', label: 'Km în plus / 100 km' }, { key: 'km_economisiti', label: 'Km economisiți' },
+        { key: 'in_afara_pct', label: 'În afara traseului %' }, { key: 'ore_extra', label: 'Ore în plus' },
+        { key: 'litri_extra', label: 'Litri în plus (estimat)' }, { key: 'viteza', label: 'Viteză medie' },
+      ],
+      filename: 'clasament-trasee-' + new Date().toISOString().slice(0, 10) + '.csv',
+    }) : '';
+
+    return kpi + awHtml + searchBox($t('sv2.pp.searchDrivers'))
+      + '<div class="sv2-panel">'
+      +   '<div class="sv2-panel-head"><div class="sv2-panel-title">🏁 ' + $esc($t('sv2.rt.pTitle')) + '</div>'
+      +     '<div style="display:flex;gap:8px;">' + exportBtn + '</div></div>'
+      +   '<div class="text-muted" style="font-size:12px;margin:-4px 0 8px;">' + $esc($t('sv2.rt.hint', { n: _route.min_orders })) + '</div>'
+      +   '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      +     '<th style="width:32px;text-align:center;">✓</th>'
+      +     '<th style="text-align:center;">' + $t('sv2.rt.cRank') + '</th>'
+      +     '<th>' + $t('sv2.pp.cDriver') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cOrders') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cDev') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cPlanReal') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cExtraKm') + '</th>'
+      +     '<th>' + $t('sv2.rt.cPer100') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cSaved') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cOffPct') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cExtraH') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cExtraL') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.rt.cSpeed') + '</th>'
+      +     '<th></th>'
+      +   '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+      +   '<div class="text-muted" style="font-size:11.5px;margin-top:8px;">' + $esc($t('sv2.rt.foot')) + '</div>'
       + '</div>';
   }
 

@@ -359,6 +359,10 @@ handlers.routeDeviationMap = async function (req, res, args) {
       let where = '';
       if (['ok', 'deviation'].includes(a.status)) { params.push(a.status); where = ' AND d.status = $' + params.length; }
       else where = " AND d.status IN ('ok','deviation')";
+      if (a.sofer_email) {
+        params.push(String(a.sofer_email).toLowerCase().slice(0, 200));
+        where += ` AND LOWER(COALESCE(o.email_sofer,'')) = $` + params.length;
+      }
       if (a.rendszam) {
         params.push(String(a.rendszam).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20));
         where += ` AND UPPER(REGEXP_REPLACE(COALESCE(o.rendszam_camion,''),'[^A-Za-z0-9]','','g')) = $` + params.length;
@@ -389,6 +393,23 @@ handlers.routeDeviationMap = async function (req, res, args) {
     return res.json({ result: { ok: true, mode, meta, items, summary: rd.summarize(items), off_km: rd.OFF_KM } });
   } catch (err) {
     console.error('routeDeviationMap hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Sofőr-verseny: útvonal-fegyelem sofőrönként (Statisztika → Emberek) ──
+handlers.routeDeviationDriverStats = async function (req, res, args) {
+  try {
+    const u = await _gate(req, res); if (!u) return;
+    const a = (args && args[0]) || {};
+    const to = isDay(a.to) ? a.to : new Date().toISOString().slice(0, 10);
+    const from = isDay(a.from) ? a.from : new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    let board = { drivers: [], company: null, awards: null, min_orders: 3 };
+    try { board = await require('../lib/routeDeviation').driverLeaderboard(u.company_id, from, to); }
+    catch (e) { if (!(e && e.code === '42P01')) throw e; }
+    return res.json({ result: Object.assign({ ok: true, from, to }, board) });
+  } catch (err) {
+    console.error('routeDeviationDriverStats hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
