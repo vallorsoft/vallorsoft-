@@ -2057,7 +2057,7 @@
     'cs.rm.rNoKey': { hu: "hiányzik a HERE-kulcs", ro: "lipsește cheia HERE" },
     'cs.rm.rDecrypt': { hu: "a HERE-kulcs nem olvasható (megváltozott INTEGRATION_ENC_KEY) — add meg újra", ro: "cheia HERE nu poate fi citită (INTEGRATION_ENC_KEY schimbat) — introdu-o din nou" },
     'cs.rm.rOther': { hu: "a HERE-beállítás nem elérhető", ro: "setarea HERE nu este disponibilă" },
-    'rdm.osrmPlan': { hu: "A terv OSRM-mel készült (autós, kamion-korlátok nélkül), nem HERE-rel", ro: "Planul a fost calculat cu OSRM (auto, fără restricții camion), nu cu HERE" },
+    'rdm.ndNoHere': { hu: "A terv csak HERE-rel (40 t-s kamion) készül — a cégnek nincs aktív HERE-kulcsa. Az OSRM (autós) számítás félrevezető lenne, ezért nem számolunk.", ro: "Planul se calculează doar cu HERE (camion 40 t) — firma nu are o cheie HERE activă. Calculul OSRM (auto) ar fi înșelător, de aceea nu se face." },
     'cs.rm.srcErr': { hu: 'Az útvonal nem számolható', ro: 'Traseul nu poate fi calculat' },
     'cs.rm.close': { hu: '✕ Bezár', ro: '✕ Închide' },
     'cs.rm.save': { hu: 'Útvonal mentése', ro: 'Salvează ruta' },
