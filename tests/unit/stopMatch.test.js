@@ -262,3 +262,70 @@ describe('handlers/stopMatch — térképes kiválasztás', () => {
   });
 });
 
+
+describe('stopMatch — pihenő / szünet után a valódi rakodóhely', () => {
+  const MISK = [48.1035, 20.7784];
+  const PARK = [48.0800, 20.7400];   // parkoló a város szélén (~3,8 km)
+  const CUST = [48.1200, 20.8000];   // a valódi lerakó (~2,4 km a központtól)
+  const T = Date.parse('2026-10-06T15:00:00Z') / 1000;
+  function nightThenShortUnload(ign) {
+    const p = [[T, 47.9, 20.4, 0, 1, null, null, null, null]];
+    let t = T;
+    t = drive(p, t, [47.9, 20.4], PARK, 180);   // érkezés 18:00Z (21:00 RO)
+    t = stand(p, t, PARK, 600);                 // 10 óra napi pihenő
+    t = drive(p, t, PARK, CUST, 12);
+    t = stand(p, t, CUST, 2, ign);              // 2 perces lerakás
+    t = drive(p, t, CUST, [48.3, 21.2], 40);
+    return p;
+  }
+  const exp = [{ cityGeo: { lat: MISK[0], lng: MISK[1] }, memory: [] }];
+  const stop = [{ kind: 'delivery', loc: 'Miskolc', firma: 'Gamma Kft', data: '2026-10-06' }];
+
+  test('éjszakai pihenő a város szélén, reggel 2 perc lerakás → a 2 perces hely', () => {
+    const cands = sm.buildCandidates(nightThenShortUnload(), {});
+    const rest = cands.find((c) => c.rest === 'daily');
+    const hop = cands.find((c) => c.hop);
+    expect(rest).toBeTruthy(); expect(hop).toBeTruthy();
+    expect(Math.abs(hop.lat - CUST[0])).toBeLessThan(0.005);
+    const r = sm.align(stop, cands, exp);
+    expect(cands[r[0].candIdx]).toBe(hop);
+    expect(r[0].status).not.toBe('auto');           // rövid, pihenő utáni hely → az iroda nézze át
+    const restSig = sm.scorePair(stop[0], rest, exp[0]).signals.map((x) => x[0]);
+    expect(restSig).toContain('rest_then_moved');
+  });
+
+  test('forgalmi megállás az úton (lámpa) nem lesz jelölt', () => {
+    const pts = nightThenShortUnload(1);
+    const road = [[[CUST[0] - 0.01, CUST[1]], [CUST[0] + 0.01, CUST[1]]]];
+    const cands = sm.buildCandidates(pts, { roadLines: road });
+    expect(cands.some((c) => c.hop)).toBe(false);
+  });
+
+  test('a cégnél éjszakázott (utána nem állt meg a közelben) → a pihenő hely marad, büntetés nélkül', () => {
+    const p = [[T, 47.9, 20.4, 0, 1, null, null, null, null]];
+    let t = drive(p, T, [47.9, 20.4], CUST, 180);
+    t = stand(p, t, CUST, 600);
+    drive(p, t, CUST, [48.6, 21.6], 60);
+    const cands = sm.buildCandidates(p, {});
+    for (const c of cands) c.place = { city: 'Miskolc' };   // élesben a reverse-geokód adja
+    const r = sm.align(stop, cands, exp);
+    expect(r[0].candIdx).not.toBeNull();
+    expect(r[0].signals.map((x) => x[0])).not.toContain('rest_then_moved');
+  });
+
+  test('45 perces szünet a város szélén, utána 5 km-re 1 óra lerakás → a lerakó', () => {
+    const p = [[T, 47.9, 20.4, 0, 1, null, null, null, null]];
+    let t = drive(p, T, [47.9, 20.4], PARK, 120);
+    t = stand(p, t, PARK, 45);
+    t = drive(p, t, PARK, CUST, 10);
+    t = stand(p, t, CUST, 60);
+    drive(p, t, CUST, [48.3, 21.2], 40);
+    const road = [[[PARK[0] - 0.01, PARK[1]], [PARK[0] + 0.01, PARK[1]]]];   // a parkoló az út mellett
+    const cands = sm.buildCandidates(p, { roadLines: road });
+    const brk = cands.find((c) => c.rest === 'break');
+    expect(brk).toBeTruthy();
+    const r = sm.align(stop, cands, exp);
+    expect(Math.abs(cands[r[0].candIdx].lat - CUST[0])).toBeLessThan(0.005);
+    expect(sm.scorePair(stop[0], brk, exp[0]).signals.map((x) => x[0])).toContain('break_then_moved');
+  });
+});
