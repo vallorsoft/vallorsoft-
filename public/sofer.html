@@ -12,9 +12,9 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260918payalloc">
-  <script src="/i18n.js?v=20261029bcadm"></script>
+  <script src="/i18n.js?v=20261105autostop"></script>
   <script src="/expense-cat.js?v=20260922wb"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20261029bcadm">
+  <link rel="stylesheet" href="/sofer.css?v=20261105autostop">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -448,7 +448,8 @@
 <script src="/uit-format.js?v=20260820uit3"></script>
 <script src="/uit-scan.js?v=20261007uitscan"></script>
 <script src="/sofer-uit.js?v=20261007uitscan"></script>
-<script src="/sofer.js?v=20261029bcadm"></script>
+<script src="/sofer.js?v=20261105autostop"></script>
+<script src="/sofer-auto-stops.js?v=20261105autostop"></script>
 <!-- sofer-tour.js kivéve — a bemutató önálló /sofer-demo oldalon fut.
      A sofer.js `SoferTour.demoIntercept` hívásai biztonságos guarddal
      élnek (window.SoferTour && …), tehát a hiánya nem hasal el. -->
@@ -560,6 +561,21 @@
     <div class="vs-so-btns">
       <button class="vs-so-btn logout"  id="vsSessionLogoutBtn"  onclick="vsSessionLogout()" data-i18n="sof.sess.logout">Kilépés</button>
       <button class="vs-so-btn refresh" id="vsSessionRefreshBtn" onclick="vsSessionRefresh()" data-i18n="sof.sess.refresh">🔄 Frissítés</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 🤖 GPS-BŐL PÓTOLT ÁLLOMÁSOK — átnézés belépéskor ──
+     Ha a sofőr elfelejtette az odaértem / felraktam / leürítettem gombot és a
+     rendszer biztosan felismerte a GPS-ből, itt sorban leokézza vagy javítja
+     (idő / térkép). Tartalmát a public/sofer-auto-stops.js tölti. -->
+<div id="autoStopModal" class="sof-modal" style="display:none;">
+  <div class="sof-modal-card">
+    <h3 class="sof-cf-title" data-i18n="sof.as.title">🤖 Acestea au fost marcate automat în locul tău</h3>
+    <div id="asBody"></div>
+    <div class="as-foot" id="asFoot">
+      <button class="as-btn ghost" onclick="soferAutoStopsClose()" data-i18n="sof.as.later">Mai târziu</button>
+      <button class="as-btn ok" onclick="SoferAutoStops.okAll()" data-i18n="sof.as.okAll">✓ Toate sunt în regulă</button>
     </div>
   </div>
 </div>

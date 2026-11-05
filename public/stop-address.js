@@ -63,6 +63,7 @@
         + '<div id="saSettings" style="margin-top:12px;padding:10px 12px;border:1px solid rgba(148,163,184,0.35);border-radius:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
         + '<label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;"><input type="checkbox" id="saAuto" style="width:18px;height:18px;"> 📄 ' + _t('sa.autoApply', 'Pune automat adresa pe foaia de parcurs') + '</label>'
         + '<label style="display:flex;align-items:center;gap:6px;">' + _t('sa.minScore', 'peste') + ' <input type="number" class="input" id="saMin" min="30" max="200" step="5" style="width:90px;"> ' + _t('sa.points', 'pct') + '</label>'
+        + '<label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;flex-basis:100%;"><input type="checkbox" id="saAutoEv" style="width:18px;height:18px;"> 🤖 ' + _t('sa.autoEvents', 'Dacă șoferul uită să marcheze sosirea / încărcarea / descărcarea, sistemul o marchează din GPS (doar la recunoaștere sigură); șoferul confirmă sau corectează la următoarea intrare') + '</label>'
         + '<button class="btn" id="saSaveSet" onclick="StopAddress.saveSettings()">💾 ' + _t('sa.saveSet', 'Salvează') + '</button>'
         + '<button class="btn" onclick="StopAddress.applyBulk()">📄 ' + _t('sa.applyBulk', 'Pune pe foile de parcurs toate confirmatele din perioadă') + '</button>'
         + '<div class="text-muted" style="font-size:12px;flex-basis:100%;">🧠 ' + _t('sa.learnHint', 'Sistemul învață din deciziile tale: ce accepți devine loc cunoscut, ce respingi nu mai este propus pentru aceeași firmă; după fiecare decizie restul curselor se recalculează.') + '</div>'
@@ -75,7 +76,7 @@
       f.value = S.from; tt.value = S.to; st.value = S.status; q.value = S.q;
       q.addEventListener('keydown', function (e) { if (e.key === 'Enter') reload(); });
       st.addEventListener('change', reload);
-      ['saAuto', 'saMin'].forEach(function (id) { var el = box.querySelector('#' + id); if (el) el.addEventListener('change', function () { S.setTouched = true; }); });
+      ['saAuto', 'saMin', 'saAutoEv'].forEach(function (id) { var el = box.querySelector('#' + id); if (el) el.addEventListener('change', function () { S.setTouched = true; }); });
     }
     return box;
   }
@@ -96,10 +97,23 @@
       renderCounts(r.counts || {}, r.queue || 0);
       if (r.settings) {
         var au = document.getElementById('saAuto'), mn = document.getElementById('saMin');
-        if (au && !S.setTouched) { au.checked = !!r.settings.auto_apply; mn.value = r.settings.min_score; }
+        if (au && !S.setTouched) {
+          au.checked = !!r.settings.auto_apply; mn.value = r.settings.min_score;
+          var ae = document.getElementById('saAutoEv'); if (ae) ae.checked = r.settings.auto_events !== false;
+        }
       }
       render();
     }).catch(function () { body.innerHTML = '<div class="text-muted" style="padding:14px;">Eroare de rețea</div>'; });
+  }
+
+  // 🤖 a rendszer pótolta a sofőr elfelejtett gombját (GPS) — és mit szólt hozzá a sofőr
+  function autoBadge(r) {
+    if (!r.auto_filled) return '';
+    var t = r.auto_ack_at
+      ? (r.auto_ack_action === 'ok' ? _t('sa.autoAckOk', 'Șoferul a confirmat') : r.auto_ack_action === 'map' ? _t('sa.autoAckMap', 'Șoferul a corectat pe hartă') : _t('sa.autoAckTime', 'Șoferul a corectat ora'))
+      : _t('sa.autoAckWait', 'Așteaptă confirmarea șoferului');
+    var cls = r.auto_ack_at ? (r.auto_ack_action === 'ok' ? 'ok' : 'warn') : 'info';
+    return '<div style="margin-top:4px;"><span class="badge ' + cls + '" title="' + _e(dt(r.auto_filled_at)) + '">🤖 ' + _e(t) + '</span></div>';
   }
 
   function renderCounts(c, queue) {
@@ -149,7 +163,8 @@
         + (S.open[r.id] ? signalsHtml(det) : '')
         + '</td>'
         + '<td>' + (st ? '<span class="badge ' + st.cls + '">' + _t(st.k, st.d) + '</span>' : '<span class="badge">' + _t('sa.f.none', 'Neprocesat') + '</span>')
-        + (r.match_score != null ? '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _e(r.match_score) + ' ' + _t('sa.points', 'pct') + '</div>' : '') + '</td>'
+        + (r.match_score != null ? '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _e(r.match_score) + ' ' + _t('sa.points', 'pct') + '</div>' : '')
+        + autoBadge(r) + '</td>'
         + '<td style="white-space:nowrap;">'
         + ((r.match_status === 'auto' || r.match_status === 'suggested') ? '<button class="btn ok" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'confirm\')" title="' + _t('sa.a.confirm', 'Acceptă') + '">✓</button> ' : '')
         + (r.match_status !== 'rejected' && r.match_status ? '<button class="btn danger" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'reject\')" title="' + _t('sa.a.reject', 'Respinge') + '">✕</button> ' : '')
@@ -418,7 +433,8 @@
     },
     saveSettings: function () {
       var au = document.getElementById('saAuto'), mn = document.getElementById('saMin');
-      var v = { auto_apply: !!(au && au.checked), min_score: parseInt(mn && mn.value, 10) || 80 };
+      var ae = document.getElementById('saAutoEv');
+      var v = { auto_apply: !!(au && au.checked), min_score: parseInt(mn && mn.value, 10) || 80, auto_events: !!(ae && ae.checked) };
       if (v.auto_apply && !window.confirm(_t('sa.autoConfirm', 'Adresele recunoscute peste pragul ales vor fi puse automat pe foile de parcurs (și pe cele deja trimise). Continui?'))) return;
       gas('stopMatchSettingsSave', [v]).then(function (r) {
         if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');

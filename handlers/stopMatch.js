@@ -62,6 +62,7 @@ handlers.stopMatchList = async function (req, res, args) {
               s.arrived_at, s.done_at, s.actual_lat, s.actual_lng, s.actual_address, s.actual_city, s.actual_country,
               s.gps_arrived_at, s.gps_left_at, s.match_score, s.match_source, s.match_status, s.match_detail,
               s.matched_at, s.match_decided_by, s.waybill_apply, s.waybill_applied_at,
+              s.auto_filled, s.auto_filled_at, s.auto_ack_at, s.auto_ack_action,
               (SELECT COUNT(*)::int FROM fuvarlevelek f WHERE f.company_id = s.company_id
                   AND f.order_ids @> jsonb_build_array(s.order_id)) AS wb_count,
               o.fuvar_no, o.client, o.rendszam_camion, o.status AS order_status, o.nume_sofer
@@ -302,7 +303,8 @@ handlers.stopMatchSettingsSave = async function (req, res, args) {
     const u = await _gate(req, res); if (!u) return;
     if (u.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Doar administratorul poate modifica această setare' } });
     const a = (args && args[0]) || {};
-    const st = await wb.saveSettings(u.company_id, { auto_apply: a.auto_apply === true, min_score: a.min_score }, u.email);
+    const st = await wb.saveSettings(u.company_id, { auto_apply: a.auto_apply === true, min_score: a.min_score,
+      auto_events: typeof a.auto_events === 'boolean' ? a.auto_events : undefined }, u.email);
     audit.fromReq(req, 'order.stop_address.settings', 'company', String(u.company_id), st);
     // bekapcsoláskor a már felismert, küszöb feletti címek is rákerülnek (háttérben)
     if (st.auto_apply) {

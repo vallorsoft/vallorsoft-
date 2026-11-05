@@ -3645,3 +3645,54 @@
 }
 .border-log-item .bc-badge.edited { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
 .border-log-item .bc-badge.warn { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
+
+/* ── 🤖 GPS-ből pótolt állomások átnézése (#autoStopModal) ──
+   Világos kártya (mint a #sofTimeModal), görgethető lista; a gombok
+   ujjbarátok (≥ 46px), kontraszt ≥ 4,5:1 világos háttéren. */
+#autoStopModal {
+  position: fixed; inset: 0; z-index: 1150;
+  align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(6px);
+}
+#autoStopModal .sof-modal-card {
+  width: min(520px, 100%); max-height: 90vh; overflow-y: auto;
+  box-sizing: border-box;
+  background: #fff; color: #0f172a;
+  border: 1.5px solid #cbd5e1; border-radius: 20px;
+  padding: 20px 18px 16px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
+}
+#autoStopModal .sof-cf-title { margin: 0 0 8px; font-size: 18px; font-weight: 900; color: #0f172a; }
+#autoStopModal .as-intro { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: #334155; font-weight: 600; }
+#autoStopModal .as-item {
+  border: 1.5px solid #cbd5e1; border-left: 5px solid #2563eb; border-radius: 14px;
+  padding: 12px 12px 10px; margin-bottom: 10px; background: #f8fafc;
+}
+#autoStopModal .as-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+#autoStopModal .as-kind { font-weight: 800; font-size: 14px; padding: 3px 10px; border-radius: 999px; }
+#autoStopModal .as-kind.pu { background: #dbeafe; color: #1e3a8a; }
+#autoStopModal .as-kind.de { background: #dcfce7; color: #14532d; }
+#autoStopModal .as-no { font-size: 12.5px; font-weight: 700; color: #334155; }
+#autoStopModal .as-where { font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 6px; word-break: break-word; }
+#autoStopModal .as-line { font-size: 14px; color: #1e293b; margin: 2px 0; }
+#autoStopModal .as-yours { font-size: 12px; color: #475569; }
+#autoStopModal .as-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+#autoStopModal .as-foot { display: flex; gap: 10px; margin-top: 6px; }
+#autoStopModal .as-btn {
+  flex: 1 1 auto; min-height: 46px; padding: 10px 12px; border-radius: 12px;
+  font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+  touch-action: manipulation;
+}
+#autoStopModal .as-btn.ok { border: 1.5px solid #15803d; background: #15803d; color: #fff; }
+#autoStopModal .as-btn.ghost { border: 1.5px solid #94a3b8; background: #f1f5f9; color: #1e293b; }
+#autoStopModal .as-btn:active { transform: scale(0.98); }
+#autoStopModal .as-edit { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+#autoStopModal .as-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 700; color: #334155; }
+#autoStopModal .as-edit input {
+  min-height: 46px; padding: 8px 12px; font-size: 16px; font-weight: 700; color: #0f172a;
+  background: #fff; border: 1.5px solid #94a3b8; border-radius: 10px; font-family: inherit;
+}
+#autoStopModal .as-map { height: 52vh; min-height: 260px; border-radius: 12px; border: 1.5px solid #cbd5e1; overflow: hidden; background: #e2e8f0; }
+#autoStopModal .as-map-load { padding: 16px; color: #334155; font-weight: 700; }

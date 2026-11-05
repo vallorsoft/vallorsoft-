@@ -1050,6 +1050,7 @@ var _SOF_MODALS = [
   { id: 'wbLocModal',         btn:   'wbLocCancel' },   // a Mégse gomb onclick-je hívja a callback-et
   { id: 'receiptReviewModal', close: 'rrClose' },
   { id: 'orderPickerModal',   close: 'opCancel' },
+  { id: 'autoStopModal',      close: 'soferAutoStopsClose', ext: 'sofer-auto-stops.js' }, // 🤖 GPS-ből pótolt állomások
   { id: 'companyInfoModal',   close: 'closeCompanyInfo' },
   { id: 'hoModal',            close: 'closeHandover' },
   { id: 'bugModal',           close: 'closeBugReport' }
@@ -4699,6 +4700,8 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     loadSoferMiniStats();
     loadMyAssignedVehicle();
     loadGdprNotice();
+    // 🤖 a rendszer által (GPS-ből) pótolt, még át nem nézett állomás-gombok
+    try { if (window.SoferAutoStops) window.SoferAutoStops.load(); } catch (_) {}
     applyBonScanVisibility();
     // Bon-várólista karbantartás — csak ITT, a `_meData` ismeretében (a
     // lista kulcsa per-sofőr): megszakadt feldolgozás folytatása a
@@ -6340,6 +6343,7 @@ document.addEventListener('visibilitychange', function() {
   try { if (typeof loadSoferMiniStats === 'function') loadSoferMiniStats(); } catch(e) {}
   try { if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle(); } catch(e) {}
   try { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); } catch(e) {}
+  try { if (window.SoferAutoStops) window.SoferAutoStops.load(); } catch(e) {}
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

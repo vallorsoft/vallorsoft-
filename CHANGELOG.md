@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-05 — 🤖 Elfelejtett állomás-gomb: a rendszer pótolja GPS-ből, a sofőr belépéskor leokézza / javítja (PR #597)
+- Ha a cím-felismerés egy állomásnál BIZTOS (`auto`), a kamion már elhagyta a helyet (utána még van GPS-mozgás, ≥ 15 perce), de a sofőr nem nyomta meg az odaértem / felraktam / leürítettem gombot, a háttér-ütemező beírja helyette: érkezés = GPS-állás eleje, kész = vége (`lib/stopAutoEvents.js` `planAutoFill`/`applyAutoEvents`, a `stopMatchRunner.matchOrder` végén). Csak sorrendben (kihagyni nem lehet), a sofőr gombnyomása sosem íródik felül és a későbbi gombnyomás felső korlát; a státusz ugyanúgy lép (első felrakó → In Curs, utolsó lerakó → Finalizat); push az irodának. A sorba kerülnek a már lejárt felrakó-dátumú `Alocat` fuvarok is (ha a sofőr az elsőt is elfelejtette).
+- Sofőr: belépéskor (és az appba visszatérve) felugró `#autoStopModal` (`public/sofer-auto-stops.js`) — sorban az automatikusan rögzített lépések; ✓ Rendben / ✓ Mind rendben / ⏱ idő-javítás / 🗺️ térképes javítás (a kijelölt helyen talált GPS-állás ideje lesz az új idő; a hely javaslatként az irodához kerül). Szerver: `handlers/stopAutoEvents.js`.
+- Iroda: Tényleges címek fülön 🤖 jelvény (vár / jóváhagyta / javította), és kapcsoló a beállításoknál (alap: be). Migráció `db/zz-stop-auto-events.sql`. Teszt: `tests/unit/stopAutoEvents.test.js` (17 eset).
+
 ## 2026-11-05 — 📍 Útvonaltervező: koordináta is beírható (HERE is felismeri) (PR #596)
 - Az útvonaltervező (és minden cím-autocomplete) pont-mezőjébe koordináta is írható: `45.12345, 25.45678` · `45.123 N, 25.456 E` · `45°07'23"N 25°27'21"E` · tizedesvesszős `45,123 25,456` · Google/HERE/OSM térkép-link. A pont azonnal felkerül a térképre (kiválasztás nélkül is), a listában a cím „cím (lat, lng)" formában jelenik meg.
 - Közös felismerő `public/coord-parse.js` (kliens+szerver, `lib/coordParse.js`); a `mapsProvider.geocode` koordinátánál külső hívás és díj nélkül tér vissza, az új `reverseLabel` HERE-kulcsos cégnél HERE revgeocode-dal, egyébként Photonnal ad címet. Bekötve: `rpAcSearch`/`rpPlanRoute` (HERE routing a pontos koordinátát kapja), `mapsProvider.autocomplete`, `routeEstimate.geocodeCached`, `routePlannerHandlers.geocodeFree`. Csak-egész számpár (pl. házszám) nem koordináta. Teszt: `tests/unit/coordParse.test.js`.
