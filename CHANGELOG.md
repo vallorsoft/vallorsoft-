@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-05 — 🧪 Cím-felismerés: fuzz-teszt + visszamérés valós adaton + térkép előtöltés (PR #599)
+- `tests/unit/stopMatchRobust.test.js`: 400 véletlen, szándékosan hibás GPS-nap (null sebesség, hiányzó mezők, ismétlődő/hiányzó pontok, NaN) — a motor (`buildCandidates`/`align`), a gomb-pótlás (`planAutoFill`) és a térképes javítás (`dwellNear`) sosem dob, az eredmény mindig érvényes (sorrend, státusz, kész ≥ érkezés; pihenő utáni rövid állás tanult adat nélkül sosem „biztos"). Lefedi a napi pihenő / szünet / pihenő utáni ágakat is.
+- `scripts/stop-match-backtest.js` + `matchOrder(..., { dryRun, noMemory, cacheOnly })`: az iroda által elfogadott címeket „helyes válasznak" véve írás nélkül újrafuttatja a felismerést, és kiírja a találati arányt, illetve hányszor lett volna „biztos" egy ROSSZ helyre (ebből fut a gomb-pótlás — 0 felett nem-nulla kilépési kód).
+- FIX `lib/mapsProvider.js` `geocode`: a „nem található" geokód-cache 3 nap után lejár (egy átmeneti szolgáltató-hiba eddig örökre rögzült, a település soha többé nem lett meg a cím-felismerésben). Teszt: `tests/unit/geocodeNegCache.test.js`.
+- Sofőr: az automatikus rögzítések ablaka megnyitáskor előtölti a térkép-könyvtárat és az első 8 tétel térkép-adatát (sorban, csendesen) → a „Javítás térképen" azonnal nyílik; `preconnect` a cdnjs-re.
+
 ## 2026-11-05 — 🛏️ Cím-felismerés: pihenő / szünet után a valódi rakodóhely (PR #598)
 - Gond: ha a sofőr a lerakó előtt a város szélén éjszakázott (≥ 9 óra) vagy 45 percet pihent, majd pár km-re csak 2 percet (vagy 1 órát) állt a valódi lerakón, a rendszer a pihenőt választhatta (a 2 perces állás nem is volt jelölt, a 20 perces küszöb alatt).
 - `lib/stopMatch.js`: pihenő-felismerés (`daily` ≥ 8 óra vagy éjszakai ≥ 6 óra; `break` 30–75 perc, gyújtás ki, manőver nélkül, út mellett). Pihenő után 6 / 3 órán belül, 0,4–30 km-re lévő rövid (≥ 2 perces) állások is jelöltek (`microStops`; az úton álló, manőver nélküli forgalmi megállás kiszűrve). Ha a pihenő után a közelben — a tervezett helyhez legalább olyan közel — még megállt: a pihenő −35 / −25 pont (`rest_then_moved` / `break_then_moved`), az utána következő állás +14 (`after_rest`, ha ≤ 30 km a tervezett településtől), és a rövid állásnál nincs „rövid állás" büntetés. Az ilyen hely sosem „biztos" (`auto`) — kivéve helymemória / tervezett cég / POI-név egyezésnél —, így a sofőr-gomb pótlása sem fut belőle.
