@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 77. lépés — Tényleges címek heti újraellenőrzése (2026-11-06, PR #604) ✅ KÉSZ
+- A háttér-újraellenőrzés minden írása `company_id`-szűrt, paraméteres; iroda által megerősített / elvetett állomáshoz nem nyúl. A 10. sikertelen kör után a „biztos" jelölés lekerül, így bizonytalan helyre automatikus menetlevél-rátétel / gomb-pótlás nem épül. A lista új mezői olvasásnál migráció-tűrők (`to_jsonb`). Új végpont nincs.
+
 ### 76. lépés — Teljes km sorrendben (fuvar + menetlevél) (2026-11-05, PR #603) ✅ KÉSZ
 - Háttér-számítás (`lib/orderRouteKm.js`, `lib/waybillRoute.js`): minden lekérdezés és írás `company_id`-szűrt, paraméteres; a fuvar `km`-jét csak üres / korábban automata érték esetén írja (kézi érték védett). Az `order-route-map` kapcsolóval kikapcsolt cégnél nem fut. A menetlevél állomás-koordinátáit csak a saját cég `order_stops` soraiból veszi (`company_id` + id-lista). A `routeDeviationRecheck` menetlevél-ága tulajdon-ellenőrzéssel (Admin/Manager kapu, audit). A `sanitizeRouteGeo` a kliens által küldött szakaszokat is fehérlistázza és hosszra vágja.
 

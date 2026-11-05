@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-06 — 🔁 Tényleges címek heti újraellenőrzése 150 pontig + kézi megerősítés 10 próba után + heti pontosság-mérés (PR #604)
+- **Heti újraellenőrzés** (`lib/stopMatchRunner.js`): minden, az iroda által még el nem döntött állomást, amelynek pontszáma 150 alatt van, a rendszer hetente újraelemez (új GPS-adat, tanult helyek, frissebb cím-adatok). **10 sikertelen újraellenőrzés után kézi megerősítésre** kerül (`order_stops.needs_manual`); ilyenkor a „biztos" jelölés lekerül róla, így automatikus menetlevél-rátétel és gomb-pótlás sem épül rá. Ha közben eléri a 150 pontot, a jelzés magától lekerül. Küszöbök: `STOP_RECHECK_TARGET`/`_MAX`/`_DAYS` (alap 150 / 10 / 7 nap). Migráció `db/zz-stop-recheck.sql`.
+- **Ha egy cím helye érdemben változik** (> 50 m), a fuvar útvonal-eltérése és a fuvart tartalmazó menetlevelek teljes útja is újraszámolódik (`invalidateRoutes`).
+- **A pontosság-mérés havi helyett heti** (ISO-hét, pl. `2026-W45`).
+- Tényleges címek fül: soronként „🔁 Újraellenőrzés N/10 · következő dátum" vagy „✋ Kézi megerősítés kell"; új szűrő „Kézi megerősítésre vár" + kattintható számláló. Teszt: `tests/unit/stopRecheck.test.js` (8 eset); valódi Postgres 16-on a 10 heti kör végig ellenőrizve.
+
 ## 2026-11-05 — 🛣️ Teljes km sorrendben: fuvar (első felrakó → utolsó lerakó, üres km-mel) + menetlevél (Plecare → Sosire) (PR #603)
 - **Fuvar km**: minden fel-/lerakó pont a fuvaron belüli sorrendben, az első felrakótól az utolsó lerakóig — benne a lerakó → következő felrakó üres szakasz is (pl. Ploiești fel → Copșa Mică le → Arad fel → Copșa Mică le). Szakaszonként rakott / üres jelzés, összesítve rakott és üres km (`orders.route_geo.legs/loaded_km/empty_km`). A fuvar `km`-je csak akkor íródik, ha üres vagy korábban is automata volt (kézi érték nyer).
 - Közös `lib/routeChain.js` (`classifyLegs` — több lerakós fuvarnál a lerakók közti szakasz rakott marad; `routeChain` — 20 pont fölött darabolva). A fuvar-kiírás ellenőrző lapján a szakaszok „rakott / üres" címkét kapnak + Σ sor.

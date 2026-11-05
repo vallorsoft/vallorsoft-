@@ -1720,7 +1720,7 @@ function startStopMatchScheduler() {
         if (n >= PER_ROUND || Date.now() - t0 > BUDGET_MS) break;
         if (!(await allowed(q.company_id))) continue;
         n++;
-        try { await runner.matchOrder(q.company_id, q.id); }
+        try { await runner.matchOrder(q.company_id, q.id, { recheck: q.recheck === true }); }
         catch (e) {
           console.warn('[StopMatch] fuvar hiba', q.id, e.message);
           await pool.query(
@@ -1750,19 +1750,19 @@ function startStopMatchScheduler() {
         // régebbi ellenőrzések mutatói (menetidő, letérés) — csak GPS-naplóból, külső hívás nélkül
         if (Date.now() - t0 < BUDGET_MS) await rd.backfillStats(20);
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[RouteDev] sor hiba', e.message); }
-      // havi pontosság-mérés (visszamérés az elfogadott címeken, írás nélkül): körönként 1 cég
+      // heti pontosság-mérés (visszamérés az elfogadott címeken, írás nélkül): körönként 1 cég
       try {
         if (Date.now() - t0 < BUDGET_MS) {
           const { rows: due } = await pool.query(
             `SELECT DISTINCT s.company_id FROM order_stops s
               WHERE s.match_status='confirmed' AND s.actual_lat IS NOT NULL
                 AND NOT EXISTS (SELECT 1 FROM stop_match_accuracy a WHERE a.company_id=s.company_id
-                                 AND a.period = to_char(NOW() AT TIME ZONE 'Europe/Bucharest','YYYY-MM'))
+                                 AND a.period = to_char(NOW() AT TIME ZONE 'Europe/Bucharest','IYYY-"W"IW'))
               LIMIT 5`);
           for (const d of due) {
             if (!(await allowed(d.company_id))) continue;
             const r = await require('../lib/stopMatchAccuracy').measureAndStore(d.company_id, { days: 90, limit: 100, noMemory: true });
-            console.log('[StopMatch] havi pontosság cég', d.company_id, r.totals.hit + '/' + r.totals.stops, '· biztos-de-rossz', r.totals.auto_wrong);
+            console.log('[StopMatch] heti pontosság cég', d.company_id, r.totals.hit + '/' + r.totals.stops, '· biztos-de-rossz', r.totals.auto_wrong);
             break;
           }
         }
