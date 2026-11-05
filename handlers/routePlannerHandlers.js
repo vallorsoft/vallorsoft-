@@ -379,7 +379,8 @@ handlers.orderRouteEstimate = async function (req, res, args) {
       loaded_km: est.loaded_km, empty_km: est.empty_km, source: est.source, free_reason: est.free_reason || null } });
   } catch (err) {
     console.error('orderRouteEstimate hiba:', err);
-    return res.json({ result: { ok: false, err: (err && err.message) || 'Eroare de server la calculul rutei.' } });
+    return res.json({ result: { ok: false, err: (err && err.message) || 'Eroare de server la calculul rutei.',
+      code: (err && err.code) || null, retry: !!(err && err.retryable) } });
   }
 };
 

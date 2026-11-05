@@ -1810,7 +1810,7 @@ function startOrderRouteKmScheduler() {
         if (!(await allowed(q.company_id))) { ork.markFailed(q.id); continue; }
         n++;
         try { await ork.computeForOrder(q.company_id, q.id); }
-        catch (e) { ork.markFailed(q.id); console.warn('[OrderKm] fuvar hiba', q.id, e.message); }
+        catch (e) { ork.markFailed(q.id, !(e && e.retryable)); console.warn('[OrderKm] fuvar hiba', q.id, e.message); }
       }
       // a menetlevelek teljes útvonala (Plecare → Sosire)
       try {
@@ -1821,7 +1821,7 @@ function startOrderRouteKmScheduler() {
           if (!(await allowed(w.company_id))) { wr.markFailed(w.id); continue; }
           k++;
           try { await wr.checkWaybill(w.company_id, w.id); }
-          catch (e) { wr.markFailed(w.id); console.warn('[WaybillKm] menetlevél hiba', w.id, e.message); }
+          catch (e) { wr.markFailed(w.id, !(e && e.retryable)); console.warn('[WaybillKm] menetlevél hiba', w.id, e.message); }
         }
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillKm] sor hiba', e.message); }
     } catch (e) {

@@ -727,15 +727,29 @@ function _rmBuildWps(which){
 
 // Felrakó+lerakó(+köztespontok) → km + polyline. A km mezőt csak akkor tölti,
 // ha üres VAGY korábban is automata volt (kézi érték nyer).
-function orderRouteRecalc(which){
+// HERE-hiba (hálózat / túlterhelés) esetén 3 mp-enként elölről, max. 20× — amíg a pontok nem változnak
+var RM_RETRY_MS=3000, RM_RETRY_MAX=20;
+function orderRouteRecalc(which, _retry){
   if(!_orderMapOn) return;
   var c=RM_CFG[which], st=_rmState[which];
   var wps=_rmBuildWps(which); if(!wps) return;
   var key=JSON.stringify(wps);
-  if(key===st.lastKey && st.polyline.length){ if(_rmWhich===which) routeMapDraw(which); return; }
+  if(!_retry && key===st.lastKey && st.polyline.length){ if(_rmWhich===which) routeMapDraw(which); return; }
+  if(st.retryTimer){ clearTimeout(st.retryTimer); st.retryTimer=null; }
+  if(!_retry) st.retryN=0;
   st.lastKey=key;
   gas('orderRouteEstimate',[{waypoints:wps}]).then(function(r){
-    if(!r||!r.ok){ _rmSrcBadge(which, null, (r&&r.err)||''); return; }  // a kézi km marad
+    if(st.lastKey!==key) return;            // közben változtak a pontok
+    if(!r||!r.ok){
+      if(r && r.retry && (st.retryN||0) < RM_RETRY_MAX){
+        st.retryN=(st.retryN||0)+1;
+        _rmSrcBadge(which, null, (r.err||'')+' — '+t('cs.rm.retry').replace('{n}', st.retryN).replace('{max}', RM_RETRY_MAX));
+        st.retryTimer=setTimeout(function(){ st.retryTimer=null; if(st.lastKey===key) orderRouteRecalc(which, true); }, RM_RETRY_MS);
+        return;
+      }
+      _rmSrcBadge(which, null, (r&&r.err)||''); return;   // a kézi km marad
+    }
+    st.retryN=0;
     st.source=r.source||null;
     _rmSrcBadge(which, st.source, null, r.free_reason);
     st.km=r.km; st.dur=r.durationSeconds; st.polyline=r.polyline||[]; st.waypoints=r.waypoints||[]; st.legs=r.legs||[];
@@ -777,6 +791,7 @@ function buildRouteGeo(which){
            legs: (st.legs||[]).map(function(l){ return { from:l.fromLabel, to:l.toLabel, km:l.km, empty:!!l.empty }; }) };
 }
 function resetRouteState(which){
+  var old=_rmState[which]; if(old && old.retryTimer) clearTimeout(old.retryTimer);
   _rmState[which]=_rmFresh();
   var se=document.getElementById(RM_CFG[which].km+'Src'); if(se) se.remove();
   var b=document.getElementById(RM_CFG[which].btn); if(b) b.style.display='none';
