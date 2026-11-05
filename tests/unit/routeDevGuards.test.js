@@ -39,17 +39,56 @@ describe('checkOrder védőkorlátok', () => {
     expect(r).toMatchObject({ status: 'no_data', reason: 'time' });
   });
 
-  test('a kamion közben más fuvart csinált → no_data / overlap, a fuvarszámokkal', async () => {
+  test('közben másik fuvar → az egész út egy tervbe fűzve, időrendben, mindkét fuvarra mentve', async () => {
+    const rc = require('../../lib/routeChain');
+    const spy = jest.spyOn(rc, 'routeChain').mockResolvedValue({ km: 2800, durationSeconds: 36000, polyline: [[44.9, 26], [46.1, 24.3]],
+      legs: [], loaded_km: 2000, empty_km: 800, source: 'here-truck' });
+    const gtm = require('../../lib/gpsTrack');
+    const ae = require('../../lib/stopAutoEvents');
+    const t0 = Date.parse('2026-10-01T08:00:00Z') / 1000;
+    jest.spyOn(ae, 'loadPoints').mockResolvedValue([[t0 + 60, 44.9, 26, 0], [t0 + 86400 * 2, 46.1, 24.3, 0]]);
+    jest.spyOn(gtm, 'odoDelta').mockReturnValue(2842);
+    const O2 = [stop({ id: 3, loc: 'Arad', actual_lat: 46.17, actual_lng: 21.3,
+      gps_arrived_at: '2026-10-01T20:00:00Z', gps_left_at: '2026-10-01T22:00:00Z' }),
+    stop({ id: 4, kind: 'delivery', loc: 'Copsa', actual_lat: 46.1, actual_lng: 24.3,
+      gps_arrived_at: '2026-10-03T10:00:00Z', gps_left_at: '2026-10-03T12:00:00Z' })];
     pool.query.mockResolvedValueOnce(rows([ORDER]))
       .mockResolvedValueOnce(rows(STOPS))
       .mockResolvedValueOnce(rows([{ id: 'O2', fuvar_no: 'CMD-2026-0054' }]))
+      .mockResolvedValueOnce(rows(O2))
+      .mockResolvedValue(rows([]));
+    const r = await rd.checkOrder(7, 'O1');
+    expect(r).toMatchObject({ status: 'ok', planned_km: 2800, actual_km: 2842, group: 2 });
+    // 3. hívás: az átfedés-keresés a már bent lévő fuvarokat kizárja
+    expect(pool.query.mock.calls[2][1].slice(0, 3)).toEqual([7, ['O1'], 'B104VLR']);
+    // időrend: Ploiești → Arad → Copșa (O1 lerakó) → Copșa (O2 lerakó)
+    expect(spy.mock.calls[0][1].map((w) => w.lat)).toEqual([44.9, 46.17, 46.1, 46.1]);
+    const saves = pool.query.mock.calls.filter((x) => /INSERT INTO order_route_deviation/.test(x[0]));
+    expect(saves.map((x) => x[1][0])).toEqual(['O1', 'O2']);
+    expect(JSON.parse(saves[0][1][12])).toMatchObject({ group_key: 'O1|O2', empty_km: 800 });
+    jest.restoreAllMocks();
+  });
+
+  test('a másik fuvar állomása bizonytalan → no_data / overlap', async () => {
+    pool.query.mockResolvedValueOnce(rows([ORDER]))
+      .mockResolvedValueOnce(rows(STOPS))
+      .mockResolvedValueOnce(rows([{ id: 'O2', fuvar_no: 'CMD-2026-0054' }]))
+      .mockResolvedValueOnce(rows([stop({ id: 3, match_status: 'unmatched' }), stop({ id: 4, kind: 'delivery' })]))
       .mockResolvedValue(rows([]));
     const r = await rd.checkOrder(7, 'O1');
     expect(r).toMatchObject({ status: 'no_data', reason: 'overlap' });
     expect(savedDetail().overlap).toEqual([{ id: 'O2', fuvar_no: 'CMD-2026-0054' }]);
-    const q = pool.query.mock.calls[2];
-    expect(q[0]).toMatch(/o\.id <> \$2/);
-    expect(q[1].slice(0, 3)).toEqual([7, 'O1', 'B104VLR']);
+  });
+
+  test('driverBoard + summarize: az egy útba fűzött fuvarokat egyszer számolja', () => {
+    const det = { group_key: 'O1|O2', stats: {} };
+    const b = rd.driverBoard([
+      { email_sofer: 'a@x', planned_km: 2800, actual_km: 2842, diff_km: 42, status: 'deviation', detail: det },
+      { email_sofer: 'a@x', planned_km: 2800, actual_km: 2842, diff_km: 42, status: 'deviation', detail: det }]);
+    expect(b.drivers[0]).toMatchObject({ orders: 1, planned_km: 2800 });
+    const s = rd.summarize([{ status: 'ok', planned_km: 100, actual_km: 100, diff_km: 0, group_key: 'g' },
+      { status: 'ok', planned_km: 100, actual_km: 100, diff_km: 0, group_key: 'g' }]);
+    expect(s.planned_km).toBe(100);
   });
 
   test('_timeMismatch: csak ha mindkettő megvan és > 12 óra', () => {
