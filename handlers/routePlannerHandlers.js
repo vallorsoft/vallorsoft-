@@ -45,6 +45,8 @@ async function jsonGet(url) {
 
 // Cím -> koordináta (Photon / OpenStreetMap, ingyenes, kulcs nélkül)
 async function geocodeFree(addr) {
+  const cc = require('../lib/coordParse').parseCoords(addr);
+  if (cc) return { lat: cc.lat, lng: cc.lng, label: String(addr).trim() };
   const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(addr) + '&limit=1';
   const data = await jsonGet(url);
   const f = (data.features || [])[0];

@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-05 — 📍 Útvonaltervező: koordináta is beírható (HERE is felismeri) (PR #TBD)
+- Az útvonaltervező (és minden cím-autocomplete) pont-mezőjébe koordináta is írható: `45.12345, 25.45678` · `45.123 N, 25.456 E` · `45°07'23"N 25°27'21"E` · tizedesvesszős `45,123 25,456` · Google/HERE/OSM térkép-link. A pont azonnal felkerül a térképre (kiválasztás nélkül is), a listában a cím „cím (lat, lng)" formában jelenik meg.
+- Közös felismerő `public/coord-parse.js` (kliens+szerver, `lib/coordParse.js`); a `mapsProvider.geocode` koordinátánál külső hívás és díj nélkül tér vissza, az új `reverseLabel` HERE-kulcsos cégnél HERE revgeocode-dal, egyébként Photonnal ad címet. Bekötve: `rpAcSearch`/`rpPlanRoute` (HERE routing a pontos koordinátát kapja), `mapsProvider.autocomplete`, `routeEstimate.geocodeCached`, `routePlannerHandlers.geocodeFree`. Csak-egész számpár (pl. házszám) nem koordináta. Teszt: `tests/unit/coordParse.test.js`.
+
 ## 2026-11-04 — 🔁 Régi tényleges címek átírása koordinátás formára (PR #595)
 - A korábban felismert / megerősített címek (cégnévvel, koordináta nélkül) automatikusan az új formára íródnak: cégnév nélkül + „(lat, lng)" 5 tizedessel. Kézzel írt cím szövege megmarad, mögé kerül a koordináta. A megerősített (vagy menetlevélre kért) állomásnál a menetlevél pontja is frissül (az eredeti cím a `loc_planned`-ben marad; irodában kézzel átírt pont érintetlen).
 - `lib/stopMatchRunner.js` `upgradedAddress` + `upgradeAddressFormat` (csak a cache-elt reverse-geokódot használja, külső hívás nincs; idempotens — a már koordinátás címet nem fogja meg), a cím-felismerő ütemező minden körben lefuttatja (200/kör). Elvetett állomás kimarad. Teszt: `tests/unit/stopAddressFormat.test.js`.
