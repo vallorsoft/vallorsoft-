@@ -11,7 +11,13 @@
   'use strict';
   var S = { from: null, to: null, status: 'pending', q: '', rows: [], open: {}, secOpen: {}, devStatus: 'deviation' };
 
-  function _t(k, d) { try { var v = (typeof t === 'function') ? t(k) : null; return (v && v !== k) ? v : (d || k); } catch (e) { return d || k; } }
+  function _t(k, d, vars) {
+    var v;
+    try { v = (typeof t === 'function') ? t(k) : null; } catch (e) { v = null; }
+    v = (v && v !== k) ? v : (d || k);
+    if (vars) Object.keys(vars).forEach(function (x) { v = String(v).split('{' + x + '}').join(vars[x]); });
+    return v;
+  }
   function _e(s) { return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function _toast(m, k) { if (typeof toast === 'function') toast(m, k || 'ok'); }
   function ymd(d) { return d.toISOString().slice(0, 10); }
@@ -53,6 +59,7 @@
         + '<option value="pending">' + _t('sa.f.pending', 'De verificat') + '</option>'
         + '<option value="">' + _t('sa.f.all', 'Toate') + '</option>'
         + ['auto', 'suggested', 'unmatched', 'confirmed', 'rejected'].map(function (k) { return '<option value="' + k + '">' + _t(ST[k].k, ST[k].d) + '</option>'; }).join('')
+        + '<option value="manual">✋ ' + _t('sa.f.manual', 'Așteaptă confirmare manuală') + '</option>'
         + '<option value="none">' + _t('sa.f.none', 'Neprocesat') + '</option>'
         + '</select></label>'
         + '<label class="field" style="flex:1;min-width:180px;"><span>' + _t('sa.search', 'Căutare') + '</span><input class="input" id="saQ" placeholder="' + _t('sa.searchPh', 'Nr. cursă, client, oraș, camion…') + '"></label>'
@@ -97,6 +104,7 @@
     gas('stopMatchList', [{ from: S.from, to: S.to, status: S.status, q: S.q }]).then(function (r) {
       if (!r || !r.ok) { body.innerHTML = '<div class="text-muted" style="padding:14px;">' + _e((r && r.err) || 'Eroare') + '</div>'; return; }
       S.rows = r.rows || [];
+      S.recheck = r.recheck || S.recheck;
       renderCounts(r.counts || {}, r.queue || 0);
       if (r.settings) {
         var au = document.getElementById('saAuto'), mn = document.getElementById('saMin');
@@ -201,12 +209,25 @@
     return '<div style="margin-top:4px;"><span class="badge ' + cls + '" title="' + _e(dt(r.auto_filled_at)) + '">🤖 ' + _e(t) + '</span></div>';
   }
 
+  // 🔁 heti újraellenőrzés állása / ✋ kézi megerősítésre vár
+  function recheckBadge(r) {
+    if (['auto', 'suggested', 'unmatched'].indexOf(r.match_status) < 0) return '';
+    var rc = S.recheck || { target: 150, max: 10, days: 7 };
+    if (r.needs_manual) return '<div style="margin-top:4px;"><span class="badge warn" title="' + _e(_t('sa.manualTip', 'După {n} reverificări scorul tot nu a atins {t} — confirmă sau alege locul manual.', { n: rc.max, t: rc.target })) + '">✋ ' + _e(_t('sa.manual', 'Confirmare manuală')) + '</span></div>';
+    if (r.match_score != null && Number(r.match_score) >= rc.target) return '';
+    var base = r.recheck_at || r.matched_at;
+    var next = base ? new Date(new Date(base).getTime() + rc.days * 86400000) : null;
+    return '<div style="margin-top:4px;"><span class="badge info" title="' + _e(_t('sa.recheckTip', 'Se reanalizează săptămânal până la scorul {t}; după {n} încercări rămâne pentru confirmare manuală.', { n: rc.max, t: rc.target })) + '">🔁 ' + _e(_t('sa.recheck', 'Reverificare')) + ' ' + (r.recheck_count || 0) + '/' + rc.max
+      + (next ? ' · ' + _e(next.toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })) : '') + '</span></div>';
+  }
+
   function renderCounts(c, queue) {
     var el = document.getElementById('saCounts'); if (!el) return;
     var html = ['auto', 'suggested', 'unmatched', 'confirmed', 'rejected'].map(function (k) {
       return '<span class="badge ' + ST[k].cls + '">' + _t(ST[k].k, ST[k].d) + ': ' + (c[k] || 0) + '</span>';
     }).join('');
     html += '<span class="badge">' + _t('sa.f.none', 'Neprocesat') + ': ' + (c.none || 0) + '</span>';
+    if (c.manual) html += '<span class="badge warn" style="cursor:pointer;" onclick="StopAddress.filterManual()">✋ ' + _t('sa.f.manual', 'Așteaptă confirmare manuală') + ': ' + c.manual + '</span>';
     if (queue) html += '<span class="badge info">⏳ ' + _t('sa.queue', 'În coadă') + ': ' + queue + '</span>';
     el.innerHTML = html;
   }
@@ -249,7 +270,7 @@
         + '</td>'
         + '<td>' + (st ? '<span class="badge ' + st.cls + '">' + _t(st.k, st.d) + '</span>' : '<span class="badge">' + _t('sa.f.none', 'Neprocesat') + '</span>')
         + (r.match_score != null ? '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _e(r.match_score) + ' ' + _t('sa.points', 'pct') + '</div>' : '')
-        + autoBadge(r) + '</td>'
+        + autoBadge(r) + recheckBadge(r) + '</td>'
         + '<td style="white-space:nowrap;">'
         + ((r.match_status === 'auto' || r.match_status === 'suggested') ? '<button class="btn ok" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'confirm\')" title="' + _t('sa.a.confirm', 'Acceptă') + '">✓</button> ' : '')
         + (r.match_status !== 'rejected' && r.match_status ? '<button class="btn danger" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'reject\')" title="' + _t('sa.a.reject', 'Respinge') + '">✕</button> ' : '')
@@ -502,6 +523,7 @@
       });
     },
     devFilter: function (st) { S.devStatus = st; loadDev(); },
+    filterManual: function () { S.status = 'manual'; var e = document.getElementById('saStatus'); if (e) e.value = 'manual'; reload(); },
     devRecheck: function (oid) {
       gas('routeDeviationRecheck', [{ order_id: oid }]).then(function (r) {
         if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');

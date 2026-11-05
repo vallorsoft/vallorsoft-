@@ -50,6 +50,7 @@ handlers.stopMatchList = async function (req, res, args) {
     if (STATUSES.includes(a.status)) { params.push(a.status); where += ` AND s.match_status = $${params.length}`; }
     else if (a.status === 'pending') where += ` AND s.match_status IN ('auto','suggested')`;
     else if (a.status === 'none') where += ` AND s.match_status IS NULL`;
+    else if (a.status === 'manual') where += ` AND COALESCE((to_jsonb(s) ->> 'needs_manual')::boolean, false) AND s.match_status IN ('auto','suggested','unmatched')`;
     const q = String(a.q || '').trim().slice(0, 80);
     if (q) {
       params.push('%' + q + '%');
@@ -63,6 +64,9 @@ handlers.stopMatchList = async function (req, res, args) {
               s.gps_arrived_at, s.gps_left_at, s.match_score, s.match_source, s.match_status, s.match_detail,
               s.matched_at, s.match_decided_by, s.waybill_apply, s.waybill_applied_at,
               s.auto_filled, s.auto_filled_at, s.auto_ack_at, s.auto_ack_action,
+              COALESCE((to_jsonb(s) ->> 'recheck_count')::int, 0) AS recheck_count,
+              (to_jsonb(s) ->> 'recheck_at') AS recheck_at,
+              COALESCE((to_jsonb(s) ->> 'needs_manual')::boolean, false) AS needs_manual,
               (SELECT COUNT(*)::int FROM fuvarlevelek f WHERE f.company_id = s.company_id
                   AND f.order_ids @> jsonb_build_array(s.order_id)) AS wb_count,
               o.fuvar_no, o.client, o.rendszam_camion, o.status AS order_status, o.nume_sofer
@@ -82,8 +86,15 @@ handlers.stopMatchList = async function (req, res, args) {
     try { queue = (await pool.query('SELECT COUNT(*)::int AS n FROM stop_match_state WHERE company_id=$1 AND requeued=true', [cid])).rows[0].n; } catch (_) {}
     const counts = {};
     for (const r of cnt.rows) counts[r.st] = r.n;
+    try {
+      counts.manual = (await pool.query(
+        `SELECT COUNT(*)::int AS n FROM order_stops s JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
+          WHERE s.company_id = $1 AND COALESCE(s.data, o.data_incarcare, o.created_at::date) BETWEEN $2::date AND $3::date
+            AND s.needs_manual AND s.match_status IN ('auto','suggested','unmatched')`, [cid, from, to])).rows[0].n;
+    } catch (_) { counts.manual = 0; }
     const settings = await wb.getSettings(cid);
-    return res.json({ result: { ok: true, from, to, rows, counts, queue, settings } });
+    return res.json({ result: { ok: true, from, to, rows, counts, queue, settings,
+      recheck: { target: runner.RECHECK_TARGET, max: runner.RECHECK_MAX, days: runner.RECHECK_DAYS } } });
   } catch (err) {
     console.error('stopMatchList hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
