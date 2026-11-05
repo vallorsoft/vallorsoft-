@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="/session-guard.js?v=20260722sess"></script>
+  <script src="/coord-parse.js?v=20261105coord"></script>
   <style>
     * { box-sizing: border-box; }
     html, body { margin:0; padding:0; height:100%; font-family: 'Inter', system-ui, sans-serif; color:#0f172a; background:#f8fafc; }
@@ -554,7 +555,7 @@ function renderRow(w, i){
   const canDel = waypoints.length > 2;
   const canUp = i > 0;
   const canDown = i < waypoints.length - 1;
-  const ph = i===0 ? 'Punct de plecare' : (i===waypoints.length-1 ? 'Destinație' : 'Punct intermediar #' + i);
+  const ph = (i===0 ? 'Punct de plecare' : (i===waypoints.length-1 ? 'Destinație' : 'Punct intermediar #' + i)) + ' (adresă sau coordonate)';
   return '<div class="wp-row" data-id="'+w.id+'">'
     + '<div class="wp-pin">'+pin+'</div>'
     + '<div class="wp-input-wrap">'
@@ -714,6 +715,10 @@ function attach(w){
     w.label = inp.value;
     w.lat = null; w.lng = null;
     w.__lastQuery = q; // ezt küldjük a `rpAcPick`-nek majd a kiválasztáskor
+    // Beírt koordináta (45.12345, 25.45678 · 45°07'23"N 25°27'21"E · térkép-link)
+    // → azonnal ponttá válik (kiválasztás nélkül is), a cím a listában jön.
+    const cc = window.VsCoord && VsCoord.parseCoords(q);
+    if (cc) { w.lat = cc.lat; w.lng = cc.lng; drawMarkers(); }
     updatePlanBtn();
     if (q.length < 2){ dd.classList.remove('open'); dd.innerHTML=''; return; }
 

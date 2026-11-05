@@ -305,6 +305,21 @@ async function rpAcSearch(req, res, args) {
     });
   }
   try {
+    // 0. LÉPÉS — beírt KOORDINÁTA (pl. „45.12345, 25.45678", 45°07'23"N…,
+    // térkép-link): a pontot közvetlenül adjuk, a címét reverse-geokódoljuk
+    // (HERE-kulcsos cégnél a HERE revgeocode, különben Photon).
+    const cc = maps.parseCoords(q);
+    if (cc) {
+      const coordTxt = maps.fmtCoords(cc);
+      const addr = await maps.reverseLabel(cid, cc.lat, cc.lng);
+      const out = [{
+        label: addr ? addr + ' (' + coordTxt + ')' : coordTxt,
+        title: '📍 ' + coordTxt,
+        lat: cc.lat, lng: cc.lng, catHint: null, _learned: false, _pickCount: null,
+      }];
+      _acCacheSet(key, out);
+      return res.json({ result: { ok: true, items: out, coords: true } });
+    }
     // 1. LÉPÉS — Tanult sorok elsőként. Nem várunk a HERE-re, ha van
     // erős pick-history a query prefixére, az azonnal megjelenik legelöl.
     push(await _fetchLearned(cid, q.toLowerCase()));
