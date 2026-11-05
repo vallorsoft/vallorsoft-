@@ -50,3 +50,16 @@ describe('estimateRoute — HERE kamion 40 t', () => {
     expect(calls[0]).toContain('project-osrm');
   });
 });
+
+describe('routeChain — forrás továbbadása a fuvar-kiírónak', () => {
+  const rc = require('../../lib/routeChain');
+  const mk = (source) => async (part) => ({ km: 100, durationSeconds: 3600, polyline: [], waypoints: part.map((p) => ({ lat: p.lat, lng: p.lng, label: 'x' })),
+    legs: part.slice(1).map(() => ({ fromLabel: 'a', toLabel: 'b', km: 100, durationSeconds: 3600 })), source });
+  const wps = [{ type: 'loading', lat: 1, lng: 1 }, { type: 'unloading', lat: 2, lng: 2 }];
+  test('HERE kamion → source here-truck', async () => {
+    expect((await rc.routeChain(1, wps, { estimate: mk('here-truck') })).source).toBe('here-truck');
+  });
+  test('OSRM → source osrm', async () => {
+    expect((await rc.routeChain(1, wps, { estimate: mk('osrm') })).source).toBe('osrm');
+  });
+});
