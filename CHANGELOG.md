@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-06 — 🏁 Rövid lerakás: a sofőr gombnyomása is „ismert hellyé" teszi a rakodóhelyet (PR #619)
+- **Kérés:** a #618 után a mai rebati (Copșa Mică) 5 perces lerakást a rendszer még mindig nem ajánlotta fel. **Ok:** a rövid állás csak ismert helyen jelölt; ismert hely eddig csak irodai elfogadásból / biztos vagy megerősített testvér-állomásból / pontos cég-geokódból lett — a korábbi rebati lerakások viszont csak „javaslat" állapotban voltak, a „Rebat" nevet a térkép nem ismeri.
+- **Új** (`lib/stopMatch.js` `pressSites` / `pointAt`): ugyanannak a helynek a többi állomásánál a sofőr „kész" (ennek hiányában „odaértem") gombnyomásának pillanatában álló kamion helye is ismert hely — ha legalább két állomás gombnyomása ugyanott (300 m) volt, vagy a gombnyomás helye egyezik az állomás GPS-ből felismert helyével. Menet közben megnyomott gomb nem számít (félrenyomás-védelem). A runner a testvér-állomásokra hívja (`matchOrder`).
+- Tesztek: +5 eset; 2254 Jest zöld valós Postgres 16-tal.
+
 ## 2026-11-06 — 🏁 Rövid lerakás ismert helyen is felismerve → a sofőrnek felajánlva (PR #618)
 - **Kérés:** a sofőr ma reggel 5 perc alatt leürített (Copșa Mică, Rebat), de a rendszer nem ajánlotta fel a gomb pótlását. **Ok:** a felismerő csak a legalább 20 perces állást vette rakodásnak (rövidebbet csak pihenő után).
 - **Új szabály** (`lib/stopMatch.js` `siteStops`): **ismert rakodóhelyen** (helymemória, a fuvar már megerősített / biztos, azonos helyű állomása, vagy a tervezett cég pontos — nem a település-középpontra eső — geokódolt helye, 300 m-en belül) a **≥ 2 perces** állás is jelölt; ha utána a kamion továbbment, ott rakodott. A kapunál várakozás + rámpa (15 percen belül) egy látogatás. A tisztán forgalmi megállás (úton, járó motorral, manőver nélkül, 4 percnél rövidebb) kimarad. A rövid állás ismert helyen csak kis levonást kap (`short_site` −4), így azonos helyen a hosszabb állás elsőbbséget kap.
