@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-06 — 🛡️ Cégenkénti éjszakai biztonsági mentés Google Drive-ba (PR #614)
+## 2026-11-06 — 🛡️ Cégenkénti éjszakai biztonsági mentés Google Drive-ba (PR #615)
 - **Cél:** ha támadás/hiba miatt adat törlődik, legyen teljes, friss másolat. Minden éjjel (a cég által beállított órában, alap 02:00 Europe/Bucharest) a cég ÖSSZES adatáról — minden `company_id`-s tábla (106 tábla: fuvarok, állomások, menetlevelek, dokumentumok + fotók base64-ben, GPS-útvonalak, számlák…), a sofőr-e-mailhez kötött naplók (határátlépések) és maga a cég-sor — titkosított pillanatkép készül.
 - **Hova:** (1) a cég SAJÁT Google Drive-jára, ha az Admin összekötötte (Integrációk → 🛡️ Biztonsági mentés; „VallorSoft – Backup" mappa; onnan mi nem törlünk, csak ha a cég megőrzési korlátot állít: örökre/1 év/6 hó/3 hó); (2) a VallorSoft saját Drive-jára (developer → 🛡️ Biztonsági mentés fül; minden aktív cégről; 30 nap után automatikusan törlődik).
 - **Új:** `db/company-backup.sql` (`company_backup_settings`, `company_backup_runs`), `lib/googleDrive.js` (OAuth2 + Drive v3, függőség nélkül, `drive.file` jogosultság), `lib/backupFile.js` (`.vsbk`: gzip NDJSON, AES-256-GCM, cégenkénti HKDF-kulcs — `lib/crypto.deriveKey`), `services/companyBackup.js` (táblák felderítése, lapozott mentés, feltöltés, megőrzés, ütemező 10 percenként), `routes/backup.js` (OAuth connect/callback, munkamenethez kötött egyszeri state), `handlers/backup.js` (`backupGetStatus`/`SaveSettings`/`Disconnect`/`RunNow`, `devBackupStatus`/`VsDisconnect`), `public/backup-card.js`, funkció-kapcsoló `drive-backup`.
