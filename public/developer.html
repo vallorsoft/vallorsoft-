@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title data-i18n="title.developer">VallorSoft — Developer Console</title>
-  <script src="/i18n.js?v=20260927otpl"></script>
+  <script src="/i18n.js?v=20261106bk"></script>
   <link rel="stylesheet" href="/style.css?v=20260614qa">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
@@ -168,6 +168,7 @@
     <div class="dev-tab" onclick="showPane('bank');loadBankDetails()">🏦 Banki adatok</div>
     <div class="dev-tab" onclick="showPane('payments');loadPaymentRequests()">💸 Fizetési kérelmek</div>
     <div class="dev-tab" onclick="showPane('orphanwb');loadOrphanWaybills()">🧾 Árva menetlevelek</div>
+    <div class="dev-tab" onclick="showPane('backup');loadBackupPane()">🛡️ Biztonsági mentés</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
       <button class="btn-danger-sm" style="width:100%;" onclick="logout()" data-i18n="common.logout">Kilépés</button>
@@ -485,6 +486,18 @@
     </div>
 
     <!-- Árva menetlevelek: company_id NULL (törölt sofőr + nincs fuvar/rendszám-jel) -->
+    <div class="dev-pane hidden" id="pane-backup">
+      <div class="section-title">🛡️ Cégenkénti biztonsági mentés — Google Drive</div>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Minden cég éjszakai, titkosított mentése a cég saját Drive-jára (ha összekötötte) ÉS a VallorSoft saját Drive-jára (biztonsági háló, 30 nap után automatikusan törlődik). A VallorSoft Drive bekötése után MINDEN aktív cégről készül mentés.</p>
+      <div class="glass" style="padding:16px;margin-bottom:16px;" id="bkVsBox">Betöltés...</div>
+      <div class="glass" style="padding:0;overflow:hidden;">
+        <table class="table">
+          <thead><tr><th>Időpont</th><th>Cég</th><th>Indítás</th><th>Méret</th><th>Sorok</th><th>Cég Drive</th><th>VallorSoft</th><th>Állapot</th></tr></thead>
+          <tbody id="bkRunsTbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="dev-pane hidden" id="pane-orphanwb">
       <div class="section-title">🧾 Árva menetlevelek (cég nélkül)</div>
       <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Ezeknek a menetleveleknek nincs cég-hozzárendelése (pl. a létrehozó sofőrt törölték, és nincs fuvar- vagy egyértelmű rendszám-egyezés). Rendeld a megfelelő céghez — utána megjelennek a cég Fuvarlevelek oldalán. A „tippelt cég" a menetlevél rendszámából származik (ha egyértelmű).</p>
@@ -1878,6 +1891,45 @@ function escDev(s) {
 
 // ── Árva menetlevelek (company_id NULL) — kézi cég-hozzárendelés ──
 var _orphanCompanies = [];
+async function loadBackupPane() {
+  const d = await gas('devBackupStatus');
+  const box = document.getElementById('bkVsBox');
+  const tbody = document.getElementById('bkRunsTbody');
+  if (!d || !d.ok) { box.innerHTML = '<span style="color:#ef4444;">Hiba: ' + escDev(d && d.err || 'ismeretlen') + '</span>'; return; }
+  let h = '';
+  if (!d.configured) {
+    h += '<div style="color:#f59e0b;font-weight:600;">⚠️ A Google OAuth nincs beállítva.</div>'
+      + '<div style="font-size:13px;color:var(--muted);margin-top:6px;">Fly.io secret: <code>GOOGLE_OAUTH_CLIENT_ID</code> + <code>GOOGLE_OAUTH_CLIENT_SECRET</code>. Engedélyezett visszahívási cím a Google Cloud konzolban: <code>' + escDev(d.redirect_uri) + '</code></div>';
+  } else if (d.vs_connected) {
+    h += '<div>✅ VallorSoft Drive összekötve: <b>' + escDev(d.vs_email || 'Google') + '</b> · megőrzés ' + d.vs_retention_days + ' nap · saját Drive-ot bekötött cégek: <b>' + d.companies_connected + '</b></div>'
+      + '<button class="btn ghost" style="margin-top:10px;" onclick="devBackupVsDisconnect()">Kapcsolat bontása</button>';
+  } else {
+    h += '<div>VallorSoft Drive: <b>nincs összekötve</b> · saját Drive-ot bekötött cégek: <b>' + d.companies_connected + '</b></div>'
+      + '<a class="btn primary" style="margin-top:10px;display:inline-block;text-decoration:none;" href="/api/backup/google/connect?target=vs">🔗 VallorSoft Google Drive összekötése</a>'
+      + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">Visszahívási cím: <code>' + escDev(d.redirect_uri) + '</code></div>';
+  }
+  box.innerHTML = h;
+  const sz = (b) => b == null ? '—' : (b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
+  const stl = { ok: '✅', partial: '⚠️', error: '❌', running: '⏳', skipped: '—', deleted: '🗑' };
+  if (!d.runs.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Még nincs mentés.</td></tr>'; return; }
+  tbody.innerHTML = d.runs.map((r) => '<tr' + (r.error ? ' title="' + escDev(r.error) + '"' : '') + '><td>' + escDev(new Date(r.started_at).toLocaleString('hu-HU')) + '</td><td>' + escDev(r.company_name) + ' (#' + r.company_id + ')</td>'
+    + '<td>' + escDev(r.trigger) + '</td><td>' + sz(r.size_bytes) + '</td><td>' + (r.row_count != null ? r.row_count : '—') + '</td>'
+    + '<td>' + (stl[r.drive_status] || '—') + '</td><td>' + (stl[r.vs_status] || '—') + '</td><td>' + (stl[r.status] || escDev(r.status)) + ' ' + escDev(r.status) + '</td></tr>').join('');
+}
+async function devBackupVsDisconnect() {
+  if (!confirm('Bontod a VallorSoft Drive kapcsolatot? A meglévő fájlok a Drive-on maradnak.')) return;
+  const d = await gas('devBackupVsDisconnect');
+  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
+  loadBackupPane();
+}
+(function () {
+  const m = /[?&]gdrive=([a-z]+)/.exec(location.search || '');
+  if (!m) return;
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  const msg = { ok: 'VallorSoft Google Drive összekötve ✓', denied: 'A Google-hozzáférés nem lett engedélyezve.', error: 'Az összekötés nem sikerült.', state: 'Lejárt összekötési kérés — próbáld újra.', noconfig: 'A Google OAuth nincs beállítva.' };
+  window.addEventListener('load', () => setTimeout(() => { alert(msg[m[1]] || m[1]); showPane('backup'); loadBackupPane(); }, 600));
+})();
+
 async function loadOrphanWaybills() {
   const d = await gas('devListOrphanWaybills');
   const tbody = document.getElementById('orphanWbTbody');

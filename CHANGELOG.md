@@ -14,11 +14,26 @@
 
 ---
 
-## 2026-11-06 — 🛣️ Útvonal-eltérés szakaszonként: volt-e rövidebb kamionos út + kényszerű kitérők leszámítva (PR #615)
+## 2026-11-06 — 🛣️ Útvonal-eltérés szakaszonként: volt-e rövidebb kamionos út + kényszerű kitérők leszámítva (PR #617)
 - Az ellenőrzés már nem az egész út km-ét veti össze egy tervvel, hanem **szakaszonként** (valós, GPS-ből felismert állomás → következő állomás) a ténylegesen megtett km-et a HERE 40 t-s kamion-útvonal km-ével ugyanarra a két pontra (`lib/routeDeviation.js` `segmentChecks`/`judgeSegment`, `CALC_VERSION` 4 → a régi eredmények magától újraszámolódnak).
 - Ítélet szakaszonként: tűrés max(1 km, 3 %); ha több, a szakasz megjelölve **többlet-km + többlet-idő + többlet-üzemanyag (jármű L/100 km) + becsült többlet-útdíj (az ország €/km rátájával)** adatokkal. Ha a sofőr útja nem hosszabb, rendben van.
 - **Kényszerű kitérők nem számítanak eltérésnek** (`excursions`): a tervtől > 1 km-re letért futam, ha benne ≥ 10 perc állás vagy tankolás van (tankolás / szünet / napi pihenő / parkoló); a leszámítható km felülről korlátos (2 × a legnagyobb letérés + 2 km), így egy hosszú rossz utat egy rövid megállás nem ment fel.
 - Új oszlop `order_route_deviation.extra_km` (`db/zzz-route-dev-segments.sql`); a statisztika, a sofőr-verseny, a riasztások és a lista a többlet-km-et használják (régi soroknál a nyers különbség). Térkép: szakasz-tábla + ⛽/☕/🛏️/🅿️ jelölők a kitérőknél. i18n `rdm.*` (RO+HU), cache-bust `?v=20261106segdev`.
+
+## 2026-11-06 — ↩️ Biztonsági mentés visszaállítása gombnyomásra, előnézettel (PR #616)
+- **Cél:** ha támadás/hiba miatt adat törlődik, az Admin a mentés-listából egy gombbal visszahozza. **Biztonságos alap:** CSAK a mentésben meglévő, de az adatbázisból hiányzó (törölt) sorok jönnek vissza — semmit nem töröl, nem ír felül, a mentés óta keletkezett új adat megmarad; többször is futtatható.
+- **Folyamat** (Integrációk → 🛡️ kártya, mentés-sor „↩️ Drive-ról" / „↩️ VallorSoft"): letöltés a Drive-ról → teljes visszafejtés + hitelesség-ellenőrzés ÍRÁS NÉLKÜL → **előnézet** (táblánként hány sor hiányzik) → megerősítés a `RESTAURARE` szó beírásával → beszúrás a külső kulcsok szerinti sorrendben (szülő előbb), `ON CONFLICT DO NOTHING`, hibás kötegnél soronként + második menet.
+- **Új:** `services/companyRestore.js` (`analyze`/`restoreMissing`/`topoOrder`/`toParam`), `lib/googleDrive.js` `downloadFile`, `handlers/backup.js` `backupRestorePreview`/`backupRestoreStatus`/`backupRestoreConfirm`, migráció `db/company-backup-restore.sql` (`company_backup_restores` feladat-napló — több Fly-gépen is követhető).
+- Valós Postgres 16-on végigpróbálva (mentés → fuvarok/állomások/ügyfél törlése + új fuvar → 5 sor vissza, JSONB megőrizve, új fuvar megmaradt, 2. futás 0 hiányzó, idegen cég kulcsával nem nyitható). Tesztek: +12 eset; 2227 Jest zöld.
+- **Még nincs:** különbség-mentés (most éjjelente teljes mentés), módosított sorok visszaállítása, olvasható ZIP-export, developer-oldali visszaállítás teljesen törölt céghez.
+
+## 2026-11-06 — 🛡️ Cégenkénti éjszakai biztonsági mentés Google Drive-ba (PR #615)
+- **Cél:** ha támadás/hiba miatt adat törlődik, legyen teljes, friss másolat. Minden éjjel (a cég által beállított órában, alap 02:00 Europe/Bucharest) a cég ÖSSZES adatáról — minden `company_id`-s tábla (106 tábla: fuvarok, állomások, menetlevelek, dokumentumok + fotók base64-ben, GPS-útvonalak, számlák…), a sofőr-e-mailhez kötött naplók (határátlépések) és maga a cég-sor — titkosított pillanatkép készül.
+- **Hova:** (1) a cég SAJÁT Google Drive-jára, ha az Admin összekötötte (Integrációk → 🛡️ Biztonsági mentés; „VallorSoft – Backup" mappa; onnan mi nem törlünk, csak ha a cég megőrzési korlátot állít: örökre/1 év/6 hó/3 hó); (2) a VallorSoft saját Drive-jára (developer → 🛡️ Biztonsági mentés fül; minden aktív cégről; 30 nap után automatikusan törlődik).
+- **Új:** `db/company-backup.sql` (`company_backup_settings`, `company_backup_runs`), `lib/googleDrive.js` (OAuth2 + Drive v3, függőség nélkül, `drive.file` jogosultság), `lib/backupFile.js` (`.vsbk`: gzip NDJSON, AES-256-GCM, cégenkénti HKDF-kulcs — `lib/crypto.deriveKey`), `services/companyBackup.js` (táblák felderítése, lapozott mentés, feltöltés, megőrzés, ütemező 10 percenként), `routes/backup.js` (OAuth connect/callback, munkamenethez kötött egyszeri state), `handlers/backup.js` (`backupGetStatus`/`SaveSettings`/`Disconnect`/`RunNow`, `devBackupStatus`/`VsDisconnect`), `public/backup-card.js`, funkció-kapcsoló `drive-backup`.
+- **Beállítandó:** Fly.io secret `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET`; a Google Cloud konzolban redirect URI: `https://vallorsoft.fly.dev/api/backup/google/callback`; a hozzájárulási képernyőt „In production"-re kell állítani (Testing módban a token 7 nap után lejár). Enélkül a kártya „nincs beállítva" jelzést mutat, az ütemező nem fut.
+- **Következő kör (2. PR):** különbség-mentés (új/módosított/törölt), gombnyomásos visszaállítás előnézettel, olvasható ZIP-export.
+- Tesztek: +21 eset (`tests/unit/companyBackup.test.js`); valós Postgres 16-on 2215 Jest zöld + próba-mentés (106 tábla, visszafejtve).
 
 ## 2026-11-06 — 📍 „Fel- és lerakóhelyek GPS-ből" az Adminisztrációban (PR #614)
 - A korábbi Flotta → „Tényleges címek (GPS)" menüpont teljes egészében (lista, térkép, beállítások, pontosság) átkerült az **Adminisztráció** főmenübe, admin + manager konzolon.
