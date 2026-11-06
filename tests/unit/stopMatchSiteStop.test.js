@@ -114,6 +114,29 @@ describe('rövid állás ismert rakodóhelyen', () => {
   });
 });
 
+describe('pressSites — ismert hely a sofőr gombnyomásaiból', () => {
+  const pts = track(5);
+  const at = (min) => new Date((T0 + min * 60) * 1000).toISOString();
+  test('két állomás gombnyomása ugyanott (álló kamion) → ismert hely', () => {
+    const r = sm.pressSites(pts, [{ id: 1, done_at: at(100) }, { id: 2, done_at: at(80) }]);
+    expect(r.length).toBe(2);
+    expect(Math.abs(r[0].lat - REBAT[0])).toBeLessThan(0.002);
+  });
+  test('egyetlen gombnyomás csak akkor, ha a felismert hellyel egyezik', () => {
+    expect(sm.pressSites(pts, [{ id: 1, done_at: at(100) }])).toEqual([]);
+    expect(sm.pressSites(pts, [{ id: 1, done_at: at(100), actual_lat: REBAT[0], actual_lng: REBAT[1] }]).length).toBe(1);
+    expect(sm.pressSites(pts, [{ id: 1, done_at: at(100), actual_lat: ARAD[0], actual_lng: ARAD[1] }])).toEqual([]);
+  });
+  test('menet közben megnyomott gomb nem számít; a „kész" hiányában az „odaértem" számít', () => {
+    expect(sm.pressSites(pts, [{ id: 1, done_at: at(130), actual_lat: REBAT[0], actual_lng: REBAT[1] }])).toEqual([]);
+    expect(sm.pressSites(pts, [{ id: 1, arrived_at: at(70), actual_lat: REBAT[0], actual_lng: REBAT[1] }]).length).toBe(1);
+  });
+  test('GPS-pont nélküli időpont (5 percnél messzebb) nem számít', () => {
+    expect(sm.pointAt(pts, T0 - 3600)).toBeNull();
+    expect(sm.pointAt(pts, T0 + 100 * 60)).toBeTruthy();
+  });
+});
+
 describe('sorrend-korlát', () => {
   test('az előző állomás kész-ideje előtt véget ért állás büntetést kap', () => {
     const c = sm.buildCandidates(track(5), { sitePoints: SITE });
@@ -169,7 +192,22 @@ describe('matchOrder — a fuvar korábbi, azonos helyű állomása is ismert he
     expect(det.signals.some((x) => x[0] === 'short_site')).toBe(true);
   });
 
-  test('csak javaslat (nem megerősített) testvér-állomás nem számít ismert helynek', async () => {
+  test('csak javaslat-állapotú testvér: a sofőr ott nyomta meg a „kész" gombot → ismert hely, a rövid állás „biztos"', async () => {
+    const DONE_AT_SITE = new Date((T0 + 100 * 60) * 1000).toISOString();   // még állt Rebatnál
+    route([
+      { id: 1, kind: 'delivery', loc: 'Strada Uzinei, 555400 Copșa Mică', firma: 'Rebat', data: '2026-11-05', match_status: 'suggested', actual_lat: REBAT[0], actual_lng: REBAT[1], arrived_at: DONE_AT_SITE, done_at: DONE_AT_SITE },
+      { id: 2, kind: 'pickup', loc: 'Arad', firma: 'Alfa', data: '2026-11-05', match_status: 'suggested', done_at: DONE2 },
+      { id: 3, kind: 'delivery', loc: 'Strada Uzinei, 555400 Copșa Mică', firma: 'Rebat', data: '2026-11-05', match_status: null },
+    ]);
+    await runner.matchOrder(7, 'O1', { cacheOnly: true });
+    const u = upd(3);
+    expect(u).toBeTruthy();
+    expect(Math.abs(u[1][2] - REBAT[0])).toBeLessThan(0.005);
+    expect(u[1][11]).toBe('auto');
+    expect(JSON.parse(u[1][12]).dur_min).toBeLessThanOrEqual(6);
+  });
+
+  test('csak javaslat (nem megerősített) testvér, a gombot menet közben nyomta → nem ismert hely', async () => {
     route([
       { id: 1, kind: 'delivery', loc: 'Strada Uzinei, 555400 Copșa Mică', firma: 'Rebat', data: '2026-11-05', match_status: 'suggested', actual_lat: REBAT[0], actual_lng: REBAT[1], done_at: DONE1 },
       { id: 2, kind: 'pickup', loc: 'Arad', firma: 'Alfa', data: '2026-11-05', match_status: 'confirmed', actual_lat: ARAD[0], actual_lng: ARAD[1], done_at: DONE2 },
