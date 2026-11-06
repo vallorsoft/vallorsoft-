@@ -304,12 +304,13 @@ handlers.routeDeviationList = async function (req, res, args) {
     try {
       rows = (await pool.query(
         `SELECT d.order_id, d.planned_km, d.actual_km, d.diff_km, d.diff_pct, d.status, d.source, d.km_source,
+                to_jsonb(d)->>'extra_km' AS extra_km, d.detail->'seg_summary' AS seg_summary,
                 d.from_at, d.to_at, d.checked_at, o.fuvar_no, o.client, o.rendszam_camion, o.nume_sofer,
                 o.loc_incarcare, o.loc_descarcare
            FROM order_route_deviation d
            JOIN orders o ON o.id = d.order_id AND o.company_id = d.company_id
           WHERE d.company_id = $1 AND COALESCE(d.from_at, d.checked_at)::date BETWEEN $2::date AND $3::date` + where + `
-          ORDER BY (d.status = 'deviation') DESC, d.diff_km DESC NULLS LAST, d.checked_at DESC
+          ORDER BY (d.status = 'deviation') DESC, COALESCE((to_jsonb(d)->>'extra_km')::numeric, d.diff_km) DESC NULLS LAST, d.checked_at DESC
           LIMIT 300`, params)).rows;
       for (const r of (await pool.query(
         `SELECT status, COUNT(*)::int AS n FROM order_route_deviation
@@ -402,7 +403,7 @@ handlers.routeDeviationMap = async function (req, res, args) {
           `SELECT d.order_id FROM order_route_deviation d
              JOIN orders o ON o.id = d.order_id AND o.company_id = d.company_id
             WHERE d.company_id = $1 AND COALESCE(d.from_at, d.checked_at)::date BETWEEN $2::date AND $3::date` + where + `
-            ORDER BY (d.status = 'deviation') DESC, d.diff_km DESC NULLS LAST LIMIT $` + params.length, params)).rows.map((r) => r.order_id);
+            ORDER BY (d.status = 'deviation') DESC, COALESCE((to_jsonb(d)->>'extra_km')::numeric, d.diff_km) DESC NULLS LAST LIMIT $` + params.length, params)).rows.map((r) => r.order_id);
       } catch (e) { if (!(e && e.code === '42P01')) throw e; }
       meta = { from, to, truncated: ids.length > MAP_MAX_ORDERS };
       ids = ids.slice(0, MAP_MAX_ORDERS);

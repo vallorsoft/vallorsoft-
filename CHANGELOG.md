@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-06 — 🛣️ Útvonal-eltérés szakaszonként: volt-e rövidebb kamionos út + kényszerű kitérők leszámítva (PR #615)
+- Az ellenőrzés már nem az egész út km-ét veti össze egy tervvel, hanem **szakaszonként** (valós, GPS-ből felismert állomás → következő állomás) a ténylegesen megtett km-et a HERE 40 t-s kamion-útvonal km-ével ugyanarra a két pontra (`lib/routeDeviation.js` `segmentChecks`/`judgeSegment`, `CALC_VERSION` 4 → a régi eredmények magától újraszámolódnak).
+- Ítélet szakaszonként: tűrés max(1 km, 3 %); ha több, a szakasz megjelölve **többlet-km + többlet-idő + többlet-üzemanyag (jármű L/100 km) + becsült többlet-útdíj (az ország €/km rátájával)** adatokkal. Ha a sofőr útja nem hosszabb, rendben van.
+- **Kényszerű kitérők nem számítanak eltérésnek** (`excursions`): a tervtől > 1 km-re letért futam, ha benne ≥ 10 perc állás vagy tankolás van (tankolás / szünet / napi pihenő / parkoló); a leszámítható km felülről korlátos (2 × a legnagyobb letérés + 2 km), így egy hosszú rossz utat egy rövid megállás nem ment fel.
+- Új oszlop `order_route_deviation.extra_km` (`db/zzz-route-dev-segments.sql`); a statisztika, a sofőr-verseny, a riasztások és a lista a többlet-km-et használják (régi soroknál a nyers különbség). Térkép: szakasz-tábla + ⛽/☕/🛏️/🅿️ jelölők a kitérőknél. i18n `rdm.*` (RO+HU), cache-bust `?v=20261106segdev`.
+
 ## 2026-11-06 — 📍 „Fel- és lerakóhelyek GPS-ből" az Adminisztrációban (PR #614)
 - A korábbi Flotta → „Tényleges címek (GPS)" menüpont teljes egészében (lista, térkép, beállítások, pontosság) átkerült az **Adminisztráció** főmenübe, admin + manager konzolon.
 - Érthetőbb név: HU „📍 Fel- és lerakóhelyek GPS-ből", RO „📍 Locuri de încărcare / descărcare din GPS"; az oldal címe „… — ellenőrzés és menetlevélre írás"; a fuvar-adatlap blokkja és a funkció-katalógus (developer kapcsoló, csoport: Adminisztráció) is így hívja.
