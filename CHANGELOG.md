@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-06 — ↩️ Biztonsági mentés visszaállítása gombnyomásra, előnézettel (PR #XXX)
+## 2026-11-06 — ↩️ Biztonsági mentés visszaállítása gombnyomásra, előnézettel (PR #616)
 - **Cél:** ha támadás/hiba miatt adat törlődik, az Admin a mentés-listából egy gombbal visszahozza. **Biztonságos alap:** CSAK a mentésben meglévő, de az adatbázisból hiányzó (törölt) sorok jönnek vissza — semmit nem töröl, nem ír felül, a mentés óta keletkezett új adat megmarad; többször is futtatható.
 - **Folyamat** (Integrációk → 🛡️ kártya, mentés-sor „↩️ Drive-ról" / „↩️ VallorSoft"): letöltés a Drive-ról → teljes visszafejtés + hitelesség-ellenőrzés ÍRÁS NÉLKÜL → **előnézet** (táblánként hány sor hiányzik) → megerősítés a `RESTAURARE` szó beírásával → beszúrás a külső kulcsok szerinti sorrendben (szülő előbb), `ON CONFLICT DO NOTHING`, hibás kötegnél soronként + második menet.
 - **Új:** `services/companyRestore.js` (`analyze`/`restoreMissing`/`topoOrder`/`toParam`), `lib/googleDrive.js` `downloadFile`, `handlers/backup.js` `backupRestorePreview`/`backupRestoreStatus`/`backupRestoreConfirm`, migráció `db/company-backup-restore.sql` (`company_backup_restores` feladat-napló — több Fly-gépen is követhető).

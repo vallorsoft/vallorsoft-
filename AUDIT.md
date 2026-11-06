@@ -9,7 +9,7 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
-### 79. lépés — Mentés visszaállítása (2026-11-06, PR #XXX) ✅ KÉSZ
+### 79. lépés — Mentés visszaállítása (2026-11-06, PR #616) ✅ KÉSZ
 - Csak Admin, saját cégre (`company_id` minden lekérdezésben), `drive-backup` kapu. Előnézet nélkül nem indul: a megerősítés atomikus `UPDATE … WHERE status='preview_ready'` (egyszer használható) + beírandó megerősítő szó; audit mindkét lépésen. A fájl a cég saját HKDF-kulcsával hitelesített (GCM), a `meta.company_id` egyezése kötelező, és a `company_id`-s sorok közül csak a saját cégé kerülhet vissza. A beszúrás csak hiányzó id-ket ír (`ON CONFLICT DO NOTHING`), meglévőt nem ír felül; a cég-sor és a mentés-naplók kizárva. Tábla/oszlop-nevek az `information_schema`-ból, idézőjelezve; értékek paraméterként. Elakadt feladat 2 óra után lezárul.
 
 ### 78. lépés — Cégenkénti Google Drive biztonsági mentés (2026-11-06, PR #615) ✅ KÉSZ
