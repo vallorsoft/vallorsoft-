@@ -41,6 +41,7 @@
     refuel: 'sa.sig.refuel', home_base: 'sa.sig.home',
     rejected_before: 'sa.sig.rejBefore', rejected_place: 'sa.sig.rejPlace', homonym: 'sa.sig.homonym',
     rest_then_moved: 'sa.sig.restMoved', break_then_moved: 'sa.sig.breakMoved', after_rest: 'sa.sig.afterRest',
+    short_site: 'sa.sig.shortSite', before_prev: 'sa.sig.beforePrev',
   };
 
   function shell() {
