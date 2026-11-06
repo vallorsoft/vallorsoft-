@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-06 — 🏁 Rövid lerakás ismert helyen is felismerve → a sofőrnek felajánlva (PR #618)
+- **Kérés:** a sofőr ma reggel 5 perc alatt leürített (Copșa Mică, Rebat), de a rendszer nem ajánlotta fel a gomb pótlását. **Ok:** a felismerő csak a legalább 20 perces állást vette rakodásnak (rövidebbet csak pihenő után).
+- **Új szabály** (`lib/stopMatch.js` `siteStops`): **ismert rakodóhelyen** (helymemória, a fuvar már megerősített / biztos, azonos helyű állomása, vagy a tervezett cég pontos — nem a település-középpontra eső — geokódolt helye, 300 m-en belül) a **≥ 2 perces** állás is jelölt; ha utána a kamion továbbment, ott rakodott. A kapunál várakozás + rámpa (15 percen belül) egy látogatás. A tisztán forgalmi megállás (úton, járó motorral, manőver nélkül, 4 percnél rövidebb) kimarad. A rövid állás ismert helyen csak kis levonást kap (`short_site` −4), így azonos helyen a hosszabb állás elsőbbséget kap.
+- **Sorrend-korlát** (`before_prev` −60): az előző állomások legkésőbbi „kész" ideje előtt (30 perc tűréssel) véget ért állás nem lehet ez az állomás — ugyanarra a helyre többször járó fuvarnál a korábbi látogatás nem „lopja el" a mostanit.
+- Biztos találatnál a meglévő gomb-pótlás (`lib/stopAutoEvents`) beírja az érkezést/kész-t, a sofőr a következő belépéskor leokézza vagy javítja. Env: `STOP_MATCH_SITE_MIN_MINUTES` (alap 2). Iroda: új jel-feliratok (`sa.sig.shortSite`, `sa.sig.beforePrev`, RO+HU), cache-bust `?v=20261106sitestop`.
+- Tesztek: +10 eset (`tests/unit/stopMatchSiteStop.test.js`: ismert hely nélkül / máshol / 1 perc / forgalmi megállás nem jelölt; párosítás „biztos" + gomb-pótlás; a fuvar testvér-állomása mint ismert hely; csak javasolt testvér nem elég); 2249 Jest zöld valós Postgres 16-tal.
+
 ## 2026-11-06 — 🛣️ Útvonal-eltérés szakaszonként: volt-e rövidebb kamionos út + kényszerű kitérők leszámítva (PR #617)
 - Az ellenőrzés már nem az egész út km-ét veti össze egy tervvel, hanem **szakaszonként** (valós, GPS-ből felismert állomás → következő állomás) a ténylegesen megtett km-et a HERE 40 t-s kamion-útvonal km-ével ugyanarra a két pontra (`lib/routeDeviation.js` `segmentChecks`/`judgeSegment`, `CALC_VERSION` 4 → a régi eredmények magától újraszámolódnak).
 - Ítélet szakaszonként: tűrés max(1 km, 3 %); ha több, a szakasz megjelölve **többlet-km + többlet-idő + többlet-üzemanyag (jármű L/100 km) + becsült többlet-útdíj (az ország €/km rátájával)** adatokkal. Ha a sofőr útja nem hosszabb, rendben van.

@@ -1455,6 +1455,8 @@
     'sa.sig.beforeBtn': { hu: 'gomb előtt', ro: 'înainte de buton' },
     'sa.sig.duration': { hu: 'állás-hossz', ro: 'durată' },
     'sa.sig.short': { hu: 'rövid', ro: 'scurt' },
+    'sa.sig.beforePrev': { hu: 'az előző állomás kész-ideje előtt', ro: 'înainte de finalizarea opririi anterioare' },
+    'sa.sig.shortSite': { hu: 'rövid megállás ismert rakodóhelyen, utána továbbment', ro: 'oprire scurtă la un loc cunoscut, apoi a plecat' },
     'sa.sig.maneuver': { hu: 'manőverezés', ro: 'manevre' },
     'sa.sig.offroad': { hu: 'úton kívül', ro: 'în afara drumului' },
     'sa.sig.restMoved': { hu: 'napi pihenő, utána a közelben még megállt', ro: 'odihnă zilnică, apoi a mai oprit în apropiere' },
