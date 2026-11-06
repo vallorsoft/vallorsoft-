@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-06 — 📍 „Fel- és lerakóhelyek GPS-ből" az Adminisztrációban (PR #614)
+- A korábbi Flotta → „Tényleges címek (GPS)" menüpont teljes egészében (lista, térkép, beállítások, pontosság) átkerült az **Adminisztráció** főmenübe, admin + manager konzolon.
+- Érthetőbb név: HU „📍 Fel- és lerakóhelyek GPS-ből", RO „📍 Locuri de încărcare / descărcare din GPS"; az oldal címe „… — ellenőrzés és menetlevélre írás"; a fuvar-adatlap blokkja és a funkció-katalógus (developer kapcsoló, csoport: Adminisztráció) is így hívja.
+- Csak menü/elnevezés — a `stop-address` kulcs, a funkció-kapcsoló és a működés változatlan. Cache-bust `?v=20261106saadm`.
+
 ## 2026-11-06 — ⏰ Elfelejtett állomás-gomb: óránkénti keresés nappal, éjfél után egyszer (PR #613)
 - **Ok:** a legtöbb fuvaron csak dátum van, pontos idő nem — egy egyszeri (vagy 6 óránkénti) futás nem kapta el időben, ha a sofőr elfelejtette megnyomni a gombot.
 - **`lib/stopMatchRunner.js` `PRESS_DUE_SQL` (a `pickQueue`-ban):** a belső sofőrös fuvar sofőr által le nem zárt állomását (`done_at IS NULL`) a tervezett dátumától kezdve **nappal 8–19 h között óránként** újranézi (helyi idő, Europe/Bucharest); ha estig nincs meg, **éjfél után egyszer** (esti lerakás), majd másnap nappal újra óránként — amíg a sofőr meg nem nyomja vagy a GPS-ből pótlódik, legfeljebb 14 napig a tervezett dátum után. Csak bekapcsolt automatikus pótlásnál (`stop_match_settings.auto_events`). A pótlás és a sofőr-jóváhagyás a meglévő úton (`applyAutoEvents` → sofőr belépéskor átnézi).

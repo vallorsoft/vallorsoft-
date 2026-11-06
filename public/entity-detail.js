@@ -359,7 +359,7 @@
         + '</div>';
     }).join('');
     return '<div style="margin-top:16px;">'
-      + '<div style="font-weight:700;margin-bottom:6px;color:var(--text-primary);">📍 ' + _t('sa.detailTitle', 'Adrese reale (GPS)') + '</div>'
+      + '<div style="font-weight:700;margin-bottom:6px;color:var(--text-primary);">📍 ' + _t('sa.detailTitle', 'Locuri de încărcare / descărcare din GPS') + '</div>'
       + '<div style="border:1px solid rgba(99,102,241,0.18);border-radius:10px;padding:4px 14px;">' + rows + '</div>'
       + '</div>';
   }

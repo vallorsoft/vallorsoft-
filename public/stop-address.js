@@ -50,7 +50,7 @@
     if (!box.querySelector('#saBody')) {
       box.innerHTML =
         '<div class="glass" style="padding:18px 20px;margin-bottom:14px;">'
-        + '<div class="h-title" style="margin-bottom:6px;">📍 ' + _t('sa.title', 'Adrese reale de încărcare / descărcare (GPS)') + '</div>'
+        + '<div class="h-title" style="margin-bottom:6px;">📍 ' + _t('sa.title', 'Locuri de încărcare / descărcare din GPS — verificare și trecere pe foaia de parcurs') + '</div>'
         + '<div class="text-muted" style="font-size:13px;margin-bottom:12px;">' + _t('sa.hint', 'Sistemul caută în traseul GPS locul unde camionul a staționat la încărcare/descărcare și îl completează cu adresa exactă. Vizibil doar pentru Admin/Manager.') + '</div>'
         + '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">'
         + '<label class="field" style="min-width:140px;"><span>' + _t('sa.from', 'De la') + '</span><input type="date" class="input" id="saFrom"></label>'
