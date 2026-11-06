@@ -69,7 +69,8 @@ describe('pickQueue — esedékes újraellenőrzés', () => {
     const q = await runner.pickQueue(30);
     expect(q[0].recheck).toBe(true);
     const [sql, params] = pool.query.mock.calls[0];
-    expect(params).toEqual([30, 10, 150, 7]);
+    expect(params.slice(0, 5)).toEqual([30, 10, 150, 7, runner.PRESS_WINDOW_DAYS]);
+    expect(params[5]).toBeInstanceOf(Date);
     expect(sql).toMatch(/COALESCE\(rs\.recheck_at, rs\.matched_at\) < NOW\(\) - \(\$4::int/);
     expect(sql).toMatch(/rs\.needs_manual = false AND rs\.recheck_count < \$2/);
   });

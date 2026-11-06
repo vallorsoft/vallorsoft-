@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-06 — ⏰ Elfelejtett állomás-gomb: óránkénti keresés nappal, éjfél után egyszer (PR #613)
+- **Ok:** a legtöbb fuvaron csak dátum van, pontos idő nem — egy egyszeri (vagy 6 óránkénti) futás nem kapta el időben, ha a sofőr elfelejtette megnyomni a gombot.
+- **`lib/stopMatchRunner.js` `PRESS_DUE_SQL` (a `pickQueue`-ban):** a belső sofőrös fuvar sofőr által le nem zárt állomását (`done_at IS NULL`) a tervezett dátumától kezdve **nappal 8–19 h között óránként** újranézi (helyi idő, Europe/Bucharest); ha estig nincs meg, **éjfél után egyszer** (esti lerakás), majd másnap nappal újra óránként — amíg a sofőr meg nem nyomja vagy a GPS-ből pótlódik, legfeljebb 14 napig a tervezett dátum után. Csak bekapcsolt automatikus pótlásnál (`stop_match_settings.auto_events`). A pótlás és a sofőr-jóváhagyás a meglévő úton (`applyAutoEvents` → sofőr belépéskor átnézi).
+- A „most" paraméter (`pickQueue(limit, now)`) → valós Postgres 16-on 9 időpont-esettel ellenőrizve (11:10 igen / 10:30 nem / este nem / 00:30 igen / 03:00 nem / 08:05 igen / dátum előtt nem / lezárva nem / 15 nap után nem). Tesztek: +3 eset; 2119 Jest zöld.
+
 ## 2026-11-06 — 🔁 Elvetett tényleges cím → új találat + ráírás a menetlevélre koordinátával (PR #612)
 - **Ok:** a GPS-ből kinyert fel-/lerakási címek többsége helyes volt, de az irodában elvetett (✕) címeknél a rendszer csak jelölteket kínált, új helyet nem választott, és a menetlevélen az eredeti tervezett cím maradt.
 - **`lib/stopMatchRunner.js` `matchOrder`:** elvetett állomásnál a motor az elvetett hely(ek) nélkül a legjobb jelöltet választja (de nem a fuvar egy másik állomásának helyét), „javaslat" státusszal (`match_source='retry'`) elmenti, és a menetlevélre is ráírja (`wb.applyStop`) a koordinátás címmel (`formatAddress` → „… (lat, lng)"). Az elvetett helyek a `match_detail.rejected_pts`-ben gyűlnek (max. 20): oda később sem tesszük vissza, és az új találat soha nem lesz magától „biztos" (kézi megerősítés kell). Ha nincs megfelelő jelölt, az elvetés marad (a menetlevélen az eredeti cím).
