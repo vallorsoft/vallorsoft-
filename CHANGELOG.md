@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-06 — 🔁 Elvetett tényleges cím → új találat + ráírás a menetlevélre koordinátával (PR #612)
+- **Ok:** a GPS-ből kinyert fel-/lerakási címek többsége helyes volt, de az irodában elvetett (✕) címeknél a rendszer csak jelölteket kínált, új helyet nem választott, és a menetlevélen az eredeti tervezett cím maradt.
+- **`lib/stopMatchRunner.js` `matchOrder`:** elvetett állomásnál a motor az elvetett hely(ek) nélkül a legjobb jelöltet választja (de nem a fuvar egy másik állomásának helyét), „javaslat" státusszal (`match_source='retry'`) elmenti, és a menetlevélre is ráírja (`wb.applyStop`) a koordinátás címmel (`formatAddress` → „… (lat, lng)"). Az elvetett helyek a `match_detail.rejected_pts`-ben gyűlnek (max. 20): oda később sem tesszük vissza, és az új találat soha nem lesz magától „biztos" (kézi megerősítés kell). Ha nincs megfelelő jelölt, az elvetés marad (a menetlevélen az eredeti cím).
+- **Migráció `db/zzz-stop-rejected-retry.sql`:** a már elvetett állomások fuvarjai egyszer újra sorba kerülnek, így ezek is új találatot kapnak.
+- **UI:** „🔁 Új hely az elvetés után" jelvény a Tényleges címek listán; elvetéskor új toast-szöveg (RO+HU). Cache-bust `?v=20261106rejretry`. Tesztek: +5 eset (`tests/unit/stopRejectedRetry.test.js`); 2116 Jest zöld.
+
 ## 2026-11-06 — 💾 HERE-útvonal egyszer számolva, tárolva + hiba esetén 3 mp-enként újra (PR #611)
 - **Tartós tárolás** (`db/zzz-here-route-cache.sql`, `here_route_cache`): a `lib/routeEstimate.js` `estimateRoute` minden sikeres HERE kamion-útvonalat (cég + pontok 5 tizedesig + kamion-paraméterek kulcsán, a szakaszok flexpolyline-kódolással) elment; ugyanarra a pont-sorozatra onnantól mindig a tároltat használja, új HERE-hívás nélkül (`cached: true`). Közös minden útvonal-számításnak: fuvar-km, útvonal-eltérés, menetlevél-terv, útdíj, AI-chat árajánlat, beérkező megrendelés.
 - **Újrapróbálás 3 mp-enként:** átmeneti hibánál (hálózat, időtúllépés, 429, 5xx) a háttér-számítás (fuvar-km, útvonal-eltérés, menetlevél) 3 mp múlva elölről kezdi, max. 10×; ha így sem sikerül, a következő ütemező-körben újra (a korábbi 6 órás szünet csak végleges hibánál marad, pl. „nincs kamion-útvonal"). A fuvar-kiírás km-mezője ugyanígy 3 mp-enként újrapróbál (max. 20×, kiírja: „újrapróbálás 3 mp múlva n/20"), amíg a pontok nem változnak.

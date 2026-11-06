@@ -270,6 +270,7 @@
         + '</td>'
         + '<td>' + (st ? '<span class="badge ' + st.cls + '">' + _t(st.k, st.d) + '</span>' : '<span class="badge">' + _t('sa.f.none', 'Neprocesat') + '</span>')
         + (r.match_score != null ? '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _e(r.match_score) + ' ' + _t('sa.points', 'pct') + '</div>' : '')
+        + (r.match_source === 'retry' ? '<div style="margin-top:3px;"><span class="badge info" title="' + _t('sa.retryTip', 'Locația anterioară a fost respinsă — sistemul a găsit una nouă și a scris-o pe foaia de parcurs') + '">🔁 ' + _t('sa.retry', 'Locație nouă după respingere') + '</span></div>' : '')
         + autoBadge(r) + recheckBadge(r) + '</td>'
         + '<td style="white-space:nowrap;">'
         + ((r.match_status === 'auto' || r.match_status === 'suggested') ? '<button class="btn ok" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'confirm\')" title="' + _t('sa.a.confirm', 'Acceptă') + '">✓</button> ' : '')
@@ -311,7 +312,7 @@
       if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
       if (action === 'apply') _toast(r.total_waybills ? _t('sa.applied', 'Pus pe foile de parcurs') + ': ' + r.waybills : _t('sa.appliedLater', 'Se va pune pe foaia de parcurs când aceasta este trimisă'));
       else if (action === 'reject') {
-        _toast(_t('sa.rejectedMore', 'Respins — căutăm alți candidați; dacă nu apare niciunul potrivit, alege pe hartă.'));
+        _toast(_t('sa.rejectedMore', 'Respins — căutăm o locație nouă și, dacă o găsim, o scriem și pe foaia de parcurs (cu coordonate); dacă nu apare niciuna potrivită, alege pe hartă.'));
         S.open[id] = true;
         setTimeout(function () { if (document.getElementById('saBody')) reload(); }, 20000);
       }
