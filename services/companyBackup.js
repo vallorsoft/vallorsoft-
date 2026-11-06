@@ -27,7 +27,7 @@ const COMPANY_FOLDER = 'VallorSoft – Backup';
 const VS_ROOT_FOLDER = 'VallorSoft – Backup cegek';
 const RETENTION_OPTIONS = ['forever', '365', '180', '90'];
 // Ezeket nem mentjük: munkamenet / rendszer-könyvelés / maga a mentés-napló.
-const SKIP_TABLES = new Set(['session', 'schema_migrations', 'scheduler_leader', 'company_backup_runs']);
+const SKIP_TABLES = new Set(['session', 'schema_migrations', 'scheduler_leader', 'company_backup_runs', 'company_backup_restores']);
 
 function qi(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
 
