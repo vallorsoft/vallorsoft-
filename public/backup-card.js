@@ -63,20 +63,91 @@ window.BackupCard = (function () {
     } else {
       h += '<div style="overflow-x:auto;"><table class="table" style="font-size:12px;"><thead><tr>'
         + '<th>' + esc(tt('bk.c.date')) + '</th><th>' + esc(tt('bk.c.trigger')) + '</th><th>' + esc(tt('bk.c.size')) + '</th>'
-        + '<th>' + esc(tt('bk.c.rows')) + '</th><th>' + esc(tt('bk.c.drive')) + '</th><th>' + esc(tt('bk.c.vs')) + '</th><th>' + esc(tt('bk.c.status')) + '</th>'
+        + '<th>' + esc(tt('bk.c.rows')) + '</th><th>' + esc(tt('bk.c.drive')) + '</th><th>' + esc(tt('bk.c.vs')) + '</th><th>' + esc(tt('bk.c.status')) + '</th><th></th>'
         + '</tr></thead><tbody>'
         + d.runs.map(function (r) {
           return '<tr' + (r.error ? ' title="' + esc(r.error) + '"' : '') + '><td>' + esc(fmtDate(r.started_at)) + '</td><td>' + esc(tt('bk.tr.' + r.trigger, r.trigger)) + '</td>'
             + '<td>' + esc(fmtSize(r.size_bytes)) + '</td><td>' + esc(r.row_count != null ? r.row_count.toLocaleString('ro-RO') : '—') + '</td>'
-            + '<td>' + esc(st(r.drive_status)) + '</td><td>' + esc(st(r.vs_status)) + '</td><td>' + esc(st(r.status)) + '</td></tr>';
+            + '<td>' + esc(st(r.drive_status)) + '</td><td>' + esc(st(r.vs_status)) + '</td><td>' + esc(st(r.status)) + '</td>'
+            + '<td style="white-space:nowrap;">' + restoreBtns(r) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
     }
-    h += '<div style="font-size:12px;color:var(--muted);margin-top:10px;">' + esc(tt('bk.restoreSoon')) + '</div></div>';
+    h += '<div style="font-size:12px;color:var(--muted);margin-top:10px;">' + esc(tt('bk.restoreHint')) + '</div>'
+      + '<div id="bkRestoreBox" style="margin-top:12px;"></div></div>';
     box.innerHTML = h;
+    loadRestore();
     // Futó mentésnél frissítünk, amíg be nem fejeződik.
     clearTimeout(_poll);
     var running = d.running || (d.runs || []).some(function (r) { return r.status === 'running'; });
     if (running) _poll = setTimeout(load, 15000);
+  }
+
+  // ---- Visszaállítás ----
+  var _rPoll = null, _confirmWord = 'RESTAURARE';
+  function restoreBtns(r) {
+    if (r.status !== 'ok' && r.status !== 'partial') return '';
+    var b = '';
+    if (r.has_drive_copy) b += '<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="BackupCard.restoreStart(' + r.id + ',\'company\')">↩️ ' + esc(tt('bk.r.fromDrive')) + '</button> ';
+    if (r.has_vs_copy) b += '<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="BackupCard.restoreStart(' + r.id + ',\'vs\')">↩️ ' + esc(tt('bk.r.fromVs')) + '</button>';
+    return b;
+  }
+  function renderRestore(j) {
+    var el = document.getElementById('bkRestoreBox'); if (!el) return;
+    clearTimeout(_rPoll);
+    if (!j) { el.innerHTML = ''; return; }
+    var h = '<div class="glass-soft" style="padding:14px;">';
+    h += '<div style="font-weight:700;margin-bottom:6px;color:var(--text-primary);">↩️ ' + esc(tt('bk.r.title')) + ' — ' + esc(fmtDate(j.created_at)) + '</div>';
+    if (j.status === 'analyzing' || j.status === 'restoring') {
+      h += '<div style="font-size:13px;">⏳ ' + esc(tt(j.status === 'analyzing' ? 'bk.r.analyzing' : 'bk.r.restoring')) + '</div>';
+      _rPoll = setTimeout(loadRestore, 5000);
+    } else if (j.status === 'error') {
+      h += '<div style="font-size:13px;color:var(--status-danger);">❌ ' + esc(j.error || tt('common.error', 'Eroare')) + '</div>';
+    } else if (j.status === 'preview_ready' && j.preview) {
+      var p = j.preview;
+      h += '<div style="font-size:13px;margin-bottom:6px;">' + esc(tt('bk.r.backupFrom')) + ' <b>' + esc(fmtDate(p.backup_created_at)) + '</b></div>';
+      if (!p.total_missing) {
+        h += '<div style="font-size:13px;">✅ ' + esc(tt('bk.r.nothing')) + '</div>';
+      } else {
+        h += '<div style="font-size:13px;margin-bottom:6px;">' + esc(tt('bk.r.missing', '', { n: p.total_missing.toLocaleString('ro-RO') })) + '</div>'
+          + '<table class="table" style="font-size:12px;max-width:520px;"><thead><tr><th>' + esc(tt('bk.r.table')) + '</th><th style="text-align:right;">' + esc(tt('bk.r.rowsBack')) + '</th></tr></thead><tbody>'
+          + p.tables.filter(function (t) { return t.missing > 0; }).map(function (t) {
+            return '<tr><td>' + esc(t.table) + '</td><td style="text-align:right;">' + esc(t.missing.toLocaleString('ro-RO')) + '</td></tr>';
+          }).join('') + '</tbody></table>'
+          + '<div style="font-size:12px;color:var(--muted);margin:8px 0;">' + esc(tt('bk.r.safe')) + '</div>'
+          + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+          + '<input class="input" id="bkRestoreConfirm" style="max-width:200px;" placeholder="' + esc(_confirmWord) + '">'
+          + '<button class="btn primary" onclick="BackupCard.restoreConfirm(' + j.id + ',this)">' + esc(tt('bk.r.go')) + '</button></div>'
+          + '<div style="font-size:12px;color:var(--muted);margin-top:4px;">' + esc(tt('bk.r.typeWord', '', { w: _confirmWord })) + '</div>';
+      }
+    } else if (j.status === 'done' && j.result) {
+      h += '<div style="font-size:13px;">✅ ' + esc(tt('bk.r.done', '', { n: (j.result.inserted || 0).toLocaleString('ro-RO') })) + '</div>';
+      if (j.result.failed) h += '<div style="font-size:12px;color:var(--status-warn);margin-top:4px;">⚠️ ' + esc(tt('bk.r.failed', '', { n: j.result.failed })) + '</div>';
+    }
+    h += '</div>';
+    el.innerHTML = h;
+  }
+  function loadRestore(jobId) {
+    gas('backupRestoreStatus', [jobId ? { job_id: jobId } : {}]).then(function (d) {
+      if (!d || !d.ok) return;
+      if (d.confirm_word) _confirmWord = d.confirm_word;
+      renderRestore(d.job);
+    }).catch(function () {});
+  }
+  function restoreStart(runId, source) {
+    if (!confirm(tt('bk.r.startConfirm'))) return;
+    gas('backupRestorePreview', [{ run_id: runId, source: source }]).then(function (d) {
+      if (d && d.ok) { renderRestore(d.job); var el = document.getElementById('bkRestoreBox'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      else toast((d && d.err) || tt('common.error', 'Eroare'), 'err');
+    });
+  }
+  function restoreConfirm(jobId, btn) {
+    var v = (document.getElementById('bkRestoreConfirm') || {}).value || '';
+    if (v.trim().toUpperCase() !== _confirmWord) { toast(tt('bk.r.typeWord', '', { w: _confirmWord }), 'err'); return; }
+    if (btn) btn.disabled = true;
+    gas('backupRestoreConfirm', [{ job_id: jobId, confirm: v }]).then(function (d) {
+      if (d && d.ok) renderRestore(Object.assign({}, d.job, { status: 'restoring' }));
+      else { if (btn) btn.disabled = false; toast((d && d.err) || tt('common.error', 'Eroare'), 'err'); }
+    });
   }
 
   function load() { gas('backupGetStatus').then(render).catch(function () {}); }
@@ -114,5 +185,6 @@ window.BackupCard = (function () {
     }, 800);
   });
 
-  return { mount: mount, save: save, disconnect: disconnect, runNow: runNow, reload: load };
+  return { mount: mount, save: save, disconnect: disconnect, runNow: runNow, reload: load,
+    restoreStart: restoreStart, restoreConfirm: restoreConfirm };
 })();

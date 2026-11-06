@@ -192,3 +192,65 @@ describe('handlers/backup — jogosultság + validáció', () => {
     expect(JSON.stringify(r)).not.toMatch(/credentials|refresh/);
   });
 });
+
+describe('services/companyRestore — tiszta segédek', () => {
+  const rst = require('../../services/companyRestore');
+  test('topoOrder: szülő a gyerek előtt, kör esetén is minden tábla benne', () => {
+    const o = rst.topoOrder(['order_stops', 'orders', 'clients'], [
+      { child: 'order_stops', parent: 'orders' }, { child: 'orders', parent: 'clients' }, { child: 'orders', parent: 'companies' }]);
+    expect(o.indexOf('clients')).toBeLessThan(o.indexOf('orders'));
+    expect(o.indexOf('orders')).toBeLessThan(o.indexOf('order_stops'));
+    const cyc = rst.topoOrder(['a', 'b'], [{ child: 'a', parent: 'b' }, { child: 'b', parent: 'a' }]);
+    expect(cyc.sort()).toEqual(['a', 'b']);
+  });
+  test('toParam: jsonb → JSON szöveg, bytea → Buffer, null marad', () => {
+    expect(rst.toParam({ km: 12 }, 'jsonb')).toBe('{"km":12}');
+    expect(rst.toParam([1, 2], 'json')).toBe('[1,2]');
+    expect(Buffer.isBuffer(rst.toParam({ $b64: 'aGk=' }, 'bytea'))).toBe(true);
+    expect(rst.toParam(null, 'jsonb')).toBeNull();
+    expect(rst.toParam('x', 'text')).toBe('x');
+  });
+  test('rowBelongs: más cég sora sosem kerül vissza', () => {
+    expect(rst.rowBelongs({ company_id: 7 }, 'company', 7)).toBe(true);
+    expect(rst.rowBelongs({ company_id: 8 }, 'company', 7)).toBe(false);
+  });
+  test('a cég-sor és a mentés-naplók sosem állnak vissza', () => {
+    ['companies', 'session', 'company_backup_runs', 'company_backup_restores'].forEach((t) => expect(rst.NO_RESTORE.has(t)).toBe(true));
+  });
+});
+
+describe('handlers/backup — visszaállítás jogosultság + megerősítés', () => {
+  const ADMIN = { id: 1, pozicio: 'Admin', company_id: 7 };
+  const MGR = { id: 2, pozicio: 'Manager', company_id: 7 };
+  test.each(['backupRestorePreview', 'backupRestoreStatus', 'backupRestoreConfirm'])('%s — csak Admin', async (fn) => {
+    expect((await call(H[fn], MGR, [{}])).ok).toBe(false);
+    expect((await call(H[fn], null, [{}])).ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+  test('megerősítő szó nélkül nem indul, DB-írás sincs', async () => {
+    const r = await call(H.backupRestoreConfirm, ADMIN, [{ job_id: 3, confirm: 'igen' }]);
+    expect(r.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+  test('megerősítés csak kész előnézetből, saját cégre (atomikus UPDATE)', async () => {
+    pool.query.mockResolvedValueOnce(rows([])); // nincs preview_ready sor
+    const r = await call(H.backupRestoreConfirm, ADMIN, [{ job_id: 3, confirm: 'restaurare' }]);
+    expect(r.ok).toBe(false);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/status='preview_ready'/);
+    expect(params).toEqual([3, 7]);
+  });
+  test('előnézet: idegen / nem létező mentés elutasítva (company_id a WHERE-ben)', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    const r = await call(H.backupRestorePreview, ADMIN, [{ run_id: 55, source: 'company' }]);
+    expect(r.ok).toBe(false);
+    expect(pool.query.mock.calls[0][1]).toEqual([55, 7]);
+  });
+  test('státusz: saját cégre szűrve', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    const r = await call(H.backupRestoreStatus, ADMIN, [{ job_id: 9 }]);
+    expect(r.ok).toBe(true);
+    expect(pool.query.mock.calls[0][1]).toEqual([9, 7]);
+    expect(r.confirm_word).toBe('RESTAURARE');
+  });
+});

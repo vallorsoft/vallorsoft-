@@ -8,6 +8,7 @@ const audit = require('../lib/audit');
 const drive = require('../lib/googleDrive');
 const backup = require('../services/companyBackup');
 const { featureEnabled } = require('../lib/featureEnabled');
+const restore = require('../services/companyRestore');
 
 const handlers = {};
 const MANUAL_COOLDOWN_MIN = 15;
@@ -21,6 +22,7 @@ function runRow(r) {
     started_at: r.started_at, finished_at: r.finished_at, size_bytes: r.size_bytes != null ? Number(r.size_bytes) : null,
     row_count: r.row_count, drive_status: r.drive_status, vs_status: r.vs_status,
     error: r.error ? String(r.error).slice(0, 300) : null,
+    has_drive_copy: !!r.drive_file_id, has_vs_copy: !!r.vs_file_id,
   };
 }
 
@@ -111,6 +113,82 @@ handlers.backupRunNow = async function (req, res) {
     return res.json({ result: { ok: true, started: true } });
   } catch (e) {
     console.error('backupRunNow hiba:', e);
+    return deny(res, 'Eroare de server');
+  }
+};
+
+// ---- Visszaállítás (csak hiányzó/törölt sorok; nem töröl, nem ír felül) ----
+const RESTORE_CONFIRM_WORD = 'RESTAURARE';
+
+function jobRow(j) {
+  return j ? { id: j.id, run_id: j.run_id, source: j.source, status: j.status, preview: j.preview || null,
+    result: j.result || null, error: j.error || null, created_at: j.created_at, updated_at: j.updated_at } : null;
+}
+
+handlers.backupRestorePreview = async function (req, res, args) {
+  try {
+    if (!isAdmin(req)) return deny(res);
+    const cid = req.session.user.company_id;
+    if (!(await featureEnabled(cid, 'drive-backup'))) return deny(res, 'Funcție indisponibilă');
+    const f = (args && args[0]) || {};
+    const source = f.source === 'vs' ? 'vs' : 'company';
+    const run = await restore.loadRun(cid, parseInt(f.run_id, 10));
+    if (!run || run.status === 'running' || run.status === 'error') return deny(res, 'Backup inexistent sau incomplet');
+    if (source === 'vs' ? !run.vs_file_id : !run.drive_file_id) return deny(res, 'Copia nu mai există pe această sursă');
+    if (await restore.activeJob(cid)) return deny(res, 'O restaurare este deja în curs');
+    const ins = await pool.query(
+      `INSERT INTO company_backup_restores (company_id, run_id, source, status, requested_by)
+       VALUES ($1,$2,$3,'analyzing',$4) RETURNING *`, [cid, run.id, source, req.session.user.id || null]);
+    const job = ins.rows[0];
+    audit.fromReq(req, 'backup.restore_preview', 'company_backup_runs', run.id, { source, job: job.id });
+    restore.runAnalyze(job.id, cid, run, source).catch(() => {});
+    return res.json({ result: { ok: true, job: jobRow(job) } });
+  } catch (e) {
+    console.error('backupRestorePreview hiba:', e);
+    return deny(res, 'Eroare de server');
+  }
+};
+
+handlers.backupRestoreStatus = async function (req, res, args) {
+  try {
+    if (!isAdmin(req)) return deny(res);
+    const cid = req.session.user.company_id;
+    const f = (args && args[0]) || {};
+    const jobId = parseInt(f.job_id, 10);
+    const r = Number.isInteger(jobId)
+      ? await pool.query('SELECT * FROM company_backup_restores WHERE id=$1 AND company_id=$2', [jobId, cid])
+      : await pool.query('SELECT * FROM company_backup_restores WHERE company_id=$1 ORDER BY created_at DESC LIMIT 1', [cid]);
+    return res.json({ result: { ok: true, job: jobRow(r.rows[0]), confirm_word: RESTORE_CONFIRM_WORD } });
+  } catch (e) {
+    console.error('backupRestoreStatus hiba:', e);
+    return deny(res, 'Eroare de server');
+  }
+};
+
+handlers.backupRestoreConfirm = async function (req, res, args) {
+  try {
+    if (!isAdmin(req)) return deny(res);
+    const cid = req.session.user.company_id;
+    if (!(await featureEnabled(cid, 'drive-backup'))) return deny(res, 'Funcție indisponibilă');
+    const f = (args && args[0]) || {};
+    if (String(f.confirm || '').trim().toUpperCase() !== RESTORE_CONFIRM_WORD) {
+      return deny(res, 'Scrieți ' + RESTORE_CONFIRM_WORD + ' pentru confirmare');
+    }
+    const jobId = parseInt(f.job_id, 10);
+    // Atomikus állapotváltás: csak a kész előnézetből indulhat, egyszer.
+    const up = await pool.query(
+      `UPDATE company_backup_restores SET status='restoring', updated_at=now()
+        WHERE id=$1 AND company_id=$2 AND status='preview_ready' RETURNING *`, [jobId, cid]);
+    if (!up.rows.length) return deny(res, 'Previzualizarea nu este gata sau a fost deja folosită');
+    const job = up.rows[0];
+    const run = await restore.loadRun(cid, job.run_id);
+    if (!run) { await pool.query(`UPDATE company_backup_restores SET status='error', error='Backup inexistent' WHERE id=$1`, [job.id]); return deny(res, 'Backup inexistent'); }
+    audit.fromReq(req, 'backup.restore_run', 'company_backup_runs', run.id,
+      { source: job.source, job: job.id, expected: job.preview && job.preview.total_missing });
+    restore.runRestore(job.id, cid, run, job.source).catch(() => {});
+    return res.json({ result: { ok: true, job: jobRow(job) } });
+  } catch (e) {
+    console.error('backupRestoreConfirm hiba:', e);
     return deny(res, 'Eroare de server');
   }
 };
