@@ -97,6 +97,7 @@ window.VS_FEATURES = [
   { key: 'ai-forditas',          label: 'AI fordító — sofőr (szöveg + beszélgetés) 🌐', group: 'Fuvarozás & Logisztika' },
   { key: 'gps-integracio',       label: 'GPS integráció 📡',            group: 'Adminisztráció' },
   { key: 'szamlazas-integracio', label: 'Számlázó integráció 🧾',        group: 'Adminisztráció' },
+  { key: 'drive-backup',         label: 'Biztonsági mentés Google Drive-ba 🛡️', group: 'Adminisztráció' },
   { key: 'konyvelo-szerepkor',   label: 'Könyvelő szerepkör 📚',        group: 'Adminisztráció' },
   // ── Költség-kalkulátor (Valorcalc-integráció) ──
   { key: 'vcalc-run',             label: 'Költség-kalkulátor 🧮',       group: 'Költség-kalkulátor' },
