@@ -76,10 +76,44 @@
         + '.rdm-list tr.rdm-on td{background:#dbeafe;}.rdm-list .m{color:#475569;font-size:11.5px;}'
         + '.rdm-num{background:#1e293b;color:#fff;border:2px solid #fff;border-radius:50%;width:22px;height:22px;line-height:18px;text-align:center;font-weight:800;font-size:11px;box-shadow:0 1px 4px rgba(0,0,0,.4);}'
         + '.rdm-num.p{background:#1d4ed8;}.rdm-num.d{background:#b91c1c;}'
+        + '.rdm-det{background:#fff;border:2px solid #c2410c;border-radius:50%;width:24px;height:24px;line-height:20px;text-align:center;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.35);}'
+        + '.rdm-segs tr.dev td{background:#fffbeb;}.rdm-segs .pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;margin:1px 2px 1px 0;}'
         + '@media (max-width:640px){.rdm-canvas{height:52vh;}.rdm-list th:nth-child(5),.rdm-list td:nth-child(5){display:none;}}';
       document.head.appendChild(css);
     }
     return el;
+  }
+
+  var DET_ICON = { fuel: '⛽', break: '☕', daily_rest: '🛏️', parking: '🅿️' };
+  function detLabel(r) {
+    return { fuel: _t('rdm.det.fuel', 'Alimentare'), break: _t('rdm.det.break', 'Pauză'), daily_rest: _t('rdm.det.rest', 'Odihnă zilnică'),
+      parking: _t('rdm.det.parking', 'Parcare / oprire') }[r] || r;
+  }
+  function _eur(v) { return v == null ? '—' : _n(v) + ' €'; }
+  function segTable(it) {
+    var segs = it.segments || [];
+    if (!segs.length) return '';
+    return '<div class="rdm-list rdm-segs" style="margin-top:8px;"><div class="rdm-sub" style="margin-bottom:4px;">'
+      + _e(_t('rdm.segHint', 'Fiecare segment între punctele reale (GPS) este comparat cu cel mai scurt traseu pentru camion (HERE, 40 t). Ocolirile pentru alimentare, pauză sau parcare nu se socotesc abatere.'))
+      + '</div><div style="overflow-x:auto;"><table><thead><tr><th>#</th><th>' + _e(_t('rdm.c.leg', 'Segment')) + '</th><th>'
+      + _e(_t('rdm.k.planned', 'Planificat')) + '</th><th>' + _e(_t('rdm.k.actual', 'Parcurs (GPS)')) + '</th><th>'
+      + _e(_t('rdm.c.detours', 'Ocoliri justificate')) + '</th><th>' + _e(_t('rdm.c.extra', 'În plus')) + '</th><th></th></tr></thead><tbody>'
+      + segs.map(function (g, i) {
+        var dets = (g.detours || []).map(function (x) {
+          return '<span class="pill" style="color:#9a3412;background:#ffedd5;" title="' + _e(detLabel(x.reason) + ' · ' + _n(x.stop_min, 0) + ' min') + '">'
+            + (DET_ICON[x.reason] || '•') + ' ' + _n(x.excused_km) + ' km</span>';
+        }).join('');
+        var extra = g.status === 'deviation'
+          ? '<b style="color:#b45309;">+' + _n(g.extra_km) + ' km</b><div class="m">' + _h(g.extra_h) + ' · ' + _n(g.extra_l) + ' L'
+            + (g.extra_toll ? ' · ' + _eur(g.extra_toll) : '') + '</div>'
+          : (g.status === 'ok' ? '—' : '');
+        var st = g.status === 'no_data'
+          ? '<span class="m">' + _e(g.reason === 'time' ? _t('rdm.segNoTime', 'fără ore') : _t('rdm.segNoGps', 'fără GPS')) + '</span>'
+          : statusBadge(g.status);
+        return '<tr class="' + (g.status === 'deviation' ? 'dev' : '') + '"><td>' + (i + 1) + '</td><td>' + _e(g.from || '?') + ' → ' + _e(g.to || '?')
+          + (g.empty ? ' <span class="pill" style="color:#334155;background:#f1f5f9;border:1px dashed #64748b;">' + _e(_t('oc.legEmpty', 'gol')) + '</span>' : '')
+          + '</td><td>' + _n(g.planned_km) + ' km</td><td>' + _n(g.actual_km) + ' km</td><td>' + (dets || '—') + '</td><td>' + extra + '</td><td>' + st + '</td></tr>';
+      }).join('') + '</tbody></table></div></div>';
   }
 
   function kpi(label, val, cls) { return '<div class="rdm-kpi' + (cls ? ' ' + cls : '') + '"><b>' + val + '</b><span>' + _e(label) + '</span></div>'; }
@@ -131,7 +165,11 @@
       html += kpi(_t('rdm.k.planned', 'Planificat'), _n(it.planned_km) + ' km')
         + kpi(_t('rdm.k.actual', 'Parcurs (GPS)'), _n(it.actual_km) + ' km')
         + (it.empty_km != null ? kpi(_t('rdm.k.empty', 'din care gol'), _n(it.empty_km) + ' km', it.empty_km > 0 ? 'warn' : '') : '')
-        + kpi(_t('rdm.k.diff', 'Diferență'), _sign(it.diff_km) + ' km' + (it.diff_pct != null ? ' (' + _sign(it.diff_pct) + '%)' : ''), it.status === 'deviation' ? 'warn' : it.status === 'ok' ? 'ok' : '')
+        + kpi(_t('rdm.k.diff', 'Diferență'), _sign(it.diff_km) + ' km' + (it.diff_pct != null ? ' (' + _sign(it.diff_pct) + '%)' : ''))
+        + kpi(_t('rdm.k.extraShort', 'Km în plus față de traseul mai scurt'), _n(it.extra_km) + ' km', it.status === 'deviation' ? 'warn' : it.status === 'ok' ? 'ok' : '')
+        + (it.seg_summary ? kpi(_t('rdm.k.excused', 'Ocoliri justificate (alimentare / pauză)'), _n(it.seg_summary.excused_km) + ' km')
+          + (it.status === 'deviation' ? kpi(_t('rdm.k.extraCost', 'Cost în plus (timp · motorină · taxă)'), _h(it.seg_summary.extra_h) + ' · ' + _n(it.seg_summary.extra_l) + ' L'
+            + (it.seg_summary.extra_toll ? ' · ' + _eur(it.seg_summary.extra_toll) : ''), 'warn') : '') : '')
         + kpi(_t('rdm.k.offKm', 'Km în afara traseului'), _n(s.off_km) + ' km' + (s.off_pct != null ? ' (' + _n(s.off_pct) + '%)' : ''), s.off_km > 0 ? 'warn' : '')
         + kpi(_t('rdm.k.maxOff', 'Abatere maximă'), _n(s.max_off_km) + ' km')
         + kpi(_t('rdm.k.duration', 'Durată totală'), _h(s.duration_h))
@@ -163,6 +201,7 @@
       if (it.reason === 'no_here' && it.free_reason && window.vsMapsReasonText) msg += ' (' + window.vsMapsReasonText(it.free_reason) + ')';
       html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(msg) + '</div>';
     }
+    if (it && it.segments && it.segments.length && it.status !== 'no_data') html += segTable(it);
     if (!it && d.meta && d.meta.truncated) html += '<div class="rdm-sub" style="margin-top:6px;">' + _e(_t('rdm.truncated', 'Se afișează primele 40 de curse (abaterile cele mai mari).')) + '</div>';
     el.innerHTML = html;
   }
@@ -182,7 +221,8 @@
           + '<td>' + _n(it.planned_km) + ' km<div class="m"' + '>' + _e(it.source === 'here' ? 'HERE' : '') + '</div></td>'
           + '<td>' + _n(it.actual_km) + ' km<div class="m">' + _e(it.km_source === 'odo' ? _t('rdm.odo', 'odometru') : it.km_source ? 'GPS' : '') + '</div></td>'
           + '<td>' + _n(s.off_km) + ' km<div class="m">max ' + _n(s.max_off_km) + ' km</div></td>'
-          + '<td>' + statusBadge(it.status) + (it.diff_km != null ? '<div style="margin-top:3px;">' + _sign(it.diff_km) + ' km (' + _sign(it.diff_pct) + '%)</div>' : '') + '</td></tr>';
+          + '<td>' + statusBadge(it.status) + (it.status === 'deviation' && it.extra_km != null ? '<div style="margin-top:3px;"><b>+' + _n(it.extra_km) + ' km</b></div>' : '')
+          + (it.diff_km != null ? '<div class="m">' + _sign(it.diff_km) + ' km (' + _sign(it.diff_pct) + '%)</div>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
 
@@ -200,7 +240,16 @@
       L.marker([w.lat, w.lng], { icon: numIcon(i + 1, w.kind) })
         .bindTooltip((w.kind === 'pickup' ? '⬆ ' : '⬇ ') + _e(w.loc || ''), { direction: 'top' }).addTo(group);
     });
-    var tip = '<b>' + _e(it.fuvar_no || it.order_id) + '</b><br>' + _n(it.planned_km) + ' → ' + _n(it.actual_km) + ' km (' + _sign(it.diff_km) + ' km)';
+    if (!dim) (it.segments || []).forEach(function (g) {
+      (g.detours || []).forEach(function (x) {
+        if (x.lat == null || x.lng == null) return;
+        L.marker([x.lat, x.lng], { icon: L.divIcon({ className: '', html: '<div class="rdm-det">' + (DET_ICON[x.reason] || '•') + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] }) })
+          .bindTooltip(_e(detLabel(x.reason)) + ' · ' + _n(x.stop_min, 0) + ' min · ' + _n(x.excused_km) + ' km ' + _e(_t('rdm.det.notCounted', 'nu se socotește abatere')), { direction: 'top' })
+          .addTo(group);
+      });
+    });
+    var tip = '<b>' + _e(it.fuvar_no || it.order_id) + '</b><br>' + _n(it.planned_km) + ' → ' + _n(it.actual_km) + ' km'
+      + (it.status === 'deviation' ? ' · +' + _n(it.extra_km) + ' km ' + _t('rdm.k.extraTip', 'față de traseul mai scurt') : '');
     group.eachLayer(function (l) { if (l instanceof L.Polyline && !l._rdmTip) { l._rdmTip = 1; l.bindTooltip(tip, { sticky: true }); } });
   }
 

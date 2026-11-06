@@ -340,22 +340,24 @@ async function _routeDeviation(cid) {
   const out = [];
   try {
     const r = await pool.query(
-      `SELECT d.order_id, d.planned_km, d.actual_km, d.diff_km, d.diff_pct, o.fuvar_no
+      `SELECT d.order_id, d.planned_km, d.actual_km, d.diff_km, d.diff_pct, o.fuvar_no,
+              COALESCE((to_jsonb(d)->>'extra_km')::numeric, d.diff_km) AS extra_km
          FROM order_route_deviation d
          JOIN orders o ON o.id = d.order_id AND o.company_id = d.company_id
         WHERE d.company_id=$1 AND d.status='deviation' AND d.checked_at > NOW() - INTERVAL '30 days'
-        ORDER BY d.diff_km DESC LIMIT 5`, [cid]);
+        ORDER BY 7 DESC NULLS LAST LIMIT 5`, [cid]);
     r.rows.forEach((x) => {
-      const pct = Number(x.diff_pct) || 0;
+      const ek = Number(x.extra_km) || 0;
+      const pct = Number(x.planned_km) > 0 ? Math.round(ek / Number(x.planned_km) * 1000) / 10 : (Number(x.diff_pct) || 0);
       out.push({
         id: 'routedev-' + x.order_id,
         area: 'ops',
         severity: pct >= 15 ? 'danger' : 'warn',
         icon: '🛣️',
         key: 'route_deviation',
-        title: (x.fuvar_no || x.order_id) + ': +' + Number(x.diff_km) + ' km',
-        detail: 'Planificat ' + Number(x.planned_km) + ' km · GPS ' + Number(x.actual_km) + ' km (+' + pct + '%)',
-        value: Number(x.diff_km) || 0,
+        title: (x.fuvar_no || x.order_id) + ': +' + ek + ' km',
+        detail: 'Exista un traseu mai scurt pentru camion · plan ' + Number(x.planned_km) + ' km · GPS ' + Number(x.actual_km) + ' km',
+        value: ek,
         tab: 'ops',
         entity_type: 'order',
         entity_id: x.order_id,
