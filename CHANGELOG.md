@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-06 — 📄 Menetlevél: a GPS szerinti cím MINDEN pontra rákerül — a fuvar szerkesztése nem tépi el a kötést (PR #620)
+- **Kérés (MT-2026-0031 PDF):** a menetlevélen a 9 pontból csak egynél jelent meg a GPS szerinti cím, a többinél maradt a tervezett — pedig ezeket a helyeket a rendszer ismeri.
+- **Gyökér:** a `lib/orderStops.js` `replaceStopsForOrder` minden fuvar-szerkesztéskor TÖRÖLTE és újra beszúrta a fuvar összes állomását → új azonosítót kaptak. A menetlevél pontjai (`puncte[].stopId`) a régi azonosítóra mutattak („elárvultak"), így a rátétel nem talált rájuk; közben az állomás GPS-felismerése (`actual_*`/`match_*`) és a UIT-kód állomás-kötése is elveszett. A naponta bővülő (Arad → Copșa → Cluj → Copșa …) fuvarokat érintette a leginkább.
+- **Javítás 1 — helyben frissítés** (`replaceStopsForOrder` + új `pairStops`): a meglévő állomás megtartja az azonosítóját; párosítás fajtán belül: kliens által küldött id → azonos hely + dátum → azonos hely (ékezet-független) → azonos sorszám. Ami megszűnt, törlődik; ami új, beszúródik. Ha egy megtartott állomás helye átíródott, a cím-felismerés újrafut rá (a kézzel megerősítettet nem bántja), a fuvar újra sorba áll.
+- **Javítás 2 — elárvult pontok újrakötése** (`lib/stopWaybill.js` `orphanIndexes`/`stopDays`): a régi vagy hiányzó `stopId`-s pontot a rátétel a fuvar még szabad, azonos fajtájú állomásához köti — a pont dátuma szerint (tervezett nap, gombnyomás UTC/helyi napja), ennek hiányában sorrend szerint, ha a darabszám egyezik; kétes esetben nem tippel. A pont `stopId`-je a jelenlegi állomásra javul.
+- **Egyszeri pótlás** (`db/zzz-stop-waybill-orphan-relink.sql`): a már rátételt kért / megerősített állomások újra sorba állnak, az ütemező a meglévő menetleveleken is elvégzi a rátételt.
+- Tesztek: +10 eset (köztük valódi DB: szerkesztés után az azonosító, a gombnyomás és a GPS-cím megmarad); 2263 Jest zöld valós Postgres 16-tal.
+
 ## 2026-11-06 — 🏁 Rövid lerakás: a sofőr gombnyomása is „ismert hellyé" teszi a rakodóhelyet (PR #619)
 - **Kérés:** a #618 után a mai rebati (Copșa Mică) 5 perces lerakást a rendszer még mindig nem ajánlotta fel. **Ok:** a rövid állás csak ismert helyen jelölt; ismert hely eddig csak irodai elfogadásból / biztos vagy megerősített testvér-állomásból / pontos cég-geokódból lett — a korábbi rebati lerakások viszont csak „javaslat" állapotban voltak, a „Rebat" nevet a térkép nem ismeri.
 - **Új** (`lib/stopMatch.js` `pressSites` / `pointAt`): ugyanannak a helynek a többi állomásánál a sofőr „kész" (ennek hiányában „odaértem") gombnyomásának pillanatában álló kamion helye is ismert hely — ha legalább két állomás gombnyomása ugyanott (300 m) volt, vagy a gombnyomás helye egyezik az állomás GPS-ből felismert helyével. Menet közben megnyomott gomb nem számít (félrenyomás-védelem). A runner a testvér-állomásokra hívja (`matchOrder`).

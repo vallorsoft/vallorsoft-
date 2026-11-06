@@ -71,6 +71,40 @@ d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
     expect(o.email_sofer).toBe('driver@x.hu');
   });
 
+  test('comUpdate stops[]: szerkesztés után az állomások azonosítója és GPS-adata megmarad (menetlevél-kötés)', async () => {
+    const res = makeRes();
+    await orders.comCreate(admin(companyId), res, [{
+      client: 'Ügyfél', load_type: 'FTL', sofer_type: 'Intern', email_sofer: DRIVER, nume_sofer: 'Sofőr D',
+      stops: [{ kind: 'pickup', loc: 'Arad', data: '2026-10-19' }, { kind: 'delivery', loc: 'Copșa Mică', data: '2026-10-20' }],
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const id = res.body.result.id;
+    const before = (await pool.query('SELECT id, kind, loc FROM order_stops WHERE order_id=$1 ORDER BY seq_index', [id])).rows;
+    expect(before.length).toBe(2);
+    await pool.query(`UPDATE order_stops SET done_at = NOW(), actual_address = 'Copșa Mică (46.11772, 24.23624)',
+                        match_status = 'auto', match_score = 90 WHERE id = $1`, [before[1].id]);
+    // a diszpécser hozzáad egy újabb felrakót + lerakót (a régiek a helyükön)
+    const r2 = makeRes();
+    await orders.comUpdate(admin(companyId), r2, [id, { stops: [
+      { kind: 'pickup', loc: 'Arad', data: '2026-10-19' }, { kind: 'delivery', loc: 'Copșa Mică', data: '2026-10-20' },
+      { kind: 'pickup', loc: 'Cluj-Napoca', data: '2026-10-20' }, { kind: 'delivery', loc: 'Copșa Mică', data: '2026-10-21' },
+    ] }]);
+    expect(r2.body.result.ok).toBe(true);
+    const after = (await pool.query(
+      'SELECT id, kind, loc, seq_index, done_at, actual_address, match_status FROM order_stops WHERE order_id=$1 ORDER BY seq_index', [id])).rows;
+    expect(after.length).toBe(4);
+    expect(after[0].id).toBe(before[0].id);
+    expect(after[1].id).toBe(before[1].id);
+    expect(after[1].done_at).not.toBeNull();
+    expect(after[1].actual_address).toBe('Copșa Mică (46.11772, 24.23624)');
+    expect(after[1].match_status).toBe('auto');
+    expect(after.map((x) => x.loc)).toEqual(['Arad', 'Copșa Mică', 'Cluj-Napoca', 'Copșa Mică']);
+    // a fuvar mirror-mezői a trigger szerint (első felrakó, utolsó lerakó)
+    const o = (await pool.query('SELECT loc_incarcare, loc_descarcare FROM orders WHERE id=$1', [id])).rows[0];
+    expect(o.loc_incarcare).toBe('Arad');
+    expect(o.loc_descarcare).toBe('Copșa Mică');
+  });
+
   test('finalized_at TRIGGER: Finalizat-ra váltáskor beáll, egyébként null marad', async () => {
     await pool.query("INSERT INTO orders (id, company_id, status) VALUES ('CMD-T1', $1, 'Alocat')", [companyId]);
     await pool.query("UPDATE orders SET status = 'In Curs' WHERE id = 'CMD-T1'");

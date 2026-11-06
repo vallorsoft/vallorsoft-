@@ -72,40 +72,89 @@ describe('lib/orderStops.normalizeStops', () => {
 });
 
 describe('lib/orderStops.replaceStopsForOrder', () => {
-  function mockDb() {
+  function mockDb(prevRows) {
     const calls = [];
     return {
       calls,
       query: jest.fn(async (sql, params) => {
         calls.push({ sql: String(sql).replace(/\s+/g, ' ').trim(), params });
         if (/^SELECT id, kind, stop_index/.test(sql.trim())) {
-          // Simulálunk 1 meglévő pickup stopot arrived_at-tel
-          return { rows: [{ id: 100, kind: 'pickup', stop_index: 0,
-                            arrived_at: 'ts1', done_at: null, waybilled_at: null }] };
+          return { rows: prevRows || [{ id: 100, kind: 'pickup', stop_index: 0, loc: 'X', data: null }] };
         }
         return { rows: [], rowCount: 1 };
       }),
     };
   }
+  const kinds = (db, re) => db.calls.filter((c) => re.test(c.sql));
 
-  test('törli a régi stopokat, beszúrja az újakat, megőrzi az arrived_at-et', async () => {
+  test('a meglévő állomás azonosítója megmarad (helyben frissül), az új beszúródik', async () => {
     const db = mockDb();
     const norm = { pickups: [{ kind: 'pickup', stop_index: 0, loc: 'X', firma: null, data: null, ref: null }],
                    deliveries: [{ kind: 'delivery', stop_index: 0, loc: 'Y', firma: null, data: null, ref: null }] };
     await orderStops.replaceStopsForOrder(db, 'CMD-1', 42, norm);
-    // 1 SELECT + 1 DELETE + 2 INSERT
-    expect(db.calls.length).toBe(4);
     expect(db.calls[0].sql).toMatch(/^SELECT id, kind, stop_index/);
-    expect(db.calls[1].sql).toMatch(/^DELETE FROM order_stops/);
-    expect(db.calls[2].sql).toMatch(/INSERT INTO order_stops/);
-    // Új oszlop-sorrend: (order_id, company_id, kind, stop_index, seq_index,
-    // loc, firma, data, ref, arrived_at, done_at, waybilled_at) → arrived_at $10.
-    expect(db.calls[2].params[9]).toBe('ts1');
-    // A delivery új stop, arrived_at NULL
-    expect(db.calls[3].params[9]).toBeNull();
-    // seq_index a bevitel sorrendje szerint: pickup 0, delivery 1
-    expect(db.calls[2].params[4]).toBe(0);
-    expect(db.calls[3].params[4]).toBe(1);
+    const up = kinds(db, /^UPDATE order_stops SET stop_index/);
+    expect(up.length).toBe(1);
+    expect(up[0].params[0]).toBe(100);            // ugyanaz az id
+    expect(kinds(db, /^DELETE FROM order_stops/).length).toBe(0);
+    const ins = kinds(db, /INSERT INTO order_stops/);
+    expect(ins.length).toBe(1);
+    expect(ins[0].params[2]).toBe('delivery');
+    expect(ins[0].params[9]).toBeNull();          // új stop: arrived_at NULL
+    expect(ins[0].params[4]).toBe(1);             // seq_index
+  });
+
+  test('beszúrt köztes állomás: a régiek a HELYÜK alapján tartják az azonosítót', async () => {
+    const prev = [
+      { id: 1, kind: 'pickup', stop_index: 0, loc: 'Arad', data: '2026-10-19' },
+      { id: 2, kind: 'delivery', stop_index: 0, loc: 'Copsa Mica', data: '2026-10-20' },
+      { id: 3, kind: 'pickup', stop_index: 1, loc: 'Cluj', data: '2026-10-20' },
+    ];
+    const db = mockDb(prev);
+    const n = orderStops.normalizeStops({ stops: [
+      { kind: 'pickup', loc: 'Arad', data: '2026-10-19' },
+      { kind: 'pickup', loc: 'Deva', data: '2026-10-19' },        // új, középre
+      { kind: 'delivery', loc: 'Copșa Mică', data: '2026-10-20' }, // ékezet-független
+      { kind: 'pickup', loc: 'Cluj', data: '2026-10-20' },
+    ] });
+    await orderStops.replaceStopsForOrder(db, 'CMD-3', 42, n);
+    const up = kinds(db, /^UPDATE order_stops SET stop_index/);
+    const byId = Object.fromEntries(up.map((c) => [c.params[0], c.params]));
+    expect(Object.keys(byId).map(Number).sort()).toEqual([1, 2, 3]);
+    expect(byId[3][2]).toBe(2);      // Cluj új stop_index-e 2 (a Deva elé került)
+    expect(byId[3][4]).toBe('Cluj');
+    const ins = kinds(db, /INSERT INTO order_stops/);
+    expect(ins.length).toBe(1);
+    expect(ins[0].params[5]).toBe('Deva');
+    expect(kinds(db, /^DELETE FROM order_stops/).length).toBe(0);
+    // a helyük nem változott → nincs cím-felismerés-reset, de a fuvar újra sorba áll
+    expect(kinds(db, /SET match_status = NULL/).length).toBe(0);
+    expect(kinds(db, /UPDATE stop_match_state SET requeued = true/).length).toBe(1);
+  });
+
+  test('törölt állomás törlődik, átírt helyű állomás újra felismerésre kerül', async () => {
+    const prev = [
+      { id: 7, kind: 'delivery', stop_index: 0, loc: 'Copsa Mica', data: null },
+      { id: 8, kind: 'delivery', stop_index: 1, loc: 'Medias', data: null },
+    ];
+    const db = mockDb(prev);
+    const n = orderStops.normalizeStops({ stops: [{ kind: 'delivery', loc: 'Sibiu' }] });
+    await orderStops.replaceStopsForOrder(db, 'CMD-4', 42, n);
+    const up = kinds(db, /^UPDATE order_stops SET stop_index/);
+    expect(up.length).toBe(1);
+    expect(up[0].params[0]).toBe(7);               // sorszám alapján (0)
+    const del = kinds(db, /^DELETE FROM order_stops/);
+    expect(del[0].params[2]).toEqual([8]);
+    const reset = kinds(db, /SET match_status = NULL/);
+    expect(reset.length).toBe(1);
+    expect(reset[0].params[1]).toEqual([7]);
+  });
+
+  test('pairStops: a kliens által küldött id elsőbbséget kap', () => {
+    const prev = [{ id: 5, kind: 'pickup', stop_index: 0, loc: 'A' }, { id: 6, kind: 'pickup', stop_index: 1, loc: 'B' }];
+    const r = orderStops.pairStops([{ id: 6, kind: 'pickup', stop_index: 0, loc: 'A' }], prev);
+    expect(r.pairs.get(0).id).toBe(6);
+    expect(r.unmatched.map((x) => x.id)).toEqual([5]);
   });
 
   test('stops[] ordered — interleaved sorrend megőrizve seq_index-ben', async () => {
@@ -128,13 +177,13 @@ describe('lib/orderStops.replaceStopsForOrder', () => {
     expect(n.deliveries.map((s) => s.stop_index)).toEqual([0, 1]);
 
     await orderStops.replaceStopsForOrder(db, 'CMD-2', 42, n);
-    // 1 SELECT + 1 DELETE + 4 INSERT
-    expect(db.calls.length).toBe(6);
-    // seq_index a bevitel sorrendjében kerül a DB-be ($5)
-    const seqIndexes = db.calls.slice(2).map((c) => c.params[4]);
-    expect(seqIndexes).toEqual([0, 1, 2, 3]);
-    // A megfelelő kind is a helyén ($3)
-    const kinds = db.calls.slice(2).map((c) => c.params[2]);
-    expect(kinds).toEqual(['pickup', 'delivery', 'pickup', 'delivery']);
+    // a meglévő pickup#0 (X) sorszám alapján helyben frissül (P1), a többi beszúródik
+    const up = kinds(db, /^UPDATE order_stops SET stop_index/);
+    expect(up.length).toBe(1);
+    expect(up[0].params[0]).toBe(100);
+    expect(up[0].params[3]).toBe(0);              // seq_index
+    const ins = kinds(db, /INSERT INTO order_stops/);
+    expect(ins.map((c) => c.params[4])).toEqual([1, 2, 3]);
+    expect(ins.map((c) => c.params[2])).toEqual(['delivery', 'pickup', 'delivery']);
   });
 });
