@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-06 — 🛡️ Cégenkénti éjszakai biztonsági mentés Google Drive-ba (PR #615)
+- **Cél:** ha támadás/hiba miatt adat törlődik, legyen teljes, friss másolat. Minden éjjel (a cég által beállított órában, alap 02:00 Europe/Bucharest) a cég ÖSSZES adatáról — minden `company_id`-s tábla (106 tábla: fuvarok, állomások, menetlevelek, dokumentumok + fotók base64-ben, GPS-útvonalak, számlák…), a sofőr-e-mailhez kötött naplók (határátlépések) és maga a cég-sor — titkosított pillanatkép készül.
+- **Hova:** (1) a cég SAJÁT Google Drive-jára, ha az Admin összekötötte (Integrációk → 🛡️ Biztonsági mentés; „VallorSoft – Backup" mappa; onnan mi nem törlünk, csak ha a cég megőrzési korlátot állít: örökre/1 év/6 hó/3 hó); (2) a VallorSoft saját Drive-jára (developer → 🛡️ Biztonsági mentés fül; minden aktív cégről; 30 nap után automatikusan törlődik).
+- **Új:** `db/company-backup.sql` (`company_backup_settings`, `company_backup_runs`), `lib/googleDrive.js` (OAuth2 + Drive v3, függőség nélkül, `drive.file` jogosultság), `lib/backupFile.js` (`.vsbk`: gzip NDJSON, AES-256-GCM, cégenkénti HKDF-kulcs — `lib/crypto.deriveKey`), `services/companyBackup.js` (táblák felderítése, lapozott mentés, feltöltés, megőrzés, ütemező 10 percenként), `routes/backup.js` (OAuth connect/callback, munkamenethez kötött egyszeri state), `handlers/backup.js` (`backupGetStatus`/`SaveSettings`/`Disconnect`/`RunNow`, `devBackupStatus`/`VsDisconnect`), `public/backup-card.js`, funkció-kapcsoló `drive-backup`.
+- **Beállítandó:** Fly.io secret `GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET`; a Google Cloud konzolban redirect URI: `https://vallorsoft.fly.dev/api/backup/google/callback`; a hozzájárulási képernyőt „In production"-re kell állítani (Testing módban a token 7 nap után lejár). Enélkül a kártya „nincs beállítva" jelzést mutat, az ütemező nem fut.
+- **Következő kör (2. PR):** különbség-mentés (új/módosított/törölt), gombnyomásos visszaállítás előnézettel, olvasható ZIP-export.
+- Tesztek: +21 eset (`tests/unit/companyBackup.test.js`); valós Postgres 16-on 2215 Jest zöld + próba-mentés (106 tábla, visszafejtve).
+
 ## 2026-11-06 — 📍 „Fel- és lerakóhelyek GPS-ből" az Adminisztrációban (PR #614)
 - A korábbi Flotta → „Tényleges címek (GPS)" menüpont teljes egészében (lista, térkép, beállítások, pontosság) átkerült az **Adminisztráció** főmenübe, admin + manager konzolon.
 - Érthetőbb név: HU „📍 Fel- és lerakóhelyek GPS-ből", RO „📍 Locuri de încărcare / descărcare din GPS"; az oldal címe „… — ellenőrzés és menetlevélre írás"; a fuvar-adatlap blokkja és a funkció-katalógus (developer kapcsoló, csoport: Adminisztráció) is így hívja.

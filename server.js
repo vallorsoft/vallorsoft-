@@ -213,7 +213,8 @@ app.use(require('./routes/client-mail'));
 app.use(require('./routes/developer-export'));
 app.use(require('./routes/blog'));          // publikus blog cikk API
 app.use(require('./routes/trial-select')); // trial csomag-választás + fizetési email
-app.use(require('./routes/subscription-cancel')); // előfizetés-lemondás visszavonása e-mail linkről
+app.use(require('./routes/subscription-cancel'));
+app.use(require('./routes/backup'));          // Google Drive összekötés a cégenkénti biztonsági mentéshez // előfizetés-lemondás visszavonása e-mail linkről
 
 // ===== 404 az ismeretlen API-utakra + GLOBÁLIS HIBAKEZELŐ (végső védőháló) =====
 // A handlerek általában maguk kezelik a hibájukat; ez csak a réseket fogja be,
@@ -257,6 +258,7 @@ function startAllSchedulers() {
   startGpsTrackHistoryScheduler();   // GPS útvonal-előzmény: teljes pont-sor naponként mentve + úthálózatra illesztve
   startStopMatchScheduler();         // tényleges fel-/lerakási címek a GPS-ből (csak Admin/Manager látja)
   startOrderRouteKmScheduler();      // fuvar teljes km (minden állomás, üres km is) + menetlevél Plecare→Sosire
+  require('./services/companyBackup').startCompanyBackupScheduler(); // cégenkénti éjszakai mentés Google Drive-ba
   startChatHistoryCleanup();         // AI-chat beszélgetések: megőrzési idő (alap 365 nap) utáni törlés
 
   // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
