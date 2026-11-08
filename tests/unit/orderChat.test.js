@@ -391,6 +391,35 @@ describe('tanulás', () => {
     expect(pc.clients.map((c) => c.client)).toEqual(['B SRL', 'A SRL']);
   });
 
+  test('szállítmányozó: sok cím → a helység szűr, egész szóra; sok jelöltnél a helységet kérdezi', async () => {
+    const locs = Array.from({ length: 150 }, (_, i) => 'Str. X ' + (i + 1) + ', Oras' + i);
+    locs.push('Str. Aradului 5, Timișoara', 'Str. Mare 1, Arad');
+    const mem = { 'firma_addr:spedit': { loc: locs[0], locs } };
+    mockRules = [{ match: /FROM order_chat_memory/, fn: (sql, p) => { const v = mem[p[1] + ':' + p[2]]; return { rows: v ? [{ value: v }] : [] }; } }];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({ client: 'C', stops: [
+      { kind: 'pickup', loc: 'Arad', firma: 'Spedit', data: '2026-11-09' },
+      { kind: 'delivery', loc: null, firma: 'Spedit', data: '2026-11-10' },
+    ] }), { estimateRoute: false, lang: 'hu' });
+    expect(r.draft.stops[0].loc).toBe('Str. Mare 1, Arad');
+    const q = r.questions.find((x) => x.key === 'stop_site');
+    expect(q.text).toMatch(/152 ismert címe/);
+    expect(q.options).toHaveLength(4);
+    expect(h._townMatch('Str. Aradului 5, Timișoara', 'Arad')).toBe(false);
+  });
+
+  test('tanulás: a lista 300 elemig nő', async () => {
+    const puts = [];
+    const old = Array.from({ length: 299 }, (_, i) => 'Str. ' + i + ', Cluj');
+    mockRules = [
+      { match: /FROM order_chat_memory/, fn: (sql, p) => ({ rows: p[1] === 'firma_addr' ? [{ value: { loc: old[0], locs: old } }] : [] }) },
+      { match: /INSERT INTO order_chat_memory/, fn: (sql, p) => { puts.push([p[1], JSON.parse(p[3])]); return { rows: [] }; } },
+    ];
+    await h._learnFromDraft(7, { stops: [{ kind: 'pickup', loc: 'Str. Noua 9, Brasov', firma: 'Spedit' }] });
+    const fa = puts.find((x) => x[0] === 'firma_addr')[1];
+    expect(fa.locs).toHaveLength(300);
+    expect(fa.locs[0]).toBe('Str. Noua 9, Brasov');
+  });
+
   test('hiányzó memória-tábla → nincs hiba', async () => {
     mockRules = [{ match: /order_chat_memory/, fn: () => { throw new Error('relation does not exist'); } }];
     const r = await h._resolveDraft(7, h._sanitizeDraft({ stops: [{ kind: 'pickup', loc: 'Brasov', firma: 'B', data: '2026-10-12' }] }), { estimateRoute: false });

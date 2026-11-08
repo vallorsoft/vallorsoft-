@@ -93,13 +93,16 @@ const QT = {
   truckNone:    { ro: 'Nu găsesc tractorul {c} în flotă.', hu: 'A(z) {c} vontató nincs a flottában.' },
   trailerNone:  { ro: 'Nu găsesc remorca {c} în flotă.', hu: 'A(z) {c} pótkocsi nincs a flottában.' },
   editLoaded:   { ro: 'Am încărcat cursa {c}. Scrie ce trebuie modificat (ex. „a doua descărcare joi", „alt șofer").', hu: 'Betöltöttem a(z) {c} fuvart. Írd meg, mit módosítsak (pl. „a második lerakás csütörtök", „másik sofőr").' },
+  siteMany:     { ro: '{c} are {n} adrese cunoscute. În ce localitate se încarcă / descarcă? (mai jos: cele mai recente)', hu: 'A(z) {c} cégnek {n} ismert címe van. Melyik helységben? (lent a legutóbbiak)' },
+  clientMany:   { ro: 'De la acest loc de încărcare au venit comenzi de la {n} beneficiari. Cine este acum? (mai jos: cei mai recenți)', hu: 'Erről a felrakóról eddig {n} megrendelő adott fuvart. Most ki a megrendelő? (lent a legutóbbiak)' },
   siteMulti:    { ro: '{c} are mai multe adrese. Care este?', hu: 'A(z) {c} cégnek több címe is van. Melyik?' },
   noChange:     { ro: 'Nu s-a modificat nimic în schiță. Scrie mai exact, de ex. „încărcarea 1: Ploiești" sau „descărcarea de joi: Arad".', hu: 'Nem változott semmi a vázlaton. Írd pontosabban, pl. „1. felrakás helye: Ploiești" vagy „a csütörtöki lerakás: Arad".' },
   editNotFound: { ro: 'Nu găsesc cursa {c} (sau este anulată).', hu: 'Nem találom a(z) {c} fuvart (vagy törölve van).' },
 };
-function qt(lang, key, c) {
+function qt(lang, key, c, n) {
   const e = QT[key] || {};
-  return String(e[lang === 'hu' ? 'hu' : 'ro'] || e.ro || '').replace('{c}', c == null ? '' : String(c));
+  return String(e[lang === 'hu' ? 'hu' : 'ro'] || e.ro || '').replace('{c}', c == null ? '' : String(c))
+    .replace('{n}', n == null ? '' : String(n));
 }
 
 const _str = (v, max) => (v == null ? null : (String(v).trim().slice(0, max) || null));
@@ -236,7 +239,8 @@ async function learnFromDraft(cid, d) {
 }
 
 // Több telephely / több megbízó: a tanult érték lista (régi formátum: egy elem).
-const MEM_LIST_MAX = 10;
+// Szállítmányozónál / nagy megbízónál akár több száz telephely is lehet.
+const MEM_LIST_MAX = 300;
 function _locList(v) {
   if (!v) return [];
   const arr = Array.isArray(v.locs) ? v.locs : (v.loc ? [v.loc] : []);
@@ -252,13 +256,18 @@ function _addFront(list, item, keyFn) {
   const k = keyFn(item);
   return [item].concat(list.filter((x) => keyFn(x) !== k)).slice(0, MEM_LIST_MAX);
 }
+// A cím a beírt helységben van-e — egész szóként (az „Arad" ne illjen az „Aradului utcára").
+function _townMatch(addr, town) {
+  const a = ' ' + _fold(addr) + ' ', t = _fold(town);
+  return !!t && a.includes(' ' + t + ' ');
+}
 // Egy cég ismert címei: kedvenc helyszínek (címke = cégnév) + tanult címek.
 async function _firmaAddrCandidates(cid, firma) {
   const out = []; const seen = new Set();
   const add = (loc, fav) => { const k = _fold(loc); if (k && !seen.has(k)) { seen.add(k); out.push({ loc: String(loc), fav }); } };
   try {
     const r = await pool.query(
-      `SELECT address FROM favorite_locations WHERE company_id=$1 AND LOWER(label)=LOWER($2) ORDER BY id LIMIT 20`, [cid, firma]);
+      `SELECT address FROM favorite_locations WHERE company_id=$1 AND LOWER(label)=LOWER($2) ORDER BY id DESC LIMIT 500`, [cid, firma]);
     r.rows.forEach((x) => x.address && add(x.address, true));
   } catch (_) { /* tábla hiányzik → kihagyjuk */ }
   _locList(await memGet(cid, 'firma_addr', _fold(firma))).forEach((l) => add(l, false));
@@ -456,8 +465,9 @@ async function resolveDraft(cid, input, opts) {
   if (!d.client) {
     missing.push('client');
     const firstPick = (d.stops || []).find((s) => s.kind === 'pickup' && s.firma);
-    const opts = d._client_opts ? d._client_opts.slice(0, 4) : (firstPick ? [firstPick.firma] : []);
-    questions.push({ key: 'client', text: qt(o.lang, 'clientAsk'), options: opts });
+    const co = d._client_opts;
+    const opts = co ? co.slice(0, 4) : (firstPick ? [firstPick.firma] : []);
+    questions.push({ key: 'client', text: co && co.length > 4 ? qt(o.lang, 'clientMany', null, co.length) : qt(o.lang, 'clientAsk'), options: opts });
   }
   delete d._client_opts;
 
@@ -473,12 +483,14 @@ async function resolveDraft(cid, input, opts) {
   for (const s of stops) {
     if (!s.firma || (s.loc && /\d/.test(s.loc))) continue;
     const cands = await _firmaAddrCandidates(cid, s.firma);
-    const pool2 = s.loc ? cands.filter((c) => _fold(c.loc).includes(_fold(s.loc))) : cands;
+    const pool2 = s.loc ? cands.filter((c) => _townMatch(c.loc, s.loc)) : cands;
     if (pool2.length === 1) {
       s.loc = pool2[0].loc.slice(0, 200); s.fav = !!pool2[0].fav; s.learned = !pool2[0].fav;
     } else if (pool2.length > 1 && !askedFirma.has(_fold(s.firma))) {
       askedFirma.add(_fold(s.firma));
-      questions.push({ key: 'stop_site', text: qt(o.lang, 'siteMulti', s.firma + (s.loc ? ' (' + s.loc + ')' : '')),
+      const label = s.firma + (s.loc ? ' (' + s.loc + ')' : '');
+      questions.push({ key: 'stop_site',
+        text: pool2.length > 4 ? qt(o.lang, 'siteMany', label, pool2.length) : qt(o.lang, 'siteMulti', label),
         options: pool2.slice(0, 4).map((c) => (s.firma + ' — ' + c.loc).slice(0, 160)) });
     }
   }
@@ -1020,6 +1032,7 @@ Object.defineProperty(handlers, '_resolveDraft', { value: resolveDraft, enumerab
 Object.defineProperty(handlers, '_today', { value: _today, enumerable: false });
 Object.defineProperty(handlers, '_buildSystemPrompt', { value: buildSystemPrompt, enumerable: false });
 Object.defineProperty(handlers, '_learnFromDraft', { value: learnFromDraft, enumerable: false });
+Object.defineProperty(handlers, '_townMatch', { value: _townMatch, enumerable: false });
 Object.defineProperty(handlers, '_loadOrderDraft', { value: loadOrderDraft, enumerable: false });
 
 module.exports = handlers;

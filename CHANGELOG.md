@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-08 — 💬 Fuvar-chat: szállítmányozó / nagy megbízó — akár több száz cím (PR #627)
+- A tanult cím- és megbízó-lista 10 → 300 elem (legutóbbi elöl); a kedvenc helyszínek közül 500-ig.
+- A beírt helység egész szóra illesztve (`_townMatch` — az „Arad" nem illik az „Aradului" utcára).
+- Sok jelöltnél (> 4) a chat a helységet kérdezi („… N ismert címe van. Melyik helységben?"), a 4 legutóbbit gombként; sok megbízónál ugyanígy. +2 teszt.
+
 ## 2026-11-08 — 💬 Szöveges fuvarkiírás: egy cégnek több telephelye, egy felrakótól több megbízó (PR #626)
 - A tanult `firma_addr` és `pickup_client` most LISTA (max. 10, a legutóbbi elöl; a régi egyelemes érték olvasható marad). A cég kedvenc helyszínei közül is az összes azonos címkéjűt figyeli (eddig csak egyet).
 - Kitöltés csak egyértelmű esetben: beírt helységnél az abban a városban lévő cím; ha több cím / több megbízó illik, a chat rákérdez („A(z) X cégnek több címe is van. Melyik?"), gombokkal. A Tanult adatok fül a teljes listát mutatja. +3 teszt.
