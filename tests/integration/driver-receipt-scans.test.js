@@ -204,6 +204,30 @@ describe('listPendingReceipts', () => {
     expect(res.body.result.err).toMatch(/Email/i);
   });
 
+  test('include_thumb → a thumbnail is a SELECT-ben (eszközök közötti szinkron)', async () => {
+    setUser(fixtures.sofer);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'listPendingReceipts', arguments: [{ include_thumb: true }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.available).toBe(true);
+    expect(pool.query.mock.calls[0][0]).toMatch(/thumb_b64/);
+  });
+
+  test('DB-hiba → available:false (a kliens ne takarítsa a helyi listát)', async () => {
+    setUser(fixtures.sofer);
+    const pool = require('../../db');
+    pool.query.mockRejectedValueOnce(new Error('relation does not exist'));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'listPendingReceipts', arguments: [{}],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.available).toBe(false);
+    expect(res.body.result.items).toEqual([]);
+  });
+
   test('status fehérlista — csak pending|attached|deleted engedélyezett', async () => {
     setUser(fixtures.admin);
     const pool = require('../../db');

@@ -1022,7 +1022,10 @@ function goSec(id) {
   }
   if (id === 'docs')   loadDocOrderOptions();
   // A bon-várólista mindkét helyen látszik (főoldal + menetlevél 1. lépés)
-  if (id === 'dash' || id === 'fuvar') { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); }
+  if (id === 'dash' || id === 'fuvar') {
+    if (typeof renderPendingReceipts === 'function') renderPendingReceipts();
+    if (typeof rcptQueueSyncServer === 'function' && typeof _meData !== 'undefined' && _meData) rcptQueueSyncServer();
+  }
 }
 
 // ============================================================
@@ -1524,7 +1527,13 @@ function pendingAddConfirm() {
   bin.ach  = (bin.ach  || []).filter(function (_a, i) { return !binDelAch[i];  });
   orphanStore(bin);
   // Queue — id-alapján töröljük (a kép is)
-  queueDelIds.forEach(function (id) { try { rcptQueueRemove(id); } catch (_) {} });
+  queueDelIds.forEach(function (id) {
+    try {
+      var qi = rcptQueueLoad().find(function (x) { return x.id === id; });
+      if (qi && qi.pending_id) _rcptServerAttach(qi.pending_id);
+      rcptQueueRemove(id);
+    } catch (_) {}
+  });
   _pendingAddRows = (rowsAlim.length || rowsAch.length) ? { alim: rowsAlim, ach: rowsAch } : null;
   _pendingAddClose();
 }
@@ -2835,6 +2844,87 @@ function rcptQueueRemove(id) {
   rcptQueueStore(q);
   _rcptImgDel(id);
 }
+// A szerver-oldali pending sor 'attached'-re jelölése (best-effort) — hogy
+// a bon ne jöjjön vissza a többi eszköz szinkronjánál.
+function _rcptServerAttach(pendingId) {
+  if (!pendingId) return;
+  try {
+    fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ functionName: 'attachPendingReceipt', arguments: [{ id: pendingId }] })
+    }).catch(function () {});
+  } catch (_) {}
+}
+
+// ── Eszközök közötti szinkron ──
+// A lefotózott + kiolvasott bon a szerveren is megmarad (`driver_receipt_scans`
+// status='pending'), amíg a sofőr menetlevélbe nem teszi vagy el nem dobja.
+// Ha másik telefonról lép be, a szerver pending bonjai bekerülnek a helyi
+// várólistába → ott is elfogadhatók / a menetlevélhez adhatók. A máshol már
+// felhasznált/eldobott bon a helyi listáról is lekerül.
+var _rcptSyncBusy = false;
+function rcptQueueSyncServer() {
+  if (_rcptSyncBusy) return;
+  _rcptSyncBusy = true;
+  var syncStart = Date.now();
+  fetch('/api/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'listPendingReceipts', arguments: [{ include_thumb: true }] })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var r = (d && d.result) || {};
+      if (!r.ok || r.available === false || !Array.isArray(r.items)) return;
+      var serverIds = {};
+      r.items.forEach(function (it) { serverIds[String(it.id)] = it; });
+      var q = rcptQueueLoad();
+      var changed = false;
+      var localIds = {};
+      // 1) Ami máshol már menetlevélbe került / el lett dobva → helyben is ki.
+      q = q.filter(function (it) {
+        if (it && it.pending_id) {
+          localIds[String(it.pending_id)] = true;
+          // Csak a lekérés ELŐTT kész tételt takarítjuk (versenyhelyzet: a
+          // közben elkészült friss scan még nem lehetett a listában), és a
+          // most épp átnézett tételt sem.
+          var stale = (it.readyAt || 0) < syncStart && it.id !== _rrCurrentId;
+          if (stale && !serverIds[String(it.pending_id)]) { changed = true; _rcptImgDel(it.id); return false; }
+        }
+        return true;
+      });
+      // 2) A szerver pending bonjai, amik ezen az eszközön nincsenek meg.
+      r.items.forEach(function (it) {
+        if (localIds[String(it.id)]) return;
+        var f = it.fields || {};
+        if (typeof f === 'string') { try { f = JSON.parse(f); } catch (_) { f = {}; } }
+        var kind = (it.kind === 'fuel' || it.kind === 'purchase') ? it.kind
+                 : (f.kind === 'fuel' ? 'fuel' : 'purchase');
+        var thumb = '';
+        if (typeof it.thumb_b64 === 'string' && it.thumb_b64) {
+          thumb = it.thumb_b64.indexOf('data:') === 0 ? it.thumb_b64 : ('data:image/jpeg;base64,' + it.thumb_b64);
+        }
+        var ts = Date.parse(it.scanned_at);
+        q.push({
+          id: 'srv' + it.id,
+          createdAt: isFinite(ts) ? ts : Date.now(),
+          status: 'ready', kind: kind, fields: f,
+          thumb: thumb, error: null, hasImage: false,
+          pending_id: it.id, fromServer: true
+        });
+        changed = true;
+      });
+      if (!changed) return;
+      q.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+      rcptQueueStore(q);
+      renderPendingReceipts();
+    })
+    .catch(function () { /* offline → a helyi lista marad */ })
+    .then(function () { _rcptSyncBusy = false; });
+}
+
 function rcptNewId() {
   return 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
 }
@@ -3185,6 +3275,7 @@ function _scanReceiptTry(id, payload, attempt) {
             // a rrDiscard pedig 'deleted'-re → az admin-oldali Sofőr-aktivitás
             // nézetben pontosan látszik, mi lett a bonnal.
             pending_id: r.pending_id || null,
+            readyAt: Date.now(),
             attempt: null, maxAttempts: null,
           });
           renderPendingReceipts();
@@ -4707,6 +4798,8 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     // lista kulcsa per-sofőr): megszakadt feldolgozás folytatása a
     // megőrzött képből + gazdátlan képek takarítása.
     rcptQueueMaint();
+    // Más telefonon lefotózott, még menetlevélbe nem tett bonok behúzása.
+    rcptQueueSyncServer();
     // ── ELSŐ BELÉPÉS: átirányítás a /sofer-demo sandbox-ra ──
     // A jelenlegi appra rárakott overlay-tour helyett önálló DEMO oldal —
     // ott minden gomb tényleg működik (lokális state), semmi nem megy
@@ -6343,6 +6436,7 @@ document.addEventListener('visibilitychange', function() {
   try { if (typeof loadSoferMiniStats === 'function') loadSoferMiniStats(); } catch(e) {}
   try { if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle(); } catch(e) {}
   try { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); } catch(e) {}
+  try { if (typeof rcptQueueSyncServer === 'function') rcptQueueSyncServer(); } catch(e) {}
   try { if (window.SoferAutoStops) window.SoferAutoStops.load(); } catch(e) {}
 });
 
