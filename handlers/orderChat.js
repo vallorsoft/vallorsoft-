@@ -105,7 +105,8 @@ function qt(lang, key, c, n) {
     .replace('{n}', n == null ? '' : String(n));
 }
 
-const _str = (v, max) => (v == null ? null : (String(v).trim().slice(0, max) || null));
+// Objektum / tömb (pl. hibás AI-válasz: { name: … }) sosem lesz „[object Object]” szöveg.
+const _str = (v, max) => (v == null || typeof v === 'object' || typeof v === 'function' ? null : (String(v).trim().slice(0, max) || null));
 const _num = (v) => {
   if (v == null || v === '') return null;
   const n = parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
@@ -137,7 +138,8 @@ function _today(now) {
 }
 
 // Módosítást állító válasz (HU / RO) — az őr csak ilyenkor lép közbe.
-const CLAIM_RE = /\b(beirtam|beírtam|atirtam|átírtam|modositottam|módosítottam|frissitettem|frissítettem|javitottam|javítottam|cserel|cserél|beallitottam|beállítottam|hozzaadtam|hozzáadtam|toroltem|töröltem|am (actualizat|modificat|schimbat|corectat|adăugat|adaugat|pus|scris|trecut|șters|sters|setat))/i;
+// (A szó eleje ékezetes betű is lehet — „átírtam” —, ezért nem \b, hanem Unicode-betű előtti határ.)
+const CLAIM_RE = /(?<![\p{L}\p{N}])(beirtam|beírtam|atirtam|átírtam|modositottam|módosítottam|frissitettem|frissítettem|javitottam|javítottam|cserel|cserél|beallitottam|beállítottam|hozzaadtam|hozzáadtam|toroltem|töröltem|am (actualizat|modificat|schimbat|corectat|adăugat|adaugat|pus|scris|trecut|șters|sters|setat))/iu;
 function claimsChange(t) { return CLAIM_RE.test(String(t || '')); }
 
 // ─── Vázlat-tisztítás (AI-ból VAGY a kliensről jövő, megbízhatatlan) ───
@@ -243,13 +245,17 @@ async function learnFromDraft(cid, d) {
 const MEM_LIST_MAX = 300;
 function _locList(v) {
   if (!v) return [];
+  if (typeof v !== 'object') return [];
   const arr = Array.isArray(v.locs) ? v.locs : (v.loc ? [v.loc] : []);
-  return arr.map((x) => String(x || '').trim()).filter(Boolean);
+  return arr.filter((x) => typeof x === 'string' || typeof x === 'number')
+    .map((x) => String(x).trim().slice(0, 200)).filter(Boolean).slice(0, MEM_LIST_MAX);
 }
 function _clientList(v) {
-  if (!v) return [];
+  if (!v || typeof v !== 'object') return [];
   const arr = Array.isArray(v.clients) ? v.clients : (v.client ? [{ client: v.client, client_id: v.client_id || null }] : []);
-  return arr.filter((c) => c && c.client).map((c) => ({ client: String(c.client), client_id: c.client_id || null }));
+  return arr.filter((c) => c && typeof c === 'object' && (typeof c.client === 'string' || typeof c.client === 'number') && String(c.client).trim())
+    .map((c) => ({ client: String(c.client).trim().slice(0, 200), client_id: _int(c.client_id) }))
+    .slice(0, MEM_LIST_MAX);
 }
 // Új elem a lista elejére (a legutóbbi elöl), duplikátum nélkül, max MEM_LIST_MAX.
 function _addFront(list, item, keyFn) {
@@ -1033,6 +1039,10 @@ Object.defineProperty(handlers, '_today', { value: _today, enumerable: false });
 Object.defineProperty(handlers, '_buildSystemPrompt', { value: buildSystemPrompt, enumerable: false });
 Object.defineProperty(handlers, '_learnFromDraft', { value: learnFromDraft, enumerable: false });
 Object.defineProperty(handlers, '_townMatch', { value: _townMatch, enumerable: false });
+Object.defineProperty(handlers, '_locList', { value: _locList, enumerable: false });
+Object.defineProperty(handlers, '_clientList', { value: _clientList, enumerable: false });
+Object.defineProperty(handlers, '_addFront', { value: _addFront, enumerable: false });
+Object.defineProperty(handlers, '_claimsChange', { value: claimsChange, enumerable: false });
 Object.defineProperty(handlers, '_loadOrderDraft', { value: loadOrderDraft, enumerable: false });
 
 module.exports = handlers;
