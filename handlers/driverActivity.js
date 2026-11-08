@@ -427,10 +427,13 @@ handlers.getDriverActivity = async function (req, res, args) {
                 to_jsonb(bc) ->> 'orig_created_at' AS orig_created_at,
                 to_jsonb(bc) ->> 'orig_tip' AS orig_tip,
                 to_jsonb(bc) ->> 'edited_at' AS edited_at,
-                to_jsonb(bc) ->> 'added_by' AS added_by
+                to_jsonb(bc) ->> 'added_by' AS added_by,
+                to_jsonb(bc) ->> 'source' AS source,
+                to_jsonb(bc) ->> 'rendszam' AS rendszam
            FROM border_crossings bc
            JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer) AND u.company_id = $1
           WHERE LOWER(bc.email_sofer) = $2
+            AND COALESCE((to_jsonb(bc) ->> 'ignored')::boolean, false) = false
             AND bc.created_at >= $3::date AND bc.created_at < ($4::date + 1)
           ORDER BY bc.created_at DESC
           LIMIT 200`,
@@ -444,11 +447,13 @@ handlers.getDriverActivity = async function (req, res, args) {
         events.push({
           at: c.created_at, type: 'border', icon: '🛂',
           title: (isIn ? '🇷🇴 Belépés — ' : '🌍 Kilépés — ') + (c.tara || ''),
-          subtitle: c.locatie || '',
+          subtitle: (c.source === 'auto' && c.rendszam ? '🚚 ' + c.rendszam + ' · ' : '') + (c.locatie || ''),
           meta: {
             lat: c.gps_lat, lng: c.gps_lng,
             bc_id: c.id, tip: c.tip, locatie: c.locatie || '',
-            edited: !!c.edited_at, orig_created_at: c.orig_created_at || null,
+            edited: !!c.edited_at,
+            orig_created_at: c.orig_created_at ? (/[zZ]|[+-]\d\d:?\d\d$/.test(c.orig_created_at) ? c.orig_created_at : c.orig_created_at.replace(' ', 'T') + 'Z') : null,
+            auto: c.source === 'auto', rendszam: c.rendszam || null,
             orig_tip: c.orig_tip || null, seq_warn: !!c._seqWarn,
             added: !!c.added_by,
           },

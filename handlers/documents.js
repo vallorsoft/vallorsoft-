@@ -875,7 +875,7 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
       if (!diurnaExt && !diurnaInt && (indulasDt || erkezesDt)) {
         try {
           const tc = emailSofer
-            ? await fetchTripCrossings(pool, emailSofer, d.indulas_date, d.erkezes_date)
+            ? await fetchTripCrossings(pool, emailSofer, d.indulas_date, d.erkezes_date, { companyId: cid, plate: d.numar_camion || null })
             : { inWindow: [], forCalc: [] };
           hataratok = tc.inWindow;
           const dc = calculateDiurna(d.indulas_date || null, d.erkezes_date || null, tc.forCalc);
@@ -1033,7 +1033,19 @@ const BC_COLS = `bc.id, bc.email_sofer, bc.nume_sofer, bc.tip, bc.tara, bc.locat
                  to_jsonb(bc) ->> 'edited_at' AS edited_at,
                  to_jsonb(bc) ->> 'edited_by' AS edited_by,
                  to_jsonb(bc) ->> 'added_by' AS added_by,
+                 to_jsonb(bc) ->> 'source' AS source,
+                 to_jsonb(bc) ->> 'rendszam' AS rendszam,
                  COALESCE((to_jsonb(bc) ->> 'edit_count')::int, 0) AS edit_count`;
+// Az elvetett (iroda által ignorált) automata sorok sehol nem látszanak.
+const BC_NOT_IGNORED = `COALESCE((to_jsonb(bc) ->> 'ignored')::boolean, false) = false`;
+// A to_jsonb a zóna nélküli TIMESTAMP-et zóna nélkül adja ("2026-03-02T10:00:00"),
+// amit a böngésző HELYI időnek venne. A tárolt érték UTC — jelöljük.
+function _utcIso(v) {
+  if (!v) return v;
+  if (v instanceof Date) return v.toISOString();
+  const s = String(v);
+  return /[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z';
+}
 const ADMIN_EDIT_DAYS = 400;    // admin/manager (menetlevél-utólagos javítás)
 
 function _markSequence(rows) {
@@ -1055,8 +1067,11 @@ handlers.getBorderLogs = async function (req, res, args) {
       const cid = req.session.user.company_id;
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
       const r = isAdmin
-        ? await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer) WHERE u.company_id = $1 ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [cid])
-        : await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc WHERE LOWER(bc.email_sofer) = LOWER($1) ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [req.session.user.email]);
+        ? await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
+             WHERE COALESCE((to_jsonb(bc) ->> 'company_id')::int, u.company_id) = $1 AND ${BC_NOT_IGNORED}
+             ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [cid])
+        : await pool.query(`SELECT ${BC_COLS} FROM border_crossings bc WHERE LOWER(bc.email_sofer) = LOWER($1) AND ${BC_NOT_IGNORED} ORDER BY bc.created_at DESC, bc.id DESC LIMIT 200`, [req.session.user.email]);
+      for (const row of r.rows) row.orig_created_at = _utcIso(row.orig_created_at);
       const rows = _markSequence(r.rows);
       for (const row of rows) row.can_edit = isAdmin;   // a sofőr nem módosíthat
       return res.json({ result: rows });
@@ -1072,7 +1087,7 @@ handlers.getBorderLogs = async function (req, res, args) {
 // kézzel. Így egy admin által szándékosan felülírt napidíj nem vész el.
 async function _waybillsForRecalc(email, sinceDate) {
   const r = await pool.query(
-    `SELECT id, indulas_dt, erkezes_dt, diurna_externa, diurna_interna
+    `SELECT id, indulas_dt, erkezes_dt, diurna_externa, diurna_interna, company_id, numar_camion
        FROM fuvarlevelek
       WHERE LOWER(email_sofer) = LOWER($1)
         AND indulas_dt IS NOT NULL AND erkezes_dt IS NOT NULL
@@ -1085,10 +1100,11 @@ async function _waybillsForRecalc(email, sinceDate) {
     const dep = new Date(w.indulas_dt).toISOString();
     const arr = new Date(w.erkezes_dt).toISOString();
     try {
-      const tc = await fetchTripCrossings(pool, email, dep, arr);
+      const opts = { companyId: w.company_id || null, plate: w.numar_camion || null };
+      const tc = await fetchTripCrossings(pool, email, dep, arr, opts);
       const c = calculateDiurna(dep, arr, tc.forCalc);
       if (Number(w.diurna_externa || 0) === c.externDays && Number(w.diurna_interna || 0) === c.internDays) {
-        out.push({ id: w.id, dep, arr });
+        out.push({ id: w.id, dep, arr, opts });
       }
     } catch (_) {}
   }
@@ -1101,7 +1117,7 @@ async function _applyWaybillRecalc(email, recalc) {
   let updated = 0;
   for (const w of recalc || []) {
     try {
-      const tc = await fetchTripCrossings(pool, email, w.dep, w.arr);
+      const tc = await fetchTripCrossings(pool, email, w.dep, w.arr, w.opts);
       const c = calculateDiurna(w.dep, w.arr, tc.forCalc);
       const u = await pool.query(
         `UPDATE fuvarlevelek SET diurna_externa = $2, diurna_interna = $3, hataratok = $4::jsonb
@@ -1128,7 +1144,8 @@ handlers.borderCrossingUpdate = async function (req, res, args) {
       if (!id) return res.json({ result: { ok: false, err: 'ID invalid' } });
 
       const cur = await pool.query(
-        `SELECT bc.id, bc.email_sofer, bc.tip, bc.locatie, bc.created_at, u.company_id
+        `SELECT bc.id, bc.email_sofer, bc.tip, bc.locatie, bc.created_at,
+                COALESCE((to_jsonb(bc) ->> 'company_id')::int, u.company_id) AS company_id
            FROM border_crossings bc
            LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
           WHERE bc.id = $1`, [id]);
@@ -1161,7 +1178,7 @@ handlers.borderCrossingUpdate = async function (req, res, args) {
       const since = new Date(Math.min(oldT.getTime(), newT.getTime()));
       since.setUTCHours(0, 0, 0, 0);
       let recalc = [];
-      try { recalc = await _waybillsForRecalc(row.email_sofer, since); } catch (_) {}
+      try { if (row.email_sofer) recalc = await _waybillsForRecalc(row.email_sofer, since); } catch (_) {}
 
       await pool.query(
         `UPDATE border_crossings SET
@@ -1260,18 +1277,24 @@ handlers.borderCrossingDelete = async function (req, res, args) {
       const id = parseInt(((args && args[0]) || {}).id, 10);
       if (!id) return res.json({ result: { ok: false, err: 'ID invalid' } });
       const cur = await pool.query(
-        `SELECT bc.id, bc.email_sofer, bc.created_at, to_jsonb(bc) ->> 'added_by' AS added_by, u.company_id
+        `SELECT bc.id, bc.email_sofer, bc.created_at, to_jsonb(bc) ->> 'added_by' AS added_by,
+                to_jsonb(bc) ->> 'source' AS source,
+                COALESCE((to_jsonb(bc) ->> 'company_id')::int, u.company_id) AS company_id
            FROM border_crossings bc LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
           WHERE bc.id = $1`, [id]);
       const row = cur.rows[0];
       if (!row || String(row.company_id) !== String(me.company_id)) return res.json({ result: { ok: false, err: 'Trecerea nu a fost găsită' } });
-      if (!row.added_by) return res.json({ result: { ok: false, err: 'Trecerile înregistrate de șofer nu pot fi șterse, doar modificate' } });
+      const isAuto = row.source === 'auto';
+      if (!row.added_by && !isAuto) return res.json({ result: { ok: false, err: 'Trecerile înregistrate de șofer nu pot fi șterse, doar modificate' } });
       const since = new Date(row.created_at); since.setUTCHours(0, 0, 0, 0);
       let recalc = [];
-      try { recalc = await _waybillsForRecalc(row.email_sofer, since); } catch (_) {}
-      await pool.query(`DELETE FROM border_crossings WHERE id = $1`, [id]);
-      const updated = await _applyWaybillRecalc(row.email_sofer, recalc);
-      audit.fromReq(req, 'border.delete', 'border_crossing', id, { waybills_recalc: updated });
+      try { if (row.email_sofer) recalc = await _waybillsForRecalc(row.email_sofer, since); } catch (_) {}
+      // A GPS-ből felismert sort nem töröljük, csak elvetjük — különben a
+      // felismerő a következő körben visszahozná.
+      if (isAuto) await pool.query(`UPDATE border_crossings SET ignored = true, edited_at = NOW(), edited_by = $2 WHERE id = $1`, [id, me.email]);
+      else await pool.query(`DELETE FROM border_crossings WHERE id = $1`, [id]);
+      const updated = row.email_sofer ? await _applyWaybillRecalc(row.email_sofer, recalc) : 0;
+      audit.fromReq(req, isAuto ? 'border.ignore' : 'border.delete', 'border_crossing', id, { waybills_recalc: updated });
       return res.json({ result: { ok: true, waybills_recalc: updated } });
     } catch (err) {
       console.error('borderCrossingDelete hiba:', err);
@@ -1298,11 +1321,13 @@ handlers.previewTripDiurna = async function (req, res, args) {
       if (!indulasDt || !erkezesDt) {
         return res.json({ result: { ok: true, ready: false, crossings: [], days: 0 } });
       }
-      const tc = await fetchTripCrossings(pool, req.session.user.email, indulasDt, erkezesDt);
+      const tc = await fetchTripCrossings(pool, req.session.user.email, indulasDt, erkezesDt,
+        { companyId: req.session.user.company_id, plate: a.camion ? String(a.camion).slice(0, 20) : null });
       const calc = calculateDiurna(indulasDt, erkezesDt, tc.forCalc);
       const out = {
         ok: true,
         ready: true,
+        mode: tc.mode,                       // 'auto' = GPS-geozónából, 'manual' = sofőr-gombokból
         crossings: tc.inWindow,
         days: calc.days != null ? calc.days : (calc.externDays + calc.internDays)
       };

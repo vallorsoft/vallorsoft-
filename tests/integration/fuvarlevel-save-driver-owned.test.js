@@ -46,6 +46,7 @@ function _bodyWithPuncte(orderId) {
 //  1) INSERT INTO document_series ... RETURNING (auto-doc-számláló)
 //  2) SELECT FROM border_crossings (fetchTripCrossings — window)
 //  3) SELECT FROM border_crossings (fetchTripCrossings — seed)
+//  3b) SELECT rendszam FROM vehicles (nincs rendszám → kiosztott vontató; üres → kézi mód)
 //  4) INSERT INTO fuvarlevelek
 //  5) Puncte-loop (per orderId × 2 pont: pickup+delivery):
 //     - SELECT status,email_sofer FROM orders (csak első puncte-nál, cache)
@@ -59,6 +60,7 @@ function _mockCommonPrefix(driverOwned) {
     .mockResolvedValueOnce({ rowCount: 1, rows: [{ prefix: 'MT', current_seq: 1 }] })  // 1) document_series
     .mockResolvedValueOnce({ rows: [] })                                                // 2) border_crossings window
     .mockResolvedValueOnce({ rows: [] })                                                // 3) border_crossings seed
+    .mockResolvedValueOnce({ rows: [] })                                                // 3b) vehicles (kiosztott vontató — nincs → kézi mód)
     .mockResolvedValueOnce({ rowCount: 1, rows: [] })                                   // 4) INSERT fuvarlevelek
     // 5.a) SELECT status,email_sofer FROM orders (1× — a Map cache-eli)
     .mockResolvedValueOnce({ rows: [{ status, email_sofer: email }] });

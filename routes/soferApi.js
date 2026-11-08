@@ -185,9 +185,21 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     const erkezesDt = d.erkezesDt || null;
     let hataratok = [];
     try {
-      const tc = await fetchTripCrossings(pool, req.session.user.email, indulasDt, erkezesDt);
+      const tc = await fetchTripCrossings(pool, req.session.user.email, indulasDt, erkezesDt,
+        { companyId: cid, plate: d.numarCamion || null });
       hataratok = tc.inWindow;                     // ez kerül a menetlevélbe (napló)
       diurnaCalc = calculateDiurna(indulasDt, erkezesDt, tc.forCalc);
+      // A GPS-ből felismert (automata) átlépések a menetlevél sofőrjéhez
+      // kerülnek a naplóban (a felismerő a jármű kiosztott sofőrjét tippelte).
+      const autoIds = tc.inWindow.filter((x) => x.source === 'auto' && x.id).map((x) => x.id);
+      if (autoIds.length) {
+        try {
+          await pool.query(
+            `UPDATE border_crossings SET email_sofer = $1, nume_sofer = $2
+              WHERE id = ANY($3::int[]) AND company_id = $4 AND source = 'auto' AND edited_at IS NULL`,
+            [req.session.user.email, req.session.user.nume || null, autoIds, cid]);
+        } catch (_) { /* best-effort */ }
+      }
     } catch (diurnaErr) {
       console.error('diurna számítás hiba (a mentés folytatódik):', diurnaErr.message);
     }

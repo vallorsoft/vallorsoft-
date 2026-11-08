@@ -1203,16 +1203,18 @@ function loadBorderLog() {
     if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">' + t('sof.noCross') + '</div>'; return; }
     // A szerver a (módosított) időpont szerint rendezve adja — legújabb elöl.
     el.innerHTML = list.slice(0, 20).map(function(l) {
-      var dt = l.created_at ? new Date(l.created_at).toLocaleString(t('sof.locale')) : '—';
+      var RO_TZ = { timeZone: 'Europe/Bucharest' };
+      var dt = l.created_at ? new Date(l.created_at).toLocaleString(t('sof.locale'), RO_TZ) : '—';
       // A `locatie` DB-ből jön (a sofőr saját beküldése), ezért escape-elni
       // kell — különben egy rosszindulatú `/api/border-cross` hívás tárolt
       // XSS-t okozna a saját fuvarnaplójában (és bárkinél, aki a listát
       // megnyitja).
       var badges = '';
       if (l.edited_at) {
-        var orig = l.orig_created_at ? new Date(l.orig_created_at).toLocaleString(t('sof.locale')) : '';
+        var orig = l.orig_created_at ? new Date(l.orig_created_at).toLocaleString(t('sof.locale'), RO_TZ) : '';
         badges += '<span class="bc-badge edited" title="' + esc(t('bce.origAt') + ' ' + orig) + '">✏️ ' + esc(t('bce.edited')) + '</span>';
       }
+      if (l.source === 'auto') badges += '<span class="bc-badge" title="' + esc(t('bce.autoTip')) + '">🛰️ ' + esc(t('bce.auto')) + '</span>';
       if (l.seq_warn) badges += '<span class="bc-badge warn" title="' + esc(t('bce.seqWarnTip')) + '">⚠️ ' + esc(t('bce.seqWarn')) + '</span>';
       // Javítani csak az iroda tud (Sofőr-aktivitás / AI-chat) — itt csak olvasható.
       return '<div class="border-log-item">'
@@ -3714,7 +3716,8 @@ function updateDiurnaPreview() {
 
   // Ugyanarra az ablakra nem kérdezünk újra (a puncte-konténer minden
   // billentyűleütésre `input` eseményt küld a sync-en át).
-  var key = dep + '|' + arr;
+  var camion = ((document.getElementById('fCamion') || {}).value || '').trim();
+  var key = dep + '|' + arr + '|' + camion;
   if (key === _diurnaLastKey) return;
   _diurnaLastKey = key;
 
@@ -3722,7 +3725,7 @@ function updateDiurnaPreview() {
   _diurnaTimer = setTimeout(function () {
     fetch('/api/execute', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ functionName: 'previewTripDiurna', arguments: [{ indulasDt: dep, erkezesDt: arr }] })
+      body: JSON.stringify({ functionName: 'previewTripDiurna', arguments: [{ indulasDt: dep, erkezesDt: arr, camion: camion }] })
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -3753,6 +3756,11 @@ function _renderDiurnaBox(dep, arr, r) {
   }
 
   var list = r.crossings || [];
+  if (!list.length && r.mode === 'auto') {
+    el.className = 'diurna-box empty';
+    el.innerHTML = head + '<div class="diurna-hint">' + esc(t('sof.dr.autoNone')) + '</div>';
+    return;
+  }
   if (!list.length) {
     // Nincs átlépés az ablakban — ez lehet teljesen helyes (belföldi út),
     // de ha külföldön járt, most tudja pótolni. Gomb a főoldali rögzítőre.
@@ -3768,12 +3776,13 @@ function _renderDiurnaBox(dep, arr, r) {
     var isIn = c.direction === 'IN';
     var when = '';
     try { when = new Date(c.datetime).toLocaleString(t('sof.locale'), {
-      month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+      timeZone: 'Europe/Bucharest', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
     catch (e) { when = String(c.datetime || ''); }
     return '<div class="diurna-row">'
       + '<span class="diurna-dir ' + (isIn ? 'in' : 'out') + '">'
       + esc(isIn ? t('sofer.crossIn') : t('sofer.crossOut')) + '</span>'
       + '<span class="diurna-when">' + esc(when) + '</span>'
+      + (c.source === 'auto' ? '<span class="diurna-loc" title="' + esc(t('bce.autoTip')) + '">🛰️ ' + esc(t('bce.auto')) + '</span>' : '')
       + (c.locatie ? '<span class="diurna-loc">📍 ' + esc(c.locatie) + '</span>' : '')
       + '</div>';
   }).join('');
@@ -3782,9 +3791,11 @@ function _renderDiurnaBox(dep, arr, r) {
   el.innerHTML = head
     + '<div class="diurna-count">' + list.length + ' ' + esc(t('sofer.crossingCount')) + '</div>'
     + rows
-    + '<div class="diurna-hint">' + esc(t('sof.dr.hint')) + '</div>'
-    + '<button type="button" class="diurna-go" onclick="goSec(\'border\')">'
-    + esc(t('sof.dr.goRecord')) + '</button>';
+    + (r.mode === 'auto'
+      ? '<div class="diurna-hint">' + esc(t('sof.dr.auto')) + '</div>'
+      : '<div class="diurna-hint">' + esc(t('sof.dr.hint')) + '</div>'
+        + '<button type="button" class="diurna-go" onclick="goSec(\'border\')">'
+        + esc(t('sof.dr.goRecord')) + '</button>');
 }
 
 // ============================================================
