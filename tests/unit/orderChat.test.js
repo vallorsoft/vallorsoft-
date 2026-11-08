@@ -333,6 +333,27 @@ describe('tanulás', () => {
     expect(r.draft.stops[0].loc).toBe('Cluj');
   });
 
+  test('mentett helyszín nem írja felül a diszpécser által beírt más helységet', async () => {
+    mockRules = [{ match: /FROM favorite_locations/, rows: [{ address: 'Policlinica AS, Strada Făt Frumos, Arad, 310364, RO' }] }];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({ client: 'C', stops: [
+      { kind: 'pickup', loc: 'Ploiești', firma: 'Vesna GC', data: '2026-11-09' },
+      { kind: 'pickup', loc: null, firma: 'Vesna GC', data: '2026-11-10' },
+      { kind: 'pickup', loc: 'Arad', firma: 'Vesna GC', data: '2026-11-11' },
+    ] }), { estimateRoute: false });
+    expect(r.draft.stops[0].loc).toBe('Ploiești');
+    expect(r.draft.stops[0].fav).toBeFalsy();
+    expect(r.draft.stops[1].loc).toMatch(/Făt Frumos/);
+    expect(r.draft.stops[2].loc).toMatch(/Făt Frumos/);
+  });
+
+  test('ha az AI módosítást állít, de a vázlat nem változott → őszinte válasz', async () => {
+    const prev = { client: 'C', stops: [{ kind: 'pickup', loc: 'Arad', firma: 'Vesna GC', data: '2026-11-09' }, { kind: 'delivery', loc: 'Copșa Mică', data: '2026-11-10' }], load_type: 'FTL' };
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'Rendben, beírtam Ploiești-t a hétfői felrakáshoz.', draft: prev, questions: [] } });
+    const r = await call('orderChatTurn', ADMIN, [{ lang: 'hu', draft: prev, messages: [{ role: 'user', text: 'na ird oda hogy ploiest a felrakas helyehez' }] }]);
+    expect(r.ok).toBe(true);
+    expect(r.reply).toMatch(/Nem változott semmi/);
+  });
+
   test('hiányzó memória-tábla → nincs hiba', async () => {
     mockRules = [{ match: /order_chat_memory/, fn: () => { throw new Error('relation does not exist'); } }];
     const r = await h._resolveDraft(7, h._sanitizeDraft({ stops: [{ kind: 'pickup', loc: 'Brasov', firma: 'B', data: '2026-10-12' }] }), { estimateRoute: false });
