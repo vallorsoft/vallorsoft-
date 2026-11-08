@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-08 — 🛰️ Határátlépés automatikusan a GPS-ből (Románia-geozóna) + román idő (PR #623)
+- **Kérés:** a sofőrnek ne kelljen nyomkodnia — a rendszer a GPS-ből lássa a ki-/belépést (idő + koordináta), a diurna ebből számoljon; a sofőr gombja maradjon meg; minden idő román idő szerint.
+- **`lib/roBorder.js` + `lib/geo/romania.json`** (geoBoundaries CC BY 4.0, ~2900 csúcs): pont-a-poligonban rács-indexszel, PostGIS nélkül; tengeri zóna a partra (Konstanca/Sulina kikötő nem hamis kilépés); 1,5 km-es megerősítés a határ menti billegés ellen; interpolált átlépési idő, nagy GPS-hézagnál `≈` jelölés.
+- **`lib/borderAuto.js` + `startBorderAutoScheduler`** (5 perc): a `gps_track_days` új napjaiból `border_crossings` `source='auto'` sorok (rendszám, cég, koordináta, legközelebbi átkelő); sofőr a menetlevélből / kiosztott járműből; ±15 perces duplikátum-őr (az elvetett / módosított sorra is); a friss (≤ 45 nap), kézzel nem felülírt menetlevelek diurnája frissül. Migráció `db/border-crossings-auto.sql`.
+- **`lib/tripCrossings.js`:** GPS-lefedettség mellett (`mode:'auto'`) a diurna az automata sorokból + irodai pótlásból számol; a sofőr gombja csak GPS nélkül (`mode:'manual'`). Kiinduló állapot a GPS első pontjából.
+- **Felület:** 🛰️ „GPS automat” jelölés, automata sor elvetése (`ignored`), román idő a Sofőr-aktivitásban, a módosító ablakban, a sofőr naplójában és a menetlevél-előnézetben. GDPR export + anonimizálás bekötve.
+- Tesztek: +35 (valódi DB is); 2306 Jest zöld.
+
 ## 2026-11-08 — ⛽ Bon-scan: a literár nem kerül a liter mezőbe; dízel 50–1500 L (PR #622)
 - **Kérés:** kerek literes tankolásnál (pl. 300 L) a rendszer a literárat (pl. 10,93 lej/l) vette tankolt liternek. Motorină 50–1500 L lehet, AdBlue kevesebb is.
 - **Új `lib/fuelLiters.js`** (`inRange`/`fixLiters`): a `sanitize` a bon-kiolvasásnál javít — ha a liter = literár vagy kilóg a sávból, összeg ÷ literár (vagy összeg ÷ a hibás „liter") ad sávba eső értéket → azt veszi; ha nem javítható, üresen hagyja és figyelmeztet (`litru_warn`). Az AI-prompt új `pret_litru` mezőt kér és kifejezetten tiltja a literár/mennyiség összekeverését.

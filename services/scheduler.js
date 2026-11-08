@@ -1834,4 +1834,38 @@ function startOrderRouteKmScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler };
+// ════════════════════════════════════════════════════════════════
+//  HATÁRÁTLÉPÉS AUTOMATIKUSAN A GPS-BŐL (Románia-geozóna)
+//  A gps_track_days új / frissült napjait átnézi (lib/borderAuto.js), és a
+//  felismert ki-/belépéseket source='auto' sorként menti; a friss, nem
+//  kézzel felülírt menetlevelek diurnája ennek megfelelően frissül.
+// ════════════════════════════════════════════════════════════════
+function startBorderAutoScheduler() {
+  const ba = require('../lib/borderAuto');
+  const { featureEnabled } = require('../lib/featureEnabled');
+  const MIN = Math.max(2, parseInt(process.env.BORDER_AUTO_INTERVAL_MIN, 10) || 5);
+  let running = false;
+  const featCache = new Map();
+  async function allowed(cid) {
+    const c = featCache.get(cid);
+    if (c && Date.now() - c.t < 10 * 60 * 1000) return c.v;
+    const v = await featureEnabled(cid, 'gps-integracio');
+    featCache.set(cid, { v, t: Date.now() });
+    return v;
+  }
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      const r = await ba.scanRound({ vehicles: 30, budgetMs: 3 * 60 * 1000, allowed });
+      if (r.inserted || r.recalc) console.log('[BorderAuto] ' + r.vehicles + ' jármű, ' + r.inserted + ' új átlépés, ' + r.recalc + ' menetlevél-diurna frissítve.');
+    } catch (e) { console.warn('[BorderAuto] kör hiba', e.message); }
+    finally { running = false; }
+  }
+  setTimeout(tick, 4 * 60 * 1000);
+  const iv = setInterval(tick, MIN * 60 * 1000);
+  console.log('[BorderAuto] Automatikus határátlépés-felismerő elindítva (' + MIN + ' perces ciklus).');
+  return iv;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler };

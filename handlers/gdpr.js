@@ -28,6 +28,12 @@ handlers.exportCompanyData = async function (req, res) {
       // Állomások + a GPS-ből felismert tényleges hely/idő (a jármű GPS-éből származó adat → exportálandó)
       order_stops: await rows('SELECT id, order_id, kind, loc, firma, data, arrived_at, done_at, actual_address, actual_lat, actual_lng, gps_arrived_at, gps_left_at, match_status, match_score FROM order_stops WHERE company_id = $1'),
       carriers: await rows('SELECT * FROM carriers WHERE company_id = $1'),
+      // Határátlépések (sofőr-gomb, iroda és a GPS-ből AUTOMATIKUSAN felismert sorok) —
+      // időpont + koordináta a sofőrhöz kötve = személyes helyadat → exportálandó.
+      border_crossings: await rows(`SELECT bc.id, bc.email_sofer, bc.nume_sofer, bc.tip, bc.tara, bc.locatie, bc.gps_lat, bc.gps_lng, bc.created_at,
+                                           to_jsonb(bc) ->> 'source' AS source, to_jsonb(bc) ->> 'rendszam' AS rendszam
+                                      FROM border_crossings bc LEFT JOIN users u ON LOWER(u.email) = LOWER(bc.email_sofer)
+                                     WHERE COALESCE((to_jsonb(bc) ->> 'company_id')::int, u.company_id) = $1`),
       // Portál-belépők (személyes adat: e-mail/név) — jelszó-hash és invite-token KIZÁRVA.
       client_portal_users: await rows('SELECT id, client_id, email, nev, activ, last_login, created_at FROM client_users WHERE company_id = $1'),
       carrier_portal_users: await rows('SELECT id, carrier_id, email, nev, activ, last_login, created_at FROM carrier_users WHERE company_id = $1'),
@@ -91,6 +97,12 @@ handlers.anonymizeUser = async function (req, res, args) {
       await pool.query(
         `DELETE FROM order_chat_memory WHERE company_id = $1 AND kind = 'driver_alias' AND LOWER(value->>'email') = LOWER($2)`,
         [cid, oldEmail]).catch(() => {});
+    }
+    // Határátlépések: a sor (diurna-előzmény) megmarad, de a sofőr neve/e-mailje anonimizált.
+    if (oldEmail) {
+      await pool.query(
+        `UPDATE border_crossings SET email_sofer = $2, nume_sofer = '(anonimizat)' WHERE LOWER(email_sofer) = LOWER($1)`,
+        [oldEmail, 'deleted-' + uid + '@anonimizat.local']).catch(() => {});
     }
     // AI-chat: a felhasználó nem értett mondatai (saját szöveg) — törlés.
     await pool.query(`DELETE FROM chat_miss_log WHERE company_id = $1 AND user_id = $2`, [cid, uid]).catch(() => {});

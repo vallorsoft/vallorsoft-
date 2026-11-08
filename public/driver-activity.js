@@ -24,12 +24,14 @@
     var iso = function (d) { return d.toISOString().slice(0, 10); };
     return { from: iso(from), to: iso(to) };
   }
-  function _fmtDate(x) { return x ? new Date(x).toLocaleDateString('ro-RO') : '—'; }
+  // Minden idő ROMÁN idő szerint (Europe/Bucharest), bárhol is van a néző.
+  var RO_TZ = 'Europe/Bucharest';
+  function _fmtDate(x) { return x ? new Date(x).toLocaleDateString('ro-RO', { timeZone: RO_TZ }) : '—'; }
   function _fmtDateTime(x) {
     if (!x) return '—';
     var d = new Date(x);
-    return d.toLocaleDateString('ro-RO') + ' ' +
-      d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('ro-RO', { timeZone: RO_TZ }) + ' ' +
+      d.toLocaleTimeString('ro-RO', { timeZone: RO_TZ, hour: '2-digit', minute: '2-digit' });
   }
   function _n(x) {
     var n = parseFloat(x); if (!isFinite(n)) return '0';
@@ -339,10 +341,16 @@
           if (ev.meta.added) {
             scanBadge += ' <span class="da-bc-badge da-bc-edited">🏢 ' + esc(t('bce.addedByOffice')) + '</span>';
           }
+          if (ev.meta.auto) {
+            scanBadge += ' <span class="da-bc-badge da-bc-edited" title="' + esc(t('bce.autoTip')) + '">🛰️ ' + esc(t('bce.auto')) + '</span>';
+          }
           if (ev.meta.seq_warn) {
             scanBadge += ' <span class="da-bc-badge da-bc-warn" title="' + esc(t('bce.seqWarnTip')) + '">⚠️ ' + esc(t('bce.seqWarn')) + '</span>';
           }
           bcHtml = ' <button type="button" class="btn ghost da-ev-photo-btn" onclick="DriverActivity.editBorder(' + Number(ev.meta.bc_id) + ')">✏️ ' + esc(t('bce.edit')) + '</button>';
+          if (ev.meta.auto) {
+            bcHtml += ' <button type="button" class="btn ghost da-ev-photo-btn" onclick="DriverActivity.ignoreBorder(' + Number(ev.meta.bc_id) + ')">🚫 ' + esc(t('bce.ignore')) + '</button>';
+          }
         }
         return '<div class="da-ev da-ev-' + esc(ev.type) + '">'
           + '<div class="da-ev-ico">' + (ev.icon || '•') + '</div>'
@@ -446,10 +454,29 @@
   //  HATÁRÁTLÉPÉS MÓDOSÍTÁSA (admin / manager)
   // ═════════════════════════════════════════════
   var _daBorders = {};
+  // A dátum-mező ROMÁN idő szerint mutat és ír (nem a böngésző zónája szerint).
+  function _roParts(ms) {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: RO_TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return p;
+  }
   function _localDt(x) {
     var d = new Date(x); if (isNaN(d.getTime())) return '';
-    var p = function (n) { return String(n).padStart(2, '0'); };
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+    var p = _roParts(d.getTime());
+    return p.year + '-' + p.month + '-' + p.day + 'T' + (p.hour === '24' ? '00' : p.hour) + ':' + p.minute;
+  }
+  // 'YYYY-MM-DDTHH:MM' román idő → ISO (UTC)
+  function _roLocalToIso(v) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(v || ''));
+    if (!m) return new Date(v).toISOString();
+    var guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    for (var i = 0; i < 2; i++) {
+      var p = _roParts(guess);
+      var asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute);
+      guess -= (asUtc - Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]));
+    }
+    return new Date(guess).toISOString();
   }
   var _bcDone = null;
   var _bcNewEmail = null;
@@ -483,7 +510,7 @@
       +   '<option value="Iesire"' + (b.tip !== 'Intrare' ? ' selected' : '') + '>' + esc(t('sof.crossOut')) + '</option>'
       +   '<option value="Intrare"' + (b.tip === 'Intrare' ? ' selected' : '') + '>' + esc(t('sof.crossIn')) + '</option>'
       + '</select>'
-      + '<label style="' + lbl + '">' + esc(t('bce.at')) + '</label>'
+      + '<label style="' + lbl + '">' + esc(t('bce.at')) + ' <span style="font-weight:500;color:#475569;">(' + esc(t('bce.roTime')) + ')</span></label>'
       + '<input id="daBcAt" type="datetime-local" step="60" style="' + inp + '" value="' + esc(_localDt(b.at)) + '">'
       + '<label style="' + lbl + '">' + esc(t('bce.loc')) + '</label>'
       + '<input id="daBcLoc" type="text" maxlength="255" style="' + inp + '" value="' + esc(b.locatie) + '">'
@@ -494,6 +521,14 @@
     ov.addEventListener('click', function (e) { if (e.target === ov) closeBorderEdit(); });
     document.body.appendChild(ov);
   }
+  function ignoreBorder(id) {
+    if (!confirm(t('bce.ignoreConfirm'))) return;
+    gas('borderCrossingDelete', [{ id: id }]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      toast(t('bce.ignored') + (r.waybills_recalc ? ' · ' + t('bce.recalc').replace('{n}', r.waybills_recalc) : ''), 'ok');
+      _loadDriverDetail();
+    }).catch(function () { toast(t('common.error'), 'err'); });
+  }
   function closeBorderEdit() { var o = document.getElementById('daBcEdit'); if (o) o.remove(); }
   function saveBorderEdit(id) {
     var at = document.getElementById('daBcAt').value;
@@ -502,14 +537,14 @@
     var isNew = !id;
     var body = {
       tip: document.getElementById('daBcTip').value,
-      at: new Date(at).toISOString(),
+      at: _roLocalToIso(at),
       locatie: document.getElementById('daBcLoc').value,
     };
     if (isNew) body.email = _bcNewEmail; else body.id = id;
     gas(isNew ? 'borderCrossingCreate' : 'borderCrossingUpdate', [body]).then(function (r) {
       if (!r || !r.ok) { if (btn) btn.disabled = false; toast((r && r.err) || t('common.error'), 'err'); return; }
       var cb = _bcDone;
-      var res = { id: id, tip: document.getElementById('daBcTip').value, at: new Date(at).toISOString(), locatie: document.getElementById('daBcLoc').value };
+      var res = { id: id, tip: document.getElementById('daBcTip').value, at: _roLocalToIso(at), locatie: document.getElementById('daBcLoc').value };
       closeBorderEdit();
       if (cb) { try { cb(res); } catch (_) {} }
       toast(t(isNew ? 'bce.addSaved' : 'bce.saved') + (r.waybills_recalc ? ' · ' + t('bce.recalc').replace('{n}', r.waybills_recalc) : ''), 'ok');
@@ -531,7 +566,7 @@
     openLightbox: openLightbox,
     closeLightbox: closeLightbox,
     navLightbox: navLightbox,
-    editBorder: editBorder,
+    editBorder: editBorder, ignoreBorder: ignoreBorder,
     addBorder: addBorder,
     closeBorderEdit: closeBorderEdit,
     saveBorderEdit: saveBorderEdit,
