@@ -1005,4 +1005,41 @@ handlers.devAssignWaybillCompany = async function (req, res, args) {
   return res.json({ result: { ok: true } });
 };
 
+// ─── Használati kimutatás az audit-naplóból (minden cég, csak developer) ───
+// args: [{ days? }] — alapból az aktuális hét (hétfőtől, román idő szerint).
+// FIGYELEM: az audit-napló az ÍRÓ műveleteket rögzíti (létrehozás/módosítás/
+// küldés/automatika), az oldal-megnyitásokat és olvasásokat nem.
+handlers.devAuditUsage = async function (req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const a = (args && args[0]) || {};
+    const days = Math.min(Math.max(parseInt(a.days, 10) || 0, 0), 90);
+    // a hét eleje (hétfő 00:00, Europe/Bucharest) vagy az utolsó N nap
+    const sinceSql = days
+      ? `NOW() - ($1::int * INTERVAL '1 day')`
+      : `(date_trunc('week', NOW() AT TIME ZONE 'Europe/Bucharest') AT TIME ZONE 'Europe/Bucharest')`;
+    const p = days ? [days] : [];
+    const W = `created_at >= ${sinceSql}`;
+    const [byAction, byCompany, byDay, byUser, total] = await Promise.all([
+      pool.query(`SELECT action, COUNT(*)::int AS n, COUNT(DISTINCT company_id)::int AS companies,
+                         COUNT(DISTINCT user_email)::int AS users, MAX(created_at) AS last_at
+                    FROM audit_log WHERE ${W} GROUP BY action ORDER BY n DESC LIMIT 100`, p),
+      pool.query(`SELECT a.company_id, c.nev, COUNT(*)::int AS n, COUNT(DISTINCT a.user_email)::int AS users
+                    FROM audit_log a LEFT JOIN companies c ON c.id = a.company_id
+                   WHERE a.${W.replace('created_at', 'created_at')} GROUP BY a.company_id, c.nev ORDER BY n DESC LIMIT 50`, p),
+      pool.query(`SELECT to_char((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Bucharest', 'YYYY-MM-DD') AS day, COUNT(*)::int AS n
+                    FROM audit_log WHERE ${W} GROUP BY 1 ORDER BY 1`, p),
+      pool.query(`SELECT user_email, COUNT(*)::int AS n FROM audit_log
+                   WHERE ${W} AND user_email IS NOT NULL GROUP BY user_email ORDER BY n DESC LIMIT 20`, p),
+      pool.query(`SELECT COUNT(*)::int AS n, MIN(created_at) AS since FROM audit_log WHERE ${W}`, p),
+    ]);
+    return res.json({ result: { ok: true, total: total.rows[0].n, since: total.rows[0].since,
+      by_action: byAction.rows, by_company: byCompany.rows, by_day: byDay.rows, by_user: byUser.rows } });
+  } catch (err) {
+    console.error('devAuditUsage hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

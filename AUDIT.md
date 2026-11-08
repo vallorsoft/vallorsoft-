@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 81. lépés — Üzemanyag-riasztás, auto-útdíj, lejárat-feladat, használati kimutatás (2026-11-08, PR #624) ✅ KÉSZ
+- Minden új lekérdezés `company_id`-szűrt, paraméteres. A riasztó csak a cég saját `gps_track_days` soraiból dolgozik; a sofőr e-mailje a menetlevélből / kiosztott járműből (cégen belül); `fuel_loss_alerts.driver_email` a GDPR-exportban és anonimizáláskor cserélve. Felelős csak a saját cég aktív Admin/Manager felhasználója lehet (`expiryAssign` ellenőrzi); az alapértelmezett felelőst csak Admin állíthatja. Az automata útdíj versenyhelyzet ellen csak akkor ír, ha közben senki nem módosította (`toll_cost IS NOT DISTINCT FROM`). A `devAuditUsage` csak `is_dev`, minden cégre összesít (felhasználó-e-mailek csak a developernek). Audit: `fuel.loss_alert`, `expiry.create/update/assign/default_owner`.
+
 ### 80. lépés — Automatikus határátlépés a GPS-ből (2026-11-08, PR #623) ✅ KÉSZ
 - Új adat: a vontató GPS-pontsorából felismert határátlépés (idő + koordináta + rendszám) a sofőrhöz kötve — személyes helyadat: a GDPR-export tartalmazza, az anonimizálás a nevet/e-mailt lecseréli. A felismerő csak a cég saját `gps_track_days` soraiból dolgozik és `company_id`-vel ír; az automata sorok olvasása `company_id` + rendszám szerint szűrt, paraméteres SQL. A módosítás/elvetés továbbra is csak Admin/Manager, saját cégre (`COALESCE(bc.company_id, u.company_id)`), audit (`border.ignore`). A sofőr nem kap napszámot az előnézetben. Új végpont nincs; a `previewTripDiurna` új `camion` paramétere csak szűrésre megy (20 karakterre vágva, paraméterként).
 

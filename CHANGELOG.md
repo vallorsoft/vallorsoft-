@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-08 — ⛽ Üzemanyag-hiány riasztás + 🛣️ automatikus útdíj + 📋 lejárat-feladat + 📈 használati kimutatás (PR #624)
+- **Üzemanyag-hiány riasztás** (`lib/fuelLossAlert.js`, `startFuelLossScheduler` 30 perc): napi hiány járművenként a GPS tartály-szintből (álló hiány + hirtelen csökkenés + bon szerinti többlet, kettős számolás nélkül). > 100 L → iroda (e-mail, push, értesítés); > 250 L → a sofőr is (e-mail + push). `fuel_loss_alerts`, fokozatonként egyszer, 7 nap visszanézés. Env: `FUEL_LOSS_OFFICE_L` / `FUEL_LOSS_DRIVER_L` / `FUEL_LOSS_INTERVAL_MIN`.
+- **Automatikus útdíj** (`lib/orderAutoToll.js`): a HERE kamion-útvonalból magától; kézi / átírt értéket nem ír felül (`toll_geo.auto`), útvonal-változáskor újraszámol.
+- **Lejárat → feladat**: `document_expiries.task_*` + `companies.expiry_task_owner_id`; felelős, személyes értesítés + e-mail, csak az új dátum zárja le (`expiryAssign`, `expiryDefaultOwnerSet`, `openExpiryTasks`). Lejáratok oldal: feladat-panel.
+- **Developer → 📈 Használat (audit)** (`devAuditUsage`).
+- Tesztek: +16; 2324 Jest zöld valós Postgres 16-tal.
+
 ## 2026-11-08 — 🛰️ Határátlépés automatikusan a GPS-ből (Románia-geozóna) + román idő (PR #623)
 - **Kérés:** a sofőrnek ne kelljen nyomkodnia — a rendszer a GPS-ből lássa a ki-/belépést (idő + koordináta), a diurna ebből számoljon; a sofőr gombja maradjon meg; minden idő román idő szerint.
 - **`lib/roBorder.js` + `lib/geo/romania.json`** (geoBoundaries CC BY 4.0, ~2900 csúcs): pont-a-poligonban rács-indexszel, PostGIS nélkül; tengeri zóna a partra (Konstanca/Sulina kikötő nem hamis kilépés); 1,5 km-es megerősítés a határ menti billegés ellen; interpolált átlépési idő, nagy GPS-hézagnál `≈` jelölés.

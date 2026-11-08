@@ -28,6 +28,8 @@ handlers.exportCompanyData = async function (req, res) {
       // Állomások + a GPS-ből felismert tényleges hely/idő (a jármű GPS-éből származó adat → exportálandó)
       order_stops: await rows('SELECT id, order_id, kind, loc, firma, data, arrived_at, done_at, actual_address, actual_lat, actual_lng, gps_arrived_at, gps_left_at, match_status, match_score FROM order_stops WHERE company_id = $1'),
       carriers: await rows('SELECT * FROM carriers WHERE company_id = $1'),
+      // Üzemanyag-hiány riasztások (a sofőr e-mailje + GPS-helyek a részletekben)
+      fuel_loss_alerts: await rows('SELECT id, rendszam, day, total_l, stop_l, sudden_l, receipt_l, detail, level, driver_email, alerted_at FROM fuel_loss_alerts WHERE company_id = $1'),
       // Határátlépések (sofőr-gomb, iroda és a GPS-ből AUTOMATIKUSAN felismert sorok) —
       // időpont + koordináta a sofőrhöz kötve = személyes helyadat → exportálandó.
       border_crossings: await rows(`SELECT bc.id, bc.email_sofer, bc.nume_sofer, bc.tip, bc.tara, bc.locatie, bc.gps_lat, bc.gps_lng, bc.created_at,
@@ -103,6 +105,9 @@ handlers.anonymizeUser = async function (req, res, args) {
       await pool.query(
         `UPDATE border_crossings SET email_sofer = $2, nume_sofer = '(anonimizat)' WHERE LOWER(email_sofer) = LOWER($1)`,
         [oldEmail, 'deleted-' + uid + '@anonimizat.local']).catch(() => {});
+      await pool.query(
+        `UPDATE fuel_loss_alerts SET driver_email = $2 WHERE company_id = $3 AND LOWER(driver_email) = LOWER($1)`,
+        [oldEmail, 'deleted-' + uid + '@anonimizat.local', cid]).catch(() => {});
     }
     // AI-chat: a felhasználó nem értett mondatai (saját szöveg) — törlés.
     await pool.query(`DELETE FROM chat_miss_log WHERE company_id = $1 AND user_id = $2`, [cid, uid]).catch(() => {});

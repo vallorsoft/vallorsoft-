@@ -109,6 +109,11 @@ function startExpiryScheduler() {
   try { push = require('./push'); } catch (_) { return null; }
 
   async function tick() {
+    // 📋 feladat nyitása a figyelmeztetési ablakba ért tételekre (felelőssel) — best-effort
+    try {
+      const n = await require('../handlers/fleetCompliance').openExpiryTasks();
+      if (n) console.log('[Expiry] ' + n + ' új lejárat-feladat megnyitva.');
+    } catch (e) { console.warn('[Expiry] feladat-nyitás hiba', e.message); }
     let rows;
     try {
       ({ rows } = await pool.query(
@@ -1812,6 +1817,21 @@ function startOrderRouteKmScheduler() {
         try { await ork.computeForOrder(q.company_id, q.id); }
         catch (e) { ork.markFailed(q.id, !(e && e.retryable)); console.warn('[OrderKm] fuvar hiba', q.id, e.message); }
       }
+      // automatikus útdíj a HERE kamion-útvonalból (a 🛣️ gombot nem kell megnyomni)
+      try {
+        const at = require('../lib/orderAutoToll');
+        const { featureEnabled } = require('../lib/featureEnabled');
+        let k = 0;
+        for (const q of await at.pickQueue(PER_ROUND * 2)) {
+          if (k >= PER_ROUND) break;
+          if (!(await allowed(q.company_id)) || !(await featureEnabled(q.company_id, 'toll-becsles'))) { at.markFailed(q.id); continue; }
+          k++;
+          try {
+            const r = await at.computeForOrder(q.company_id, q.id);
+            if (r && r.skipped) at.markFailed(q.id);
+          } catch (e) { at.markFailed(q.id); console.warn('[AutoToll] fuvar hiba', q.id, e.message); }
+        }
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[AutoToll] sor hiba', e.message); }
       // a menetlevelek teljes útvonala (Plecare → Sosire)
       try {
         const wr = require('../lib/waybillRoute');
@@ -1868,4 +1888,40 @@ function startBorderAutoScheduler() {
   return iv;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler };
+// ════════════════════════════════════════════════════════════════
+//  ÜZEMANYAG-HIÁNY RIASZTÁS (lib/fuelLossAlert.js) — 30 percenként.
+//  A GPS tartály-szintből napi hiány járművenként; > FUEL_LOSS_OFFICE_L
+//  (100 L) iroda, > FUEL_LOSS_DRIVER_L (250 L) a sofőr is értesítést kap.
+// ════════════════════════════════════════════════════════════════
+function startFuelLossScheduler() {
+  const fl = require('../lib/fuelLossAlert');
+  const { featureEnabled } = require('../lib/featureEnabled');
+  const MIN = Math.max(5, parseInt(process.env.FUEL_LOSS_INTERVAL_MIN, 10) || 30);
+  let running = false;
+  const featCache = new Map();
+  async function allowed(cid) {
+    const c = featCache.get(cid);
+    if (c && Date.now() - c.t < 10 * 60 * 1000) return c.v;
+    const v = (await featureEnabled(cid, 'gps-integracio')) && (await featureEnabled(cid, 'gps-daily-track'));
+    featCache.set(cid, { v, t: Date.now() });
+    return v;
+  }
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      const r = await fl.runRound({ limit: 40, allowed });
+      if (r.alerts) console.log('[FuelLoss] ' + r.checked + ' nap ellenőrizve, ' + r.alerts + ' riasztás.');
+    } catch (e) { console.warn('[FuelLoss] kör hiba', e.message); }
+    finally { running = false; }
+  }
+  setTimeout(tick, 6 * 60 * 1000);
+  const iv = setInterval(tick, MIN * 60 * 1000);
+  console.log('[FuelLoss] Üzemanyag-hiány riasztó elindítva (' + MIN + ' perces ciklus, küszöb ' + fl.OFFICE_L + ' / ' + fl.DRIVER_L + ' L).');
+  return iv;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
+// Belső segédek (nem ütemezők) — a lib/* riasztók is ezeket használják
+Object.defineProperty(module.exports, '_emailAlertToAdmins', { enumerable: false, value: _emailAlertToAdmins });
+Object.defineProperty(module.exports, '_alertEmailBody', { enumerable: false, value: _alertEmailBody });

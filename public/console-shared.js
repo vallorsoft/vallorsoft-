@@ -2017,7 +2017,8 @@ function cpToggle(i){
 var CC_FLAG = { DE:'🇩🇪',AT:'🇦🇹',HU:'🇭🇺',FR:'🇫🇷',IT:'🇮🇹',PL:'🇵🇱',CZ:'🇨🇿',SK:'🇸🇰',SI:'🇸🇮',BE:'🇧🇪',NL:'🇳🇱',RO:'🇷🇴',BG:'🇧🇬',HR:'🇭🇷',ES:'🇪🇸',CH:'🇨🇭' };
 function renderTollBreak(tg){
   var box=document.getElementById('oeTollBreak'); if(!box) return;
-  if(!tg || !Array.isArray(tg.byCountry) || !tg.byCountry.length){ box.innerHTML=''; return; }
+  var autoNote = (tg && tg.auto) ? '<div class="text-muted" style="font-size:11.5px;margin-top:4px;">🤖 '+esc(t('cs.toll.autoNote'))+'</div>' : '';
+  if(!tg || !Array.isArray(tg.byCountry) || !tg.byCountry.length){ box.innerHTML=autoNote; return; }
   var rows=tg.byCountry.map(function(c){
     return '<tr><td>'+(CC_FLAG[c.cc]||'')+' '+esc(c.name||c.cc)+'</td><td style="text-align:right;">'+c.km+' km</td>'
       +'<td style="text-align:right;color:var(--muted);">'+(c.mode==='vignette'?t('cs.toll.vignette'):((c.eur_per_km!=null?c.eur_per_km:'')+' €/km'))+'</td>'
@@ -2027,7 +2028,7 @@ function renderTollBreak(tg){
     +'<div class="text-muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px;">'+t('cs.toll.breakdown')+(tg.pending?t('cs.toll.partial'):'')+'</div>'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
     +'<tbody>'+rows+'<tr><td style="font-weight:800;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:6px;">'+t('cs.toll.total')+'</td><td colspan="2" style="border-top:1px solid var(--border,rgba(255,255,255,.1));"></td>'
-    +'<td style="text-align:right;font-weight:800;color:#fbbf24;border-top:1px solid var(--border,rgba(255,255,255,.1));">'+(tg.total||0)+' €</td></tr></tbody></table></div>';
+    +'<td style="text-align:right;font-weight:800;color:#fbbf24;border-top:1px solid var(--border,rgba(255,255,255,.1));">'+(tg.total||0)+' €</td></tr></tbody></table>'+autoNote+'</div>';
 }
 function estimateOrderToll(){
   if(!_oeOrderId){ toast(t('cs.saveOrderFirst'),'err'); return; }

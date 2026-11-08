@@ -205,6 +205,8 @@
       var r = rs[0];
       if (!r || !r.ok) { box.innerHTML = '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('fe.errMigrate')) + '</div>'; return; }
       _expItems = r.items || [];
+      _expOwners = r.owners || [];
+      _expMeId = r.me_id || null;
       var vehicles = Array.isArray(rs[1]) ? rs[1] : [];
       var drivers = Array.isArray(rs[2]) ? rs[2] : [];
 
@@ -239,11 +241,12 @@
           + '<td>' + d2(it.expiry_date) + '</td>'
           + '<td style="text-align:center;">' + badge + '</td>'
           + '<td class="text-muted" style="font-size:12px;">' + esc(it.note || '') + '</td>'
+          + '<td style="font-size:12px;">' + (it.task_opened_at ? '📋 ' + esc(it.task_owner_name || '—') : '') + '</td>'
           + '<td style="text-align:right;white-space:nowrap;">'
           + '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.expEdit(' + i + ')">✏️</button> '
           + '<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.expDelete(' + it.id + ')">✕</button></td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:18px;">' + t('fe.exp.noItems') + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:18px;">' + t('fe.exp.noItems') + '</td></tr>';
 
       // ⏰ Interaktív KPI mutató-sáv — a már lekért _expItems-ből (nincs új hálózati hívás)
       var expBand = '';
@@ -262,16 +265,86 @@
 
       box.innerHTML =
         expBand
+        + _expTasksPanel(r)
         + panel(t('fe.exp.newTitle'), formHtml)
         + panel(t('fe.exp.listTitle'),
           '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">' + t('fe.exp.listHint') + '</p>'
           + '<div style="overflow-x:auto;"><table class="table">'
-          + '<thead><tr><th>' + t('fe.exp.vehOrDrv') + '</th><th>' + t('fe.exp.document') + '</th><th>' + t('fe.exp.expiryDate') + '</th><th style="text-align:center;">' + t('fe.exp.colState') + '</th><th>' + t('fld.note') + '</th><th></th></tr></thead>'
+          + '<thead><tr><th>' + t('fe.exp.vehOrDrv') + '</th><th>' + t('fe.exp.document') + '</th><th>' + t('fe.exp.expiryDate') + '</th><th style="text-align:center;">' + t('fe.exp.colState') + '</th><th>' + t('fld.note') + '</th><th>' + t('fe.task.owner') + '</th><th></th></tr></thead>'
           + '<tbody>' + rows + '</tbody></table></div>');
 
       // a sofőr-választó tartalmát eltároljuk típus-váltáshoz
       window._expVehOpts = vehicles.map(function (v) { return { value: v.rendszam, label: v.rendszam + (v.marca ? ' — ' + v.marca : '') }; });
       window._expDrvOpts = drivers.map(function (u) { return { value: u.nume || u.email, label: (u.nume || '') + ' (' + u.email + ')' }; });
+    });
+  }
+
+  // ── 📋 Lejárat-feladatok: felelős + „Megújítva" (csak új dátum zárja le) ──
+  var _expOwners = [], _expMeId = null, _expOnlyMine = false;
+  try { _expOnlyMine = localStorage.getItem('vs_exp_only_mine') === '1'; } catch (_) {}
+  function _expOwnerSelect(selId, selected, onchange) {
+    return '<select class="select" id="' + selId + '" style="min-width:150px;" onchange="' + onchange + '">'
+      + '<option value="">—</option>'
+      + _expOwners.map(function (o) {
+        return '<option value="' + o.id + '"' + (String(o.id) === String(selected) ? ' selected' : '') + '>'
+          + esc(o.nume || o.email) + (o.pozicio === 'Admin' ? ' (Admin)' : '') + '</option>';
+      }).join('') + '</select>';
+  }
+  function _expTasksPanel(r) {
+    var open = _expItems.filter(function (it) { return !!it.task_opened_at; });
+    var shown = _expOnlyMine ? open.filter(function (it) { return String(it.task_owner_id) === String(_expMeId); }) : open;
+    var head = '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px;">'
+      + '<label style="display:flex;gap:6px;align-items:center;font-size:13px;"><input type="checkbox"' + (_expOnlyMine ? ' checked' : '')
+      + ' onchange="FleetExtra.expOnlyMine(this.checked)"> ' + t('fe.task.onlyMine') + '</label>'
+      + '<span style="margin-left:auto;font-size:13px;" class="text-muted">' + t('fe.task.defaultOwner') + ': </span>'
+      + (r.can_set_default
+        ? _expOwnerSelect('expDefOwner', r.default_owner_id, 'FleetExtra.expSetDefaultOwner(this.value)')
+        : '<b>' + esc(((_expOwners.filter(function (o) { return String(o.id) === String(r.default_owner_id); })[0]) || {}).nume || '—') + '</b>')
+      + '</div>';
+    var rows = shown.map(function (it) {
+      var i = _expItems.indexOf(it);
+      var dl = parseInt(it.days_left, 10);
+      var badge = dl < 0 ? '<span class="badge err">' + t('fe.exp.expired', { n: Math.abs(dl) }) + '</span>'
+        : '<span class="badge warn">' + t('fe.exp.inDays', { n: dl }) + '</span>';
+      return '<tr>'
+        + '<td><b class="text-primary">' + esc(it.entity_label || '—') + '</b><div class="text-muted" style="font-size:12px;">' + esc(it.doc_type) + '</div></td>'
+        + '<td>' + d2(it.expiry_date) + '<div>' + badge + '</div></td>'
+        + '<td>' + _expOwnerSelect('expOwn' + it.id, it.task_owner_id, 'FleetExtra.expAssign(' + it.id + ',this.value)') + '</td>'
+        + '<td style="white-space:nowrap;"><input class="input" type="date" id="expNew' + it.id + '" style="max-width:160px;display:inline-block;"> '
+        + '<button class="btn ok" style="padding:6px 12px;font-size:12.5px;" onclick="FleetExtra.expRenew(' + i + ')">✅ ' + t('fe.task.renew') + '</button></td>'
+        + '</tr>';
+    }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:16px;">' + t('fe.task.none') + '</td></tr>';
+    return panel('📋 ' + t('fe.task.title') + ' (' + open.length + ')',
+      '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">' + t('fe.task.hint') + '</p>' + head
+      + '<div style="overflow-x:auto;"><table class="table"><thead><tr><th>' + t('fe.exp.document') + '</th><th>' + t('fe.exp.expiryDate')
+      + '</th><th>' + t('fe.task.owner') + '</th><th>' + t('fe.task.newDate') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+  }
+  function expOnlyMine(v) {
+    _expOnlyMine = !!v;
+    try { localStorage.setItem('vs_exp_only_mine', v ? '1' : '0'); } catch (_) {}
+    loadExpiries();
+  }
+  function expAssign(id, ownerId) {
+    if (!ownerId) return;
+    gas('expiryAssign', [{ id: id, owner_id: ownerId }]).then(function (r) {
+      if (r && r.ok) { toast(t('fe.task.assigned'), 'ok'); loadExpiries(); }
+      else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+  function expSetDefaultOwner(ownerId) {
+    gas('expiryDefaultOwnerSet', [{ owner_id: ownerId || null }]).then(function (r) {
+      if (r && r.ok) toast(t('fe.task.defaultSaved'), 'ok');
+      else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+  function expRenew(idx) {
+    var it = _expItems[idx]; if (!it) return;
+    var d = (document.getElementById('expNew' + it.id) || {}).value;
+    if (!d) { toast(t('fe.task.giveNewDate'), 'err'); return; }
+    gas('expirySave', [it.id, { entity_type: it.entity_type, entity_label: it.entity_label, doc_type: it.doc_type,
+      expiry_date: d, alert_days: it.alert_days, note: it.note }]).then(function (r) {
+      if (r && r.ok) { toast(r.task_closed ? t('fe.task.closed') : t('fe.task.stillOpen'), r.task_closed ? 'ok' : 'err'); loadExpiries(); }
+      else toast((r && r.err) || t('common.error'), 'err');
     });
   }
 
@@ -5346,6 +5419,7 @@
     dashExpiryAlert: renderDashExpiryAlert,
     dashServiceAlert: renderDashServiceAlert,
     expEntityChange: expEntityChange, expSave: expSave, expEdit: expEdit, expDelete: expDelete,
+    expOnlyMine: expOnlyMine, expAssign: expAssign, expSetDefaultOwner: expSetDefaultOwner, expRenew: expRenew,
     svSave: svSave, svDelete: svDelete,
     // Szerviz-esedékesség modal (Halasztás / Elvégezve)
     svOpenDecide: svOpenDecide,
