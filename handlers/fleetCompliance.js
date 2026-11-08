@@ -72,20 +72,64 @@ function _arg(args) {
 handlers.expiryList = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
-    const r = await pool.query(
-      `SELECT id, entity_type, entity_label, doc_type, expiry_date, alert_days, note,
-              (expiry_date - CURRENT_DATE)::int AS days_left
-       FROM document_expiries
-       WHERE company_id = $1
-       ORDER BY expiry_date ASC`,
-      [req.session.user.company_id]
-    );
-    return res.json({ result: { ok: true, items: r.rows } });
+    const cid = req.session.user.company_id;
+    let r;
+    try {
+      r = await pool.query(
+        `SELECT e.id, e.entity_type, e.entity_label, e.doc_type, e.expiry_date, e.alert_days, e.note,
+                (e.expiry_date - CURRENT_DATE)::int AS days_left,
+                e.task_owner_id, e.task_opened_at, e.task_closed_at, u.nume AS task_owner_name
+           FROM document_expiries e
+      LEFT JOIN users u ON u.id = e.task_owner_id AND u.company_id = e.company_id
+          WHERE e.company_id = $1
+          ORDER BY e.expiry_date ASC`, [cid]);
+    } catch (e) {
+      // migráció előtt (nincs task_* oszlop) a régi lista
+      r = await pool.query(
+        `SELECT id, entity_type, entity_label, doc_type, expiry_date, alert_days, note,
+                (expiry_date - CURRENT_DATE)::int AS days_left
+           FROM document_expiries WHERE company_id = $1 ORDER BY expiry_date ASC`, [cid]);
+    }
+    let owners = [], defaultOwner = null;
+    try {
+      owners = (await pool.query(
+        `SELECT id, nume, email, pozicio FROM users
+          WHERE company_id=$1 AND pozicio IN ('Admin','Manager') AND COALESCE(blocked,false)=false
+          ORDER BY (pozicio='Admin') DESC, nume`, [cid])).rows;
+      defaultOwner = await _expiryDefaultOwner(cid);
+    } catch (_) {}
+    return res.json({ result: { ok: true, items: r.rows, owners, default_owner_id: defaultOwner,
+      me_id: req.session.user.id || null, can_set_default: req.session.user.pozicio === 'Admin' } });
   } catch (err) {
     console.error('expiryList hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
+
+// A cég lejárat-felelőse: a beállított, ha még aktív Admin/Manager; különben az első Admin.
+async function _expiryDefaultOwner(cid) {
+  try {
+    const r = await pool.query(
+      `SELECT u.id FROM companies c JOIN users u ON u.id = c.expiry_task_owner_id AND u.company_id = c.id
+        WHERE c.id=$1 AND u.pozicio IN ('Admin','Manager') AND COALESCE(u.blocked,false)=false`, [cid]);
+    if (r.rows[0]) return r.rows[0].id;
+  } catch (_) {}
+  const a = await pool.query(
+    `SELECT id FROM users WHERE company_id=$1 AND pozicio IN ('Admin','Manager') AND COALESCE(blocked,false)=false
+      ORDER BY (pozicio='Admin') DESC, id ASC LIMIT 1`, [cid]);
+  return a.rows[0] ? a.rows[0].id : null;
+}
+
+// Feladat lezárása — CSAK akkor, ha az új lejárati dátum már kívül esik a figyelmeztetési ablakon.
+async function _expiryCloseIfRenewed(cid, id, byEmail) {
+  try {
+    const r = await pool.query(
+      `UPDATE document_expiries SET task_closed_at=NOW(), task_closed_by=$3, task_opened_at=NULL
+        WHERE id=$1 AND company_id=$2 AND task_opened_at IS NOT NULL
+          AND expiry_date > CURRENT_DATE + alert_days * INTERVAL '1 day'`, [id, cid, byEmail || null]);
+    return r.rowCount > 0;
+  } catch (_) { return false; }
+}
 
 // args: [id|null, {entity_type, entity_label, doc_type, expiry_date, alert_days, note}]
 handlers.expirySave = async function (req, res, args) {
@@ -111,12 +155,16 @@ handlers.expirySave = async function (req, res, args) {
         [id, cid, entityType, label || null, docType, expiry, alertDays, f.note || null]
       );
       if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
+      const closed = await _expiryCloseIfRenewed(cid, id, req.session.user.email);
+      audit.fromReq(req, 'expiry.update', 'document_expiry', id, { doc_type: docType, expiry_date: expiry, task_closed: closed });
+      return res.json({ result: { ok: true, task_closed: closed } });
     } else {
-      await pool.query(
+      const ins = await pool.query(
         `INSERT INTO document_expiries (company_id, entity_type, entity_label, doc_type, expiry_date, alert_days, note)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
         [cid, entityType, label || null, docType, expiry, alertDays, f.note || null]
       );
+      audit.fromReq(req, 'expiry.create', 'document_expiry', ins.rows[0] && ins.rows[0].id, { doc_type: docType, expiry_date: expiry });
     }
     return res.json({ result: { ok: true } });
   } catch (err) {
@@ -140,19 +188,139 @@ handlers.expiryDelete = async function (req, res, args) {
   }
 };
 
+// Feladat felelősének kijelölése. args: [{ id, owner_id }]
+handlers.expiryAssign = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const id = parseInt(a.id, 10), ownerId = parseInt(a.owner_id, 10);
+    if (!id || !ownerId) return res.json({ result: { ok: false, err: 'Date invalide' } });
+    const u = await pool.query(
+      `SELECT id, nume, email FROM users WHERE id=$1 AND company_id=$2 AND pozicio IN ('Admin','Manager')
+          AND COALESCE(blocked,false)=false`, [ownerId, cid]);
+    if (!u.rows[0]) return res.json({ result: { ok: false, err: 'Responsabilul nu a fost găsit' } });
+    const r = await pool.query(
+      `UPDATE document_expiries SET task_owner_id=$3 WHERE id=$1 AND company_id=$2
+        RETURNING entity_label, doc_type, expiry_date, task_opened_at`, [id, cid, ownerId]);
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
+    const it = r.rows[0];
+    if (it.task_opened_at && ownerId !== req.session.user.id) {
+      try {
+        const { notify } = require('./notifications');
+        await notify(pool, { company_id: cid, user_id: ownerId, type: 'expiry_task',
+          title: 'Sarcină atribuită: ' + it.doc_type + (it.entity_label ? ' — ' + it.entity_label : ''),
+          body: 'Expiră la ' + _isoDate(it.expiry_date) + '. Sarcina se închide automat când introduceți noua dată de expirare.',
+          link_tab: 'expiries' });
+      } catch (_) {}
+    }
+    audit.fromReq(req, 'expiry.assign', 'document_expiry', id, { owner_id: ownerId });
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('expiryAssign hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// A cég alapértelmezett lejárat-felelőse (csak Admin). args: [{ owner_id }]
+handlers.expiryDefaultOwnerSet = async function (req, res, args) {
+  try {
+    if (!req.session.user || req.session.user.pozicio !== 'Admin') return _deny(res);
+    const cid = req.session.user.company_id;
+    const ownerId = parseInt(_arg(args).owner_id, 10) || null;
+    if (ownerId) {
+      const u = await pool.query(
+        `SELECT 1 FROM users WHERE id=$1 AND company_id=$2 AND pozicio IN ('Admin','Manager')`, [ownerId, cid]);
+      if (!u.rows[0]) return res.json({ result: { ok: false, err: 'Responsabilul nu a fost găsit' } });
+    }
+    await pool.query('UPDATE companies SET expiry_task_owner_id=$2 WHERE id=$1', [cid, ownerId]);
+    audit.fromReq(req, 'expiry.default_owner', 'company', cid, { owner_id: ownerId });
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('expiryDefaultOwnerSet hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// Ütemező-segéd (nem RPC): a figyelmeztetési ablakba ért tételekhez feladatot nyit,
+// felelőst rendel, és személyes értesítést + e-mailt küld a felelősnek.
+async function openExpiryTasks() {
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `SELECT id, company_id, entity_label, doc_type, expiry_date, task_owner_id,
+              (expiry_date - CURRENT_DATE)::int AS days_left
+         FROM document_expiries
+        WHERE task_opened_at IS NULL AND expiry_date <= CURRENT_DATE + alert_days * INTERVAL '1 day'
+        ORDER BY company_id, expiry_date LIMIT 500`));
+  } catch (_) { return 0; }
+  const byOwner = new Map();
+  const defCache = new Map();
+  for (const r of rows) {
+    if (!defCache.has(r.company_id)) defCache.set(r.company_id, await _expiryDefaultOwner(r.company_id));
+    const owner = r.task_owner_id || defCache.get(r.company_id);
+    await pool.query(
+      `UPDATE document_expiries SET task_opened_at=NOW(), task_closed_at=NULL, task_closed_by=NULL,
+              task_owner_id=COALESCE(task_owner_id, $3)
+        WHERE id=$1 AND company_id=$2 AND task_opened_at IS NULL`, [r.id, r.company_id, owner]);
+    if (!owner) continue;
+    const k = r.company_id + '|' + owner;
+    if (!byOwner.has(k)) byOwner.set(k, { cid: r.company_id, owner, items: [] });
+    byOwner.get(k).items.push(r);
+  }
+  for (const g of byOwner.values()) {
+    const first = g.items[0];
+    const title = '📋 Sarcină nouă: ' + first.doc_type + (first.entity_label ? ' — ' + first.entity_label : '')
+      + (g.items.length > 1 ? ' (+' + (g.items.length - 1) + ')' : '');
+    try {
+      const { notify } = require('./notifications');
+      await notify(pool, { company_id: g.cid, user_id: g.owner, type: 'expiry_task', title,
+        body: 'Sarcina rămâne deschisă până introduceți noua dată de expirare.', link_tab: 'expiries' });
+    } catch (_) {}
+    try {
+      const u = await pool.query('SELECT email, nume FROM users WHERE id=$1 AND company_id=$2', [g.owner, g.cid]);
+      const to = u.rows[0] && u.rows[0].email;
+      if (to) {
+        const esc = (x) => String(x == null ? '' : x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const rowsHtml = g.items.slice(0, 50).map((i) => '<tr>'
+          + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;">' + esc(i.entity_label || '—') + '</td>'
+          + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;">' + esc(i.doc_type) + '</td>'
+          + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;text-align:right;font-weight:700;color:' + (i.days_left < 0 ? '#b91c1c' : '#b45309') + ';">'
+          + _isoDate(i.expiry_date) + '</td></tr>').join('');
+        const html = '<p style="margin:0 0 10px;font-size:16px;font-weight:700;color:#2a2018;">📋 Sarcini noi — documente care expiră</p>'
+          + '<p style="margin:0 0 14px;font-size:14px;color:#5a5048;">Bună ziua' + (u.rows[0].nume ? ', ' + esc(u.rows[0].nume) : '')
+          + '! Sunteți responsabil pentru reînnoirea documentelor de mai jos. Sarcina se închide automat când introduceți noua dată de expirare în VallorSoft → Expirări.</p>'
+          + '<table style="width:100%;border-collapse:collapse;font-size:13px;">' + rowsHtml + '</table>';
+        const { sendClientEmail } = require('../services/email');
+        await sendClientEmail({ to, subject: '📋 VallorSoft — Sarcini noi: documente care expiră (' + g.items.length + ')', html, companyId: g.cid, mailType: 'expiry_task' });
+      }
+    } catch (_) {}
+  }
+  return rows.length;
+}
+
 // Vezérlőpult-kártya: lejárt + hamarosan lejáró tételek
 handlers.getExpiryAlerts = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
     const cid = req.session.user.company_id;
-    const r = await pool.query(
-      `SELECT id, entity_type, entity_label, doc_type, expiry_date,
-              (expiry_date - CURRENT_DATE)::int AS days_left
-       FROM document_expiries
-       WHERE company_id = $1 AND expiry_date <= CURRENT_DATE + alert_days * INTERVAL '1 day'
-       ORDER BY expiry_date ASC LIMIT 20`,
-      [cid]
-    );
+    let r;
+    try {
+      r = await pool.query(
+        `SELECT e.id, e.entity_type, e.entity_label, e.doc_type, e.expiry_date,
+                (e.expiry_date - CURRENT_DATE)::int AS days_left, u.nume AS task_owner_name
+           FROM document_expiries e
+      LEFT JOIN users u ON u.id = e.task_owner_id AND u.company_id = e.company_id
+          WHERE e.company_id = $1 AND e.expiry_date <= CURRENT_DATE + e.alert_days * INTERVAL '1 day'
+          ORDER BY e.expiry_date ASC LIMIT 20`, [cid]);
+    } catch (_) {
+      r = await pool.query(
+        `SELECT id, entity_type, entity_label, doc_type, expiry_date,
+                (expiry_date - CURRENT_DATE)::int AS days_left
+         FROM document_expiries
+         WHERE company_id = $1 AND expiry_date <= CURRENT_DATE + alert_days * INTERVAL '1 day'
+         ORDER BY expiry_date ASC LIMIT 20`, [cid]);
+    }
     let items = r.rows;
     // UIT (RO e-Transport) lejáró kódok beolvasztása — a 5/15 napos érvényesség
     // végéhez közeledő AKTÍV kódok (még nem leállított), max 2 nappal lejárat előtt
@@ -2766,6 +2934,7 @@ handlers.getGpsKmComparison = async function (req, res, args) {
 // /api/execute-on át (a registry csak az enumerálható handlereket másolja),
 // de require-rel a scheduler eléri (services/scheduler.js).
 module.exports = handlers;
+Object.defineProperty(module.exports, 'openExpiryTasks', { enumerable: false, value: openExpiryTasks });
 Object.defineProperty(module.exports, 'computeServiceDueAlerts', { enumerable: false, value: computeServiceDueAlerts });
 // A `_allocateDriver` allokáció-motor NEM-enumerable → NEM hívható /api/execute-on
 // át, de require-rel a teszt eléri (same-month-first solo allokáció verifikáció).

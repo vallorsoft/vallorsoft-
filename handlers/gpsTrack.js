@@ -370,3 +370,5 @@ module.exports = handlers;
 // Teszt-segéd — NEM RPC (nem-enumerable): megvárja a futó háttér-letöltéseket,
 // hogy a teszt ne érjen véget, mielőtt a háttér-feladat a mockolt DB-t hívja.
 Object.defineProperty(module.exports, '_bgIdle', { value: () => Promise.all([..._bgJobs.values(), ..._matchJobs.values()]), enumerable: false });
+// Belső segéd (nem RPC): az üzemanyag-hiány riasztó (lib/fuelLossAlert.js) is ezt használja
+Object.defineProperty(module.exports, 'buildFuelCheck', { enumerable: false, value: buildFuelCheck });
