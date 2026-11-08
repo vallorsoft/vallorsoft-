@@ -476,11 +476,15 @@ handlers.listPendingReceipts = async function (req, res, args) {
     const statuses = Array.isArray(a.status) && a.status.length
       ? a.status.filter((s) => ['pending', 'attached', 'deleted'].includes(s))
       : ['pending'];
+    // `include_thumb`: a sofőr eszközök közötti szinkronjához (másik telefonon
+    // is lássa a bon kis képét). Csak a 128px thumbnail — a teljes kép sosem tárolt.
+    const withThumb = !!a.include_thumb;
     let items = [];
+    let available = true;
     try {
       const r = await pool.query(
         `SELECT id, kind, fields, status, waybill_id, scanned_at, attached_at, deleted_at,
-                CASE WHEN thumb_b64 IS NOT NULL THEN true ELSE false END AS has_thumb
+                CASE WHEN thumb_b64 IS NOT NULL THEN true ELSE false END AS has_thumb${withThumb ? ', thumb_b64' : ''}
            FROM driver_receipt_scans
           WHERE company_id = $1
             AND LOWER(email_sofer) = $2
@@ -493,8 +497,11 @@ handlers.listPendingReceipts = async function (req, res, args) {
     } catch (e) {
       // Régi séma-eltérés (migráció nem futott le) → üres lista.
       console.warn('listPendingReceipts skip:', e.message);
+      available = false;
     }
-    return res.json({ result: { ok: true, items } });
+    // `available:false` → a kliens NE takarítsa a helyi listát (nem tudjuk,
+    // mi van a szerveren).
+    return res.json({ result: { ok: true, items, available } });
   } catch (e) {
     console.error('listPendingReceipts hiba:', e);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
