@@ -28,8 +28,8 @@ function _clip(s, n) { s = String(s == null ? '' : s); return s.length > n ? s.s
 function _summary(kind, v, names) {
   v = v || {};
   switch (kind) {
-    case 'firma_addr': return _clip(v.loc, 160);
-    case 'pickup_client': return _clip(v.client, 160);
+    case 'firma_addr': return _clip((Array.isArray(v.locs) && v.locs.length ? v.locs : [v.loc]).filter(Boolean).join(' | '), 240);
+    case 'pickup_client': return _clip((Array.isArray(v.clients) && v.clients.length ? v.clients.map((c) => c && c.client) : [v.client]).filter(Boolean).join(' | '), 240);
     case 'client_cargo': {
       const p = [];
       if (v.load_type) p.push(v.load_type);

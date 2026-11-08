@@ -93,6 +93,7 @@ const QT = {
   truckNone:    { ro: 'Nu găsesc tractorul {c} în flotă.', hu: 'A(z) {c} vontató nincs a flottában.' },
   trailerNone:  { ro: 'Nu găsesc remorca {c} în flotă.', hu: 'A(z) {c} pótkocsi nincs a flottában.' },
   editLoaded:   { ro: 'Am încărcat cursa {c}. Scrie ce trebuie modificat (ex. „a doua descărcare joi", „alt șofer").', hu: 'Betöltöttem a(z) {c} fuvart. Írd meg, mit módosítsak (pl. „a második lerakás csütörtök", „másik sofőr").' },
+  siteMulti:    { ro: '{c} are mai multe adrese. Care este?', hu: 'A(z) {c} cégnek több címe is van. Melyik?' },
   noChange:     { ro: 'Nu s-a modificat nimic în schiță. Scrie mai exact, de ex. „încărcarea 1: Ploiești" sau „descărcarea de joi: Arad".', hu: 'Nem változott semmi a vázlaton. Írd pontosabban, pl. „1. felrakás helye: Ploiești" vagy „a csütörtöki lerakás: Arad".' },
   editNotFound: { ro: 'Nu găsesc cursa {c} (sau este anulată).', hu: 'Nem találom a(z) {c} fuvart (vagy törölve van).' },
 };
@@ -209,10 +210,19 @@ function _uitRows(codes, docs) {
 async function learnFromDraft(cid, d) {
   try {
     for (const s of d.stops || []) {
-      if (s.firma && s.loc && /\d/.test(s.loc)) await memPut(cid, 'firma_addr', _fold(s.firma), { loc: s.loc });
+      if (s.firma && s.loc && /\d/.test(s.loc)) {
+        const k = _fold(s.firma);
+        const locs = _addFront(_locList(await memGet(cid, 'firma_addr', k)), s.loc, (x) => _fold(x));
+        await memPut(cid, 'firma_addr', k, { loc: locs[0], locs });
+      }
     }
     const pu = (d.stops || []).find((s) => s.kind === 'pickup' && s.firma);
-    if (pu && d.client) await memPut(cid, 'pickup_client', _fold(pu.firma), { client: d.client, client_id: d.client_id || null });
+    if (pu && d.client) {
+      const k = _fold(pu.firma);
+      const clients = _addFront(_clientList(await memGet(cid, 'pickup_client', k)),
+        { client: d.client, client_id: d.client_id || null }, (c) => (c.client_id ? 'id:' + c.client_id : _fold(c.client)));
+      await memPut(cid, 'pickup_client', k, Object.assign({}, clients[0], { clients }));
+    }
     const ck = d.client_id ? 'id:' + d.client_id : _fold(d.client);
     if (ck && d.load_type) {
       await memPut(cid, 'client_cargo', ck, d.load_type === 'LTL'
@@ -223,6 +233,36 @@ async function learnFromDraft(cid, d) {
       await memPut(cid, 'driver_alias', _fold(d.driver_raw), { email: d.email_sofer });
     }
   } catch (e) { console.error('orderChat tanulás hiba (a fuvar mentve):', e.message); }
+}
+
+// Több telephely / több megbízó: a tanult érték lista (régi formátum: egy elem).
+const MEM_LIST_MAX = 10;
+function _locList(v) {
+  if (!v) return [];
+  const arr = Array.isArray(v.locs) ? v.locs : (v.loc ? [v.loc] : []);
+  return arr.map((x) => String(x || '').trim()).filter(Boolean);
+}
+function _clientList(v) {
+  if (!v) return [];
+  const arr = Array.isArray(v.clients) ? v.clients : (v.client ? [{ client: v.client, client_id: v.client_id || null }] : []);
+  return arr.filter((c) => c && c.client).map((c) => ({ client: String(c.client), client_id: c.client_id || null }));
+}
+// Új elem a lista elejére (a legutóbbi elöl), duplikátum nélkül, max MEM_LIST_MAX.
+function _addFront(list, item, keyFn) {
+  const k = keyFn(item);
+  return [item].concat(list.filter((x) => keyFn(x) !== k)).slice(0, MEM_LIST_MAX);
+}
+// Egy cég ismert címei: kedvenc helyszínek (címke = cégnév) + tanult címek.
+async function _firmaAddrCandidates(cid, firma) {
+  const out = []; const seen = new Set();
+  const add = (loc, fav) => { const k = _fold(loc); if (k && !seen.has(k)) { seen.add(k); out.push({ loc: String(loc), fav }); } };
+  try {
+    const r = await pool.query(
+      `SELECT address FROM favorite_locations WHERE company_id=$1 AND LOWER(label)=LOWER($2) ORDER BY id LIMIT 20`, [cid, firma]);
+    r.rows.forEach((x) => x.address && add(x.address, true));
+  } catch (_) { /* tábla hiányzik → kihagyjuk */ }
+  _locList(await memGet(cid, 'firma_addr', _fold(firma))).forEach((l) => add(l, false));
+  return out;
 }
 
 // ─── Szerkesztés: fuvar keresése fuvarszám (CMD-2026-0042) vagy belső id alapján ───
@@ -286,6 +326,7 @@ function buildSystemPrompt(today) {
     'Your job: maintain a structured DRAFT of that order across the conversation. Merge every new message into the previous draft (given below). Keep previous values unless the user changes or removes them. Corrections like "the second unloading is Thursday" or "not FTL, LTL 3 pallets" must update only the affected fields.',
     'TODAY is ' + today.ymd + ' (' + today.weekday + '). Resolve relative dates: a weekday name means the NEXT occurrence of that weekday after today (if today is that weekday, use today only if the user says "today"/"ma"/"azi"); "holnap"/"mâine" = tomorrow. Output dates as YYYY-MM-DD, add THH:mm only if a time is given.',
     'Stops: an ordered list in the order the truck visits them. kind="pickup" (felrakó/felrakás/încărcare) or kind="delivery" (lerakó/lerakás/descărcare). loc = city/address with country code if given (e.g. "Bicske, HU", "Košice, SK", "Brașov, RO"); firma = company name at that stop. "full áru"/"komplett"/"FTL"/"marfă completă" → load_type "FTL"; részrakomány/grupaj/LTL → "LTL".',
+    'One company (firma) can have several sites in different towns, and one client can order from several places: never assume the same address for a company just because it appeared before — use the place the dispatcher names for THAT stop. If the dispatcher answers with "<company> — <address>", put that address into the loc of that company\'s stops whose loc is still empty.',
     'A stop can be referred to by its weekday/date or position ("a hétfői felrakás", "încărcarea de luni", "a 2. lerakó", "prima descărcare"): find THAT stop (matching kind + date / order) and change only the field named (e.g. a city name → its loc). When the dispatcher gives a new place for a stop, REPLACE its loc with exactly that place (drop the old street address) and keep firma and data.',
     'Client (megrendelő / beneficiar) is the company that ORDERS and PAYS — it is NOT automatically the loading company. Only fill "client" if the user states it (or says the loader is the client). If the user writes a Romanian CUI/CIF (digits, maybe with RO prefix) for the client, put it in client_cui.',
     'Driver: put the driver name exactly as written into driver_name. If the user says "his/her truck" / "hozzá tartozó autó" / "a lui", leave the plates empty (the system pairs them). Plates only if explicitly written.',
@@ -380,14 +421,20 @@ async function resolveDraft(cid, input, opts) {
   if (!d.client && !cuiN) {
     const pu = (d.stops || []).find((s) => s.kind === 'pickup' && s.firma);
     const m = pu ? await memGet(cid, 'pickup_client', _fold(pu.firma)) : null;
-    if (m && m.client) {
-      d.client = String(m.client).slice(0, 200); d.learned_client = true;
-      if (m.client_id) {
+    // Egy felrakó cégtől több megbízó is adhat fuvart: csak akkor töltjük ki,
+    // ha a tanult megbízó egyértelmű; különben a kérdés felkínálja őket.
+    const list = _clientList(m);
+    if (list.length === 1) {
+      const c = list[0];
+      d.client = String(c.client).slice(0, 200); d.learned_client = true;
+      if (c.client_id) {
         try {
-          const r = await pool.query('SELECT id, denumire FROM clients WHERE id=$1 AND company_id=$2', [m.client_id, cid]);
+          const r = await pool.query('SELECT id, denumire FROM clients WHERE id=$1 AND company_id=$2', [c.client_id, cid]);
           if (r.rows.length) { d.client_id = r.rows[0].id; d.client = r.rows[0].denumire; }
         } catch (_) { /* best-effort */ }
       }
+    } else if (list.length > 1) {
+      d._client_opts = list.map((c) => c.client);
     }
   }
   if (!d.client_id && d.client) {
@@ -409,41 +456,36 @@ async function resolveDraft(cid, input, opts) {
   if (!d.client) {
     missing.push('client');
     const firstPick = (d.stops || []).find((s) => s.kind === 'pickup' && s.firma);
-    questions.push({ key: 'client', text: qt(o.lang, 'clientAsk'),
-      options: firstPick ? [firstPick.firma] : [] });
+    const opts = d._client_opts ? d._client_opts.slice(0, 4) : (firstPick ? [firstPick.firma] : []);
+    questions.push({ key: 'client', text: qt(o.lang, 'clientAsk'), options: opts });
   }
+  delete d._client_opts;
 
   // 2) Állomások ─────────────────────────────────────────────
   const stops = d.stops || [];
   if (!stops.some((s) => s.kind === 'pickup')) missing.push('pickup');
   if (!stops.some((s) => s.kind === 'delivery')) missing.push('delivery');
-  // Tanult cím: a cégnél korábban mentett teljes cím, ha most csak városnév
-  // (vagy semmi) van megadva, és a tanult cím ezt a várost tartalmazza.
+  // Tanult / mentett cím. Egy cégnek TÖBB telephelye is lehet (több helységben):
+  // a jelöltek a tanult címek (order_chat_memory firma_addr — lista) + a cég ilyen
+  // címkéjű kedvenc helyszínei. Csak egyértelmű esetben töltünk ki; ha több cím
+  // illik, rákérdezünk. A diszpécser által beírt más helységet sosem írjuk felül.
+  const askedFirma = new Set();
   for (const s of stops) {
     if (!s.firma || (s.loc && /\d/.test(s.loc))) continue;
-    const m = await memGet(cid, 'firma_addr', _fold(s.firma));
-    if (m && m.loc && (!s.loc || _fold(m.loc).includes(_fold(s.loc)))) {
-      s.loc = String(m.loc).slice(0, 200); s.learned = true;
+    const cands = await _firmaAddrCandidates(cid, s.firma);
+    const pool2 = s.loc ? cands.filter((c) => _fold(c.loc).includes(_fold(s.loc))) : cands;
+    if (pool2.length === 1) {
+      s.loc = pool2[0].loc.slice(0, 200); s.fav = !!pool2[0].fav; s.learned = !pool2[0].fav;
+    } else if (pool2.length > 1 && !askedFirma.has(_fold(s.firma))) {
+      askedFirma.add(_fold(s.firma));
+      questions.push({ key: 'stop_site', text: qt(o.lang, 'siteMulti', s.firma + (s.loc ? ' (' + s.loc + ')' : '')),
+        options: pool2.slice(0, 4).map((c) => (s.firma + ' — ' + c.loc).slice(0, 160)) });
     }
   }
   stops.forEach((s, i) => {
     if (!s.loc) missing.push('stop_loc_' + i);
     if (!s.data && !o.editing) missing.push('stop_date_' + i);
   });
-  // Mentett kedvenc helyszín: ha a cég neve pontosan egy mentett helyszín
-  // címkéje, és a cím csak városnév (nincs benne szám), a mentett cím kerül be.
-  try {
-    for (const s of stops) {
-      if (!s.firma) continue;
-      if (s.loc && /\d/.test(s.loc)) continue;
-      const r = await pool.query(
-        `SELECT address FROM favorite_locations WHERE company_id=$1 AND LOWER(label)=LOWER($2) LIMIT 1`, [cid, s.firma]);
-      // Csak ha nincs hely, vagy a mentett cím ugyanabban a városban van — a
-      // diszpécser által beírt más helységet (pl. „Ploiești") sosem írjuk felül.
-      const addr = r.rows.length ? String(r.rows[0].address || '') : '';
-      if (addr && (!s.loc || _fold(addr).includes(_fold(s.loc)))) { s.loc = addr.slice(0, 200); s.fav = true; s.learned = false; }
-    }
-  } catch (_) { /* tábla hiányzik → kihagyjuk */ }
 
   // 3) Áru ───────────────────────────────────────────────────
   // Tanult: a megrendelő szokásos áru-típusa (és LTL-méretei), ha most nincs megadva.

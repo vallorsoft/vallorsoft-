@@ -354,6 +354,43 @@ describe('tanulás', () => {
     expect(r.reply).toMatch(/Nem változott semmi/);
   });
 
+  test('több telephely: a beírt helység választ, helység nélkül rákérdez', async () => {
+    const mem = { 'firma_addr:vesna gc': { loc: 'Str. A 1, Arad', locs: ['Str. A 1, Arad', 'Str. B 2, Ploiești'] } };
+    mockRules = [{ match: /FROM order_chat_memory/, fn: (sql, p) => { const v = mem[p[1] + ':' + p[2]]; return { rows: v ? [{ value: v }] : [] }; } }];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({ client: 'C', stops: [
+      { kind: 'pickup', loc: 'Ploiesti', firma: 'Vesna GC', data: '2026-11-09' },
+      { kind: 'pickup', loc: null, firma: 'Vesna GC', data: '2026-11-10' },
+      { kind: 'delivery', loc: 'Bicske', data: '2026-11-11' },
+    ] }), { estimateRoute: false, lang: 'hu' });
+    expect(r.draft.stops[0].loc).toBe('Str. B 2, Ploiești');
+    expect(r.draft.stops[1].loc).toBeNull();
+    expect(r.missing).toContain('stop_loc_1');
+    const q = r.questions.find((x) => x.key === 'stop_site');
+    expect(q.options).toEqual(['Vesna GC — Str. A 1, Arad', 'Vesna GC — Str. B 2, Ploiești']);
+  });
+
+  test('egy felrakótól több megbízó → nem tölti ki, felkínálja őket', async () => {
+    const mem = { 'pickup_client:vesna gc': { client: 'A SRL', clients: [{ client: 'A SRL' }, { client: 'B SRL' }] } };
+    mockRules = [{ match: /FROM order_chat_memory/, fn: (sql, p) => { const v = mem[p[1] + ':' + p[2]]; return { rows: v ? [{ value: v }] : [] }; } }];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({ stops: [{ kind: 'pickup', loc: 'Arad', firma: 'Vesna GC', data: '2026-11-09' }] }), { estimateRoute: false, lang: 'hu' });
+    expect(r.draft.client).toBeNull();
+    expect(r.draft._client_opts).toBeUndefined();
+    expect(r.questions.find((x) => x.key === 'client').options).toEqual(['A SRL', 'B SRL']);
+  });
+
+  test('tanulás: a második cím a lista elejére kerül, a régi megmarad', async () => {
+    const puts = [];
+    mockRules = [
+      { match: /FROM order_chat_memory/, fn: (sql, p) => ({ rows: p[1] === 'firma_addr' ? [{ value: { loc: 'Str. A 1, Arad' } }] : (p[1] === 'pickup_client' ? [{ value: { client: 'A SRL', client_id: 1 } }] : []) }) },
+      { match: /INSERT INTO order_chat_memory/, fn: (sql, p) => { puts.push([p[1], JSON.parse(p[3])]); return { rows: [] }; } },
+    ];
+    await h._learnFromDraft(7, { client: 'B SRL', client_id: 2, stops: [{ kind: 'pickup', loc: 'Str. B 2, Ploiești', firma: 'Vesna GC' }] });
+    const fa = puts.find((x) => x[0] === 'firma_addr')[1];
+    expect(fa.locs).toEqual(['Str. B 2, Ploiești', 'Str. A 1, Arad']);
+    const pc = puts.find((x) => x[0] === 'pickup_client')[1];
+    expect(pc.clients.map((c) => c.client)).toEqual(['B SRL', 'A SRL']);
+  });
+
   test('hiányzó memória-tábla → nincs hiba', async () => {
     mockRules = [{ match: /order_chat_memory/, fn: () => { throw new Error('relation does not exist'); } }];
     const r = await h._resolveDraft(7, h._sanitizeDraft({ stops: [{ kind: 'pickup', loc: 'Brasov', firma: 'B', data: '2026-10-12' }] }), { estimateRoute: false });

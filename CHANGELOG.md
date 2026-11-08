@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-08 — 💬 Szöveges fuvarkiírás: egy cégnek több telephelye, egy felrakótól több megbízó (PR #626)
+- A tanult `firma_addr` és `pickup_client` most LISTA (max. 10, a legutóbbi elöl; a régi egyelemes érték olvasható marad). A cég kedvenc helyszínei közül is az összes azonos címkéjűt figyeli (eddig csak egyet).
+- Kitöltés csak egyértelmű esetben: beírt helységnél az abban a városban lévő cím; ha több cím / több megbízó illik, a chat rákérdez („A(z) X cégnek több címe is van. Melyik?"), gombokkal. A Tanult adatok fül a teljes listát mutatja. +3 teszt.
+
 ## 2026-11-08 — 💬 Szöveges fuvarkiírás FIX: a beírt helység megmarad + nincs „This operation was aborted" (PR #625)
 - **Gyökér:** a mentett kedvenc helyszín (`favorite_locations`, „mentett hely" jelvény) minden számmentes címet felülírt — a „hétfői felrakás Ploiești" így visszaugrott az aradi címre, miközben az AI azt írta, hogy beírta. Most csak üres helyet, vagy ugyanabban a városban lévő címet tölt ki (`handlers/orderChat.js` `resolveDraft`).
 - **Őszinte válasz:** ha az AI módosítást állít, de a vázlat nem változott, a szerver „Nem változott semmi a vázlaton…" választ ad (`claimsChange`). A prompt érti a napnévvel / sorszámmal megnevezett állomást.
