@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 80. lépés — Automatikus határátlépés a GPS-ből (2026-11-08, PR #623) ✅ KÉSZ
+- Új adat: a vontató GPS-pontsorából felismert határátlépés (idő + koordináta + rendszám) a sofőrhöz kötve — személyes helyadat: a GDPR-export tartalmazza, az anonimizálás a nevet/e-mailt lecseréli. A felismerő csak a cég saját `gps_track_days` soraiból dolgozik és `company_id`-vel ír; az automata sorok olvasása `company_id` + rendszám szerint szűrt, paraméteres SQL. A módosítás/elvetés továbbra is csak Admin/Manager, saját cégre (`COALESCE(bc.company_id, u.company_id)`), audit (`border.ignore`). A sofőr nem kap napszámot az előnézetben. Új végpont nincs; a `previewTripDiurna` új `camion` paramétere csak szűrésre megy (20 karakterre vágva, paraméterként).
+
 ### 79. lépés — Mentés visszaállítása (2026-11-06, PR #616) ✅ KÉSZ
 - Csak Admin, saját cégre (`company_id` minden lekérdezésben), `drive-backup` kapu. Előnézet nélkül nem indul: a megerősítés atomikus `UPDATE … WHERE status='preview_ready'` (egyszer használható) + beírandó megerősítő szó; audit mindkét lépésen. A fájl a cég saját HKDF-kulcsával hitelesített (GCM), a `meta.company_id` egyezése kötelező, és a `company_id`-s sorok közül csak a saját cégé kerülhet vissza. A beszúrás csak hiányzó id-ket ír (`ON CONFLICT DO NOTHING`), meglévőt nem ír felül; a cég-sor és a mentés-naplók kizárva. Tábla/oszlop-nevek az `information_schema`-ból, idézőjelezve; értékek paraméterként. Elakadt feladat 2 óra után lezárul.
 
