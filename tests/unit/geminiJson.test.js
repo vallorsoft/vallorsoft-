@@ -163,3 +163,69 @@ describe('lib/geminiJson — elérhető modellek (ListModels)', () => {
       .rejects.toThrow(/Niciun model AI nu este disponibil/);
   });
 });
+
+// ── Hibás / furcsa AI-válaszok: soha ne nyers SyntaxError, hanem következő modell ──
+describe('lib/geminiJson — hibás AI-válaszok', () => {
+  const { parseAiJson } = require('../../lib/geminiJson');
+  const origKey = process.env.GEMINI_API_KEY;
+  const origFetch = global.fetch;
+  beforeEach(() => { process.env.GEMINI_API_KEY = 'test-key'; global.fetch = jest.fn(); });
+  afterAll(() => {
+    if (origKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = origKey;
+    global.fetch = origFetch;
+  });
+  const textReply = (text) => ({ ok: true, status: 200,
+    text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }) });
+  const rawReply = (raw) => ({ ok: true, status: 200, text: async () => raw });
+
+  test.each([
+    ['sima JSON', '{"a":1}', { a: 1 }],
+    ['```json keret', '```json\n{"a":1}\n```', { a: 1 }],
+    ['``` keret nyelv nélkül', '```\n{"a":1}\n```', { a: 1 }],
+    ['szöveg a JSON körül', 'Íme a válasz: {"a":{"b":[1,2]}} remélem jó', { a: { b: [1, 2] } }],
+    ['ékezetes tartalom', '{"reply":"Brașov — Pető"}', { reply: 'Brașov — Pető' }],
+  ])('parseAiJson: %s', (_n, text, exp) => { expect(parseAiJson(text)).toEqual(exp); });
+
+  test.each([
+    ['üres', ''], ['null', null], ['tömb', '[1,2]'], ['szám', '42'], ['szöveg', 'nem tudom'],
+    ['csonka JSON', '{"a":1,"b":'], ['csak kódkeret', '```json\n```'],
+  ])('parseAiJson → null: %s', (_n, text) => { expect(parseAiJson(text)).toBeNull(); });
+
+  test('csonka JSON az elsőn → a következő modell válasza jön', async () => {
+    global.fetch
+      .mockImplementationOnce(async () => textReply('{"draft":{"stops":['))
+      .mockImplementationOnce(async () => textReply('{"ok":true}'));
+    const r = await extractJson({ systemPrompt: 's', parts: [{ text: 'x' }], models: ['m1', 'm2'] });
+    expect(r).toEqual({ json: { ok: true }, model: 'm2' });
+  });
+
+  test('biztonsági blokk (nincs candidates) → következő modell', async () => {
+    global.fetch
+      .mockImplementationOnce(async () => rawReply(JSON.stringify({ promptFeedback: { blockReason: 'SAFETY' } })))
+      .mockImplementationOnce(async () => textReply('{"ok":1}'));
+    const r = await extractJson({ systemPrompt: 's', parts: [], models: ['m1', 'm2'] });
+    expect(r.model).toBe('m2');
+  });
+
+  test('a HTTP-válasz maga sem JSON (HTML-oldal) → következő modell', async () => {
+    global.fetch
+      .mockImplementationOnce(async () => rawReply('<html>bad gateway</html>'))
+      .mockImplementationOnce(async () => textReply('{"ok":1}'));
+    const r = await extractJson({ systemPrompt: 's', parts: [], models: ['m1', 'm2'] });
+    expect(r.model).toBe('m2');
+  });
+
+  test('minden modell érvénytelen választ ad → érthető román hiba, nem SyntaxError', async () => {
+    global.fetch.mockImplementation(async () => textReply('bocs, nem megy'));
+    await expect(extractJson({ systemPrompt: 's', parts: [], models: ['m1', 'm2', 'm3'] }))
+      .rejects.toThrow(/răspuns invalid/);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  test('a hibaüzenet sosem tartalmazza a kulcsot', async () => {
+    global.fetch.mockImplementation(async () => textReply('x'));
+    try { await extractJson({ systemPrompt: 's', parts: [], models: ['m1'] }); } catch (e) {
+      expect(e.message).not.toMatch(/test-key/);
+    }
+  });
+});

@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-08 — 🧪 AI-megoldások + tanult adatok: robusztussági tesztek és javítások (PR #628)
+- **`lib/geminiJson.js`**: csonka / szöveggel körített / kódblokkos / üres (biztonsági blokk) AI-válasz nem dob nyers `SyntaxError`-t — új `parseAiJson`, érvénytelen válasz → `502` → következő modell; ha mind érvénytelen, érthető román hiba.
+- **`handlers/orderChat.js`**: objektumként / függvényként jövő AI-mező nem lesz „[object Object]” szöveg (`_str`); a sérült tanult címlista / megbízó-lista (`_locList` / `_clientList`) csak tiszta szöveget / egész id-t ad, max. 300; a „módosítottam” őr az ékezettel kezdődő szót is felismeri („átírtam”).
+- **Új tesztek** (+~120): `tests/unit/orderChatRobust.test.js` (1000 véletlen hibás vázlat fuzz, 200 véletlen AI-válasz, AI-hibák, sérült memória, helység-egyezés, állítás-őr), `tests/unit/chatMemory.test.js`, `geminiJson` hibás-válasz eseteket, `chatTools` router: hibás AI-válaszból soha nincs írás. Teljes suite: 2354 zöld.
+
 ## 2026-11-08 — 💬 Fuvar-chat: szállítmányozó / nagy megbízó — akár több száz cím (PR #627)
 - A tanult cím- és megbízó-lista 10 → 300 elem (legutóbbi elöl); a kedvenc helyszínek közül 500-ig.
 - A beírt helység egész szóra illesztve (`_townMatch` — az „Arad" nem illik az „Aradului" utcára).

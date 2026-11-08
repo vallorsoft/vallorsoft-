@@ -351,3 +351,43 @@ describe('terv + visszavonás + flotta/pénzügy', () => {
     expect(names).toContain('driver.earning_add');
   });
 });
+
+// ── Robusztusság: hibás / rosszindulatú AI-válasz sosem vezet íráshoz vagy összeomláshoz ──
+describe('router — hibás AI-válaszok', () => {
+  const writeCalls = () => Object.values(mockH).concat(Object.values(mockFC)).reduce((n, f) => n + f.mock.calls.length, 0);
+  test.each([
+    ['json null', { model: 'm', json: null }],
+    ['steps szöveg', { model: 'm', json: { steps: 'order.set_status' } }],
+    ['steps szemét', { model: 'm', json: { steps: [null, 1, 'x', { tool: 5 }, { tool: { a: 1 } }, { tool: '__proto__' }, { tool: 'constructor' }] } }],
+    ['ismeretlen tool', { model: 'm', json: { steps: [{ tool: 'db.drop_all', args: {} }], confidence: 1 } }],
+    ['args tömb', { model: 'm', json: { steps: [{ tool: 'nope', args: [1, 2] }] } }],
+    ['alacsony biztonság', { model: 'm', json: { steps: [{ tool: 'order.set_status', args: { order: '0042', status: 'Finalizat' } }], confidence: 0.1 } }],
+    ['confidence szöveg', { model: 'm', json: { steps: [], confidence: 'magas' } }],
+    ['remember szemét', { model: 'm', json: { steps: [], remember: 'x', forget: { a: 1 } } }],
+    ['alternatives szemét', { model: 'm', json: { steps: [], alternatives: [null, { tool: 'order.list', example: { a: 1 } }, 'x'] } }],
+    ['reply objektum', { model: 'm', json: { steps: [], chat: true, reply: { hu: 'x' } } }],
+    ['ai undefined', undefined],
+  ])('%s → nem dob, nem ír, szöveges válasz', async (_n, aiOut) => {
+    mockExtract.mockResolvedValue(aiOut);
+    const r = await router.route(req(ADMIN), 'izé', { lang: 'hu', now: NOW });
+    expect(r).toBeTruthy();
+    expect(writeCalls()).toBe(0);
+    expect(mockLog).toHaveLength(0);
+    if (r.reply != null) { expect(typeof r.reply).toBe('string'); expect(r.reply).not.toMatch(/\[object /); }
+    (r.questions || []).forEach((q) => (q.options || []).forEach((o) => expect(typeof o).toBe('string')));
+  });
+  test('AI-hibák (kvóta / időtúllépés / hosszú) → rövid err, nincs stack', async () => {
+    for (const e of [Object.assign(new Error('Cota epuizată'), { status: 429 }), Object.assign(new Error('timeout'), { status: 504 }), new Error('y'.repeat(4000))]) {
+      mockExtract.mockRejectedValueOnce(e);
+      const r = await router.route(req(ADMIN), 'bármi', { lang: 'hu', now: NOW });
+      expect(r.err).toBeTruthy();
+      expect(r.err.length).toBeLessThanOrEqual(300);
+      expect(r.err).not.toMatch(/at .*\.js:\d+/);
+    }
+  });
+  test('írás AI-ból: legfeljebb előkészítés (megerősítés kell), azonnali írás nincs', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { steps: [{ tool: 'order.set_status', args: { order: '0042', status: 'Finalizat' } }], confidence: 0.95 } });
+    await router.route(req(ADMIN), 'zárd le a 42-t', { lang: 'hu', now: NOW });
+    expect(mockLog).toHaveLength(0);
+  });
+});
