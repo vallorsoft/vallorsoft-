@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-08 — ⛽ Bon-scan: a literár nem kerül a liter mezőbe; dízel 50–1500 L (PR #622)
+- **Kérés:** kerek literes tankolásnál (pl. 300 L) a rendszer a literárat (pl. 10,93 lej/l) vette tankolt liternek. Motorină 50–1500 L lehet, AdBlue kevesebb is.
+- **Új `lib/fuelLiters.js`** (`inRange`/`fixLiters`): a `sanitize` a bon-kiolvasásnál javít — ha a liter = literár vagy kilóg a sávból, összeg ÷ literár (vagy összeg ÷ a hibás „liter") ad sávba eső értéket → azt veszi; ha nem javítható, üresen hagyja és figyelmeztet (`litru_warn`). Az AI-prompt új `pret_litru` mezőt kér és kifejezetten tiltja a literár/mennyiség összekeverését.
+- **Sofőr felület:** a bon-áttekintő figyelmeztet és nem fogad el sávon kívüli litert; a menetlevél beküldése blokkol, ha egy tankolás-sor litere sávon kívül van (`_validateAlimLiters`). AdBlue: 0 < L ≤ 1500.
+- Tesztek: +6; 2201 Jest zöld.
+
 ## 2026-11-08 — 📷 Sofőr bon-scan: a lefotózott, menetlevélbe nem tett bon másik telefonról is elérhető (PR #621)
 - **Kérés:** ha a sofőr lefotózza a tankolási bont, de nem adja hozzá a menetlevélhez, maradjon meg a rendszerben, és másik telefonról belépve is hozzáadhassa.
 - **Gyökér:** a kiolvasott bon a szerveren már `driver_receipt_scans` `pending` sorként megvolt, de a sofőr várólistája csak a telefon localStorage-ából töltött.

@@ -4831,6 +4831,9 @@
     // ── Élő km / üzemanyag ellenőrzés a menetlevélen ──
     'sof.km.driven':        { hu: 'Megtett út', ro: 'Distanță parcursă' },
     'sof.km.consumption':   { hu: 'Becsült fogyasztás', ro: 'Consum estimat' },
+    'sof.lit.rangeDiesel':  { hu: 'Motorină tankolás 50 és 1500 liter között lehet — ellenőrizd, nem a literár került-e a liter mezőbe (pl. 10,93 lej/l).', ro: 'Alimentarea cu motorină trebuie să fie între 50 și 1500 litri — verifică să nu fi trecut prețul pe litru (ex. 10,93 lei/l) în loc de cantitate.' },
+    'sof.lit.rangeAdblue':  { hu: 'AdBlue tankolás 0-nál több és legfeljebb 1500 liter lehet.', ro: 'Alimentarea cu AdBlue trebuie să fie mai mare de 0 și cel mult 1500 litri.' },
+    'sof.lit.check':        { hu: 'A litert nem sikerült biztosan kiolvasni — írd be a bonról a tankolt mennyiséget (nem a literárat).', ro: 'Cantitatea nu a putut fi citită sigur — introdu de pe bon litrii alimentați (nu prețul pe litru).' },
     'sof.km.negative':      { hu: 'A záró km kisebb a kezdőnél — javítsd, mert így 0 km kerülne a menetlevélre.', ro: 'Km-ul final este mai mic decât cel inițial — corectează, altfel foaia de parcurs ar primi 0 km.' },
     'sof.km.tooMuch':       { hu: 'Szokatlanul sok km egy menetlevélen — ellenőrizd a kezdő és záró km-t.', ro: 'Neobișnuit de mulți km pe o foaie de parcurs — verifică km-ul inițial și final.' },
     'sof.km.outOfRange':    { hu: 'kilóg a szokásos sávból', ro: 'în afara intervalului obișnuit' },
