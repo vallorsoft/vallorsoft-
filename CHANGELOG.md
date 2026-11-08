@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-08 — 💬 Szöveges fuvarkiírás FIX: a beírt helység megmarad + nincs „This operation was aborted" (PR #625)
+- **Gyökér:** a mentett kedvenc helyszín (`favorite_locations`, „mentett hely" jelvény) minden számmentes címet felülírt — a „hétfői felrakás Ploiești" így visszaugrott az aradi címre, miközben az AI azt írta, hogy beírta. Most csak üres helyet, vagy ugyanabban a városban lévő címet tölt ki (`handlers/orderChat.js` `resolveDraft`).
+- **Őszinte válasz:** ha az AI módosítást állít, de a vázlat nem változott, a szerver „Nem változott semmi a vázlaton…" választ ad (`claimsChange`). A prompt érti a napnévvel / sorszámmal megnevezett állomást.
+- **Időtúllépés:** a Gemini 30 mp-es AbortError-ja nem nyers angol hibaként jön ki — a lánc a következő modellel próbálkozik (504), végül román üzenet (`lib/geminiJson.js`). +3 teszt.
+
 ## 2026-11-08 — ⛽ Üzemanyag-hiány riasztás + 🛣️ automatikus útdíj + 📋 lejárat-feladat + 📈 használati kimutatás (PR #624)
 - **Üzemanyag-hiány riasztás** (`lib/fuelLossAlert.js`, `startFuelLossScheduler` 30 perc): napi hiány járművenként a GPS tartály-szintből (álló hiány + hirtelen csökkenés + bon szerinti többlet, kettős számolás nélkül). > 100 L → iroda (e-mail, push, értesítés); > 250 L → a sofőr is (e-mail + push). `fuel_loss_alerts`, fokozatonként egyszer, 7 nap visszanézés. Env: `FUEL_LOSS_OFFICE_L` / `FUEL_LOSS_DRIVER_L` / `FUEL_LOSS_INTERVAL_MIN`.
 - **Automatikus útdíj** (`lib/orderAutoToll.js`): a HERE kamion-útvonalból magától; kézi / átírt értéket nem ír felül (`toll_geo.auto`), útvonal-változáskor újraszámol.

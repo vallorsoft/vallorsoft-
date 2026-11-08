@@ -93,6 +93,7 @@ const QT = {
   truckNone:    { ro: 'Nu găsesc tractorul {c} în flotă.', hu: 'A(z) {c} vontató nincs a flottában.' },
   trailerNone:  { ro: 'Nu găsesc remorca {c} în flotă.', hu: 'A(z) {c} pótkocsi nincs a flottában.' },
   editLoaded:   { ro: 'Am încărcat cursa {c}. Scrie ce trebuie modificat (ex. „a doua descărcare joi", „alt șofer").', hu: 'Betöltöttem a(z) {c} fuvart. Írd meg, mit módosítsak (pl. „a második lerakás csütörtök", „másik sofőr").' },
+  noChange:     { ro: 'Nu s-a modificat nimic în schiță. Scrie mai exact, de ex. „încărcarea 1: Ploiești" sau „descărcarea de joi: Arad".', hu: 'Nem változott semmi a vázlaton. Írd pontosabban, pl. „1. felrakás helye: Ploiești" vagy „a csütörtöki lerakás: Arad".' },
   editNotFound: { ro: 'Nu găsesc cursa {c} (sau este anulată).', hu: 'Nem találom a(z) {c} fuvart (vagy törölve van).' },
 };
 function qt(lang, key, c) {
@@ -130,6 +131,10 @@ function _today(now) {
   const wd = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'long' }).format(d);
   return { ymd, weekday: wd };
 }
+
+// Módosítást állító válasz (HU / RO) — az őr csak ilyenkor lép közbe.
+const CLAIM_RE = /\b(beirtam|beírtam|atirtam|átírtam|modositottam|módosítottam|frissitettem|frissítettem|javitottam|javítottam|cserel|cserél|beallitottam|beállítottam|hozzaadtam|hozzáadtam|toroltem|töröltem|am (actualizat|modificat|schimbat|corectat|adăugat|adaugat|pus|scris|trecut|șters|sters|setat))/i;
+function claimsChange(t) { return CLAIM_RE.test(String(t || '')); }
 
 // ─── Vázlat-tisztítás (AI-ból VAGY a kliensről jövő, megbízhatatlan) ───
 function sanitizeDraft(d) {
@@ -281,6 +286,7 @@ function buildSystemPrompt(today) {
     'Your job: maintain a structured DRAFT of that order across the conversation. Merge every new message into the previous draft (given below). Keep previous values unless the user changes or removes them. Corrections like "the second unloading is Thursday" or "not FTL, LTL 3 pallets" must update only the affected fields.',
     'TODAY is ' + today.ymd + ' (' + today.weekday + '). Resolve relative dates: a weekday name means the NEXT occurrence of that weekday after today (if today is that weekday, use today only if the user says "today"/"ma"/"azi"); "holnap"/"mâine" = tomorrow. Output dates as YYYY-MM-DD, add THH:mm only if a time is given.',
     'Stops: an ordered list in the order the truck visits them. kind="pickup" (felrakó/felrakás/încărcare) or kind="delivery" (lerakó/lerakás/descărcare). loc = city/address with country code if given (e.g. "Bicske, HU", "Košice, SK", "Brașov, RO"); firma = company name at that stop. "full áru"/"komplett"/"FTL"/"marfă completă" → load_type "FTL"; részrakomány/grupaj/LTL → "LTL".',
+    'A stop can be referred to by its weekday/date or position ("a hétfői felrakás", "încărcarea de luni", "a 2. lerakó", "prima descărcare"): find THAT stop (matching kind + date / order) and change only the field named (e.g. a city name → its loc). When the dispatcher gives a new place for a stop, REPLACE its loc with exactly that place (drop the old street address) and keep firma and data.',
     'Client (megrendelő / beneficiar) is the company that ORDERS and PAYS — it is NOT automatically the loading company. Only fill "client" if the user states it (or says the loader is the client). If the user writes a Romanian CUI/CIF (digits, maybe with RO prefix) for the client, put it in client_cui.',
     'Driver: put the driver name exactly as written into driver_name. If the user says "his/her truck" / "hozzá tartozó autó" / "a lui", leave the plates empty (the system pairs them). Plates only if explicitly written.',
     'The previous draft may be an EXISTING order loaded for editing: then keep every field unchanged except what the dispatcher explicitly asks to change.',
@@ -432,7 +438,10 @@ async function resolveDraft(cid, input, opts) {
       if (s.loc && /\d/.test(s.loc)) continue;
       const r = await pool.query(
         `SELECT address FROM favorite_locations WHERE company_id=$1 AND LOWER(label)=LOWER($2) LIMIT 1`, [cid, s.firma]);
-      if (r.rows.length && r.rows[0].address) { s.loc = String(r.rows[0].address).slice(0, 200); s.fav = true; s.learned = false; }
+      // Csak ha nincs hely, vagy a mentett cím ugyanabban a városban van — a
+      // diszpécser által beírt más helységet (pl. „Ploiești") sosem írjuk felül.
+      const addr = r.rows.length ? String(r.rows[0].address || '') : '';
+      if (addr && (!s.loc || _fold(addr).includes(_fold(s.loc)))) { s.loc = addr.slice(0, 200); s.fav = true; s.learned = false; }
     }
   } catch (_) { /* tábla hiányzik → kihagyjuk */ }
 
@@ -745,9 +754,13 @@ handlers.orderChatTurn = async function (req, res, args) {
       await audit.fromReq(req, 'order.chat_turn', 'order', null, { turns: messages.length, ready, model: ai.model });
     } catch (_) { /* best-effort */ }
 
+    // Őr: ha az AI azt állítja, hogy módosított, de a vázlat (a feloldás után) nem
+    // változott, ne mondjon valótlant — a szerver írja meg, hogy semmi nem változott.
+    let reply = _str(out.reply, 600) || '';
+    if (claimsChange(reply) && JSON.stringify(_aiView(r.draft)) === JSON.stringify(_aiView(prev))) reply = qt(lang, 'noChange');
     return res.json({ result: {
       ok: true,
-      reply: _str(out.reply, 600) || '',
+      reply,
       draft: _clientDraft(r.draft),
       questions, notes: r.notes, missing: r.missing, ready,
     } });

@@ -53,6 +53,17 @@ describe('lib/geminiJson', () => {
     expect(opts.headers['x-goog-api-key']).toBe('test-key');
   });
 
+  test('időtúllépés (AbortError) → nincs nyers angol hiba, a következő modell jön', async () => {
+    const abort = () => { const e = new Error('This operation was aborted'); e.name = 'AbortError'; throw e; };
+    global.fetch.mockImplementationOnce(async () => abort());
+    mockJsonOnce({ ok: 1 });
+    const r = await extractJson({ systemPrompt: 's', parts: [], models: [MODELS[0], MODELS[1]] });
+    expect(r.model).toBe(MODELS[1]);
+    global.fetch.mockImplementation(async () => abort());
+    await expect(extractJson({ systemPrompt: 's', parts: [], models: [MODELS[0]] }))
+      .rejects.toThrow(/nu a răspuns la timp/);
+  });
+
   test('429 az elsőn → a második modellel próbál', async () => {
     global.fetch
       .mockImplementationOnce(async () => mockStatus(429))
