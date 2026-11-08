@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-08 — 📷 Sofőr bon-scan: a lefotózott, menetlevélbe nem tett bon másik telefonról is elérhető (PR #621)
+- **Kérés:** ha a sofőr lefotózza a tankolási bont, de nem adja hozzá a menetlevélhez, maradjon meg a rendszerben, és másik telefonról belépve is hozzáadhassa.
+- **Gyökér:** a kiolvasott bon a szerveren már `driver_receipt_scans` `pending` sorként megvolt, de a sofőr várólistája csak a telefon localStorage-ából töltött.
+- **Új** `public/sofer.js` `rcptQueueSyncServer`: belépéskor / főoldal-menetlevél nézetben / app-visszatéréskor a szerver pending bonjait (kis képpel) a helyi várólistába húzza — ott áttekinthető, elfogadható, és az új menetlevél „Korábbi tétel" popupja is felajánlja; a máshol már felhasznált/eldobott bon helyben is lekerül. `listPendingReceipts` +`include_thumb` +`available`. A popupból hozzáadott bon a szerveren is `attached` lesz.
+- Tesztek: +2; 2194 Jest zöld.
+
 ## 2026-11-06 — 📄 Menetlevél: a GPS szerinti cím MINDEN pontra rákerül — a fuvar szerkesztése nem tépi el a kötést (PR #620)
 - **Kérés (MT-2026-0031 PDF):** a menetlevélen a 9 pontból csak egynél jelent meg a GPS szerinti cím, a többinél maradt a tervezett — pedig ezeket a helyeket a rendszer ismeri.
 - **Gyökér:** a `lib/orderStops.js` `replaceStopsForOrder` minden fuvar-szerkesztéskor TÖRÖLTE és újra beszúrta a fuvar összes állomását → új azonosítót kaptak. A menetlevél pontjai (`puncte[].stopId`) a régi azonosítóra mutattak („elárvultak"), így a rátétel nem talált rájuk; közben az állomás GPS-felismerése (`actual_*`/`match_*`) és a UIT-kód állomás-kötése is elveszett. A naponta bővülő (Arad → Copșa → Cluj → Copșa …) fuvarokat érintette a leginkább.
