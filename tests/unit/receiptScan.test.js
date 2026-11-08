@@ -400,7 +400,7 @@ describe('bon-kategória felismerés', () => {
     // A prompt a `categoryListForPrompt()`-ot használja → a lista sosem
     // csúszhat el a `lib/expenseCategories.js`-től.
     expect(src).toMatch(/categorie[^\n]*categoryListForPrompt\(\)/);
-    expect(src).toMatch(/'kind, loc, data, tip, litru, km, plata, suma, valuta, produs, categorie, confidence/);
+    expect(src).toMatch(/'kind, loc, data, tip, litru, pret_litru, km, plata, suma, valuta, produs, categorie, confidence/);
   });
 
   test('vásárlásnál a fehérlistás kategória átmegy', () => {

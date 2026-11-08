@@ -3410,7 +3410,10 @@ function rrOpen(id) {
     rows += '<div class="rr-row"><label>' + t('sof.fuelType') + '</label>'
           + '<select id="rrTip"><option' + (f.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option>'
           + '<option' + (f.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>';
-    rows += '<div class="rr-row"><label>' + t('sof.liters') + '</label><input id="rrLitru" type="number" value="' + esc2(f.litru != null ? f.litru : 0) + '"></div>';
+    rows += '<div class="rr-row"><label>' + t('sof.liters') + '</label><input id="rrLitru" type="number" value="' + esc2(f.litru != null ? f.litru : '') + '"></div>';
+    if (f.litru_warn || f.litru == null) {
+      rows += '<div class="rr-row" style="color:#b45309;font-size:12.5px;font-weight:600;">⚠️ ' + esc2(t('sof.lit.check')) + '</div>';
+    }
     rows += '<div class="rr-row"><label>' + t('sof.km') + '</label><input id="rrKm" type="number" value="' + esc2(f.km != null ? f.km : 0) + '"></div>';
   } else {
     rows += '<div class="rr-row"><label>' + t('sof.product') + '</label><input id="rrProdus" value="' + esc2(f.produs) + '"></div>';
@@ -3483,8 +3486,48 @@ function rrRemove(id) {
 // A modal mezői → a sessionStorage-i menetlevél-piszkozatba egy új
 // tankolás vagy vásárlás sor; ha a menetlevél 2. lépés éppen nyitva,
 // a DOM sor is beszúródik.
+// Tankolt liter ésszerűségi szabálya (a szerver `lib/fuelLiters.js`-ével
+// azonos): Motorină 50–1500 L, AdBlue 0 < L ≤ 1500. Tipikus hiba: a bonon
+// lévő literár (pl. 10,93 lej/l) kerül a liter mezőbe.
+var FUEL_DIESEL_MIN_L = 50, FUEL_DIESEL_MAX_L = 1500, FUEL_ADBLUE_MAX_L = 1500;
+function _fuelLitersOk(litru, tip) {
+  var l = parseFloat(String(litru == null ? '' : litru).replace(',', '.'));
+  if (!isFinite(l) || l <= 0) return false;
+  if (String(tip || '').replace(/\s+/g, '').toLowerCase() === 'adblue') return l <= FUEL_ADBLUE_MAX_L;
+  return l >= FUEL_DIESEL_MIN_L && l <= FUEL_DIESEL_MAX_L;
+}
+function _fuelLitersMsg(tip) {
+  return String(tip || '').replace(/\s+/g, '').toLowerCase() === 'adblue'
+    ? t('sof.lit.rangeAdblue') : t('sof.lit.rangeDiesel');
+}
+// Menetlevél beküldés előtt: minden tankolás-sor litere ésszerű-e (blokkoló).
+function _validateAlimLiters() {
+  var bad = null;
+  document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
+    if (bad) return;
+    var litEl = row.querySelector('.alim-lit');
+    var tip = (row.querySelector('.alim-tip') || {}).value || 'Motorină';
+    var sum = parseFloat((row.querySelector('.alim-suma') || {}).value) || 0;
+    var lit = parseFloat((litEl || {}).value) || 0;
+    if (!lit && !sum) return; // üres sor — nem számít
+    if (!_fuelLitersOk(lit, tip)) bad = { el: litEl, tip: tip };
+  });
+  if (!bad) return true;
+  toast(_fuelLitersMsg(bad.tip), 'err');
+  try { if (bad.el) { bad.el.scrollIntoView({ behavior: 'smooth', block: 'center' }); bad.el.focus(); } } catch (e) {}
+  return false;
+}
+
 function rrAccept() {
   if (!_rrCurrentId) return;
+  if (((document.getElementById('rrKind') || {}).value || 'purchase') === 'fuel') {
+    var _tipV = (document.getElementById('rrTip') || {}).value || 'Motorină';
+    if (!_fuelLitersOk((document.getElementById('rrLitru') || {}).value, _tipV)) {
+      toast(_fuelLitersMsg(_tipV), 'err');
+      try { document.getElementById('rrLitru').focus(); } catch (e) {}
+      return;
+    }
+  }
   var kind = (document.getElementById('rrKind') || {}).value || 'purchase';
   var loc  = (document.getElementById('rrLoc')  || {}).value || '';
   var data = (document.getElementById('rrData') || {}).value || _todayLocalDate();
@@ -3779,6 +3822,7 @@ function submitFuvarlevel() {
   // előbb kitölti az érkezési helyet/időt, és csak utána derülne ki, hogy
   // a km hibás — felesleges kör.
   if (!_validateKm()) return;
+  if (!_validateAlimLiters()) return;
   // Lezárási védőháló: az indulás UTÁN elvégzett Finalizat fuvar nem
   // maradhat kimaradva. Ha van ilyen, felkínáljuk a pickert (a validátor
   // maga hívja meg), és most nem küldünk. A sofőr a pickerben pipálja
@@ -4016,6 +4060,7 @@ function _submitFuvarlevelSend() {
   // Km-ellenőrzés (a `submitFuvarlevel` már lefuttatta a Sosire-dialógus
   // előtt; itt a közvetlen/retry hívási útra ismételjük meg).
   if (!_validateKm()) return;
+  if (!_validateAlimLiters()) return;
   var fisa = (document.getElementById('fFisa') ? document.getElementById('fFisa').value.trim() : '');
   // Sorszámot a szerver generálja automatikusan
 

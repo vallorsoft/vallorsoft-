@@ -41,13 +41,16 @@ const FEWSHOT_MAX = 5;
 const RECEIPT_PROMPT_BASE =
   'Ești un extractor de date din bon fiscal / chitanță (RO/HU/EN) — combustibil sau achiziții. ' +
   'Din imaginea/PDF-ul primit, extrage DOAR un obiect JSON cu cheile exacte: ' +
-  'kind, loc, data, tip, litru, km, plata, suma, valuta, produs, categorie, confidence. ' +
+  'kind, loc, data, tip, litru, pret_litru, km, plata, suma, valuta, produs, categorie, confidence. ' +
   'Reguli: ' +
   '- kind = "fuel" dacă bonul este pentru combustibil (Motorină/AdBlue/benzină), altfel "purchase" (mâncare, ulei, spălare, taxe, etc.). ' +
   '- loc = localitatea (fallback: numele stației/magazinului), FĂRĂ adresa completă. ' +
   '- data = "YYYY-MM-DD" (data bonului, fus orar Europe/Bucharest). ' +
   '- tip = "Motorină" sau "AdBlue" doar pentru kind=fuel, altfel null. ' +
-  '- litru = numărul de litri (până la 3 zecimale) doar pentru fuel, altfel null. ' +
+  '- litru = CANTITATEA alimentată în litri (până la 3 zecimale) doar pentru fuel, altfel null. ' +
+  '  ATENȚIE: NU confunda cu prețul pe litru (ex. "10,93 lei/l" este PREȚ, nu cantitate). ' +
+  '  Pe bon cantitatea apare de obicei ca "300,00 L x 10,93" sau "Cantitate". Motorina: între 50 și 1500 litri; AdBlue poate fi și mai puțin. ' +
+  '- pret_litru = prețul unitar pe litru (ex. 10.93) doar pentru fuel, altfel null. ' +
   '- km = kilometrajul dacă apare pe bon (ex. bon Flota Card), altfel null. ' +
   '- plata = "Card", "Cash", "Flota Card" sau "DKV" (cea mai probabilă interpretare). ' +
   '- suma = totalul plătit ca număr (fără simbol valută, punct pentru zecimale, fără separatori de mii). ' +
@@ -67,6 +70,8 @@ const RECEIPT_PROMPT_BASE =
 
 // Csak az ismert, ellenőrzött mezők kerülnek vissza a kliensre (a Gemini
 // "kreatív" kulcsait nem propagáljuk; a plata/tip fehérlistázott).
+const fuelLiters = require('../lib/fuelLiters');
+
 function sanitize(json) {
   const kind = json && json.kind === 'fuel' ? 'fuel'
     : (json && json.kind === 'purchase' ? 'purchase' : null);
@@ -77,12 +82,20 @@ function sanitize(json) {
   const plata = plataOK.includes(json && json.plata) ? json.plata : null;
   const tip = tipOK.includes(json && json.tip) ? json.tip : null;
   const data = json && /^\d{4}-\d{2}-\d{2}$/.test(json.data || '') ? json.data : null;
+  // Tankolt liter ésszerűségi javítása (literár ≠ liter; dízel 50–1500 L).
+  let litru = _num(json && json.litru);
+  let litruWarn = false;
+  if (kind === 'fuel') {
+    const fx = fuelLiters.fixLiters(litru, _num(json && json.suma), _num(json && json.pret_litru), tip);
+    litru = fx.litru; litruWarn = fx.warn;
+  }
   return {
     kind,
     loc: _str(json && json.loc, 200),
     data,
     tip,
-    litru: _num(json && json.litru),
+    litru,
+    litru_warn: litruWarn || undefined,
     km: _num(json && json.km),
     plata,
     suma: _num(json && json.suma),
