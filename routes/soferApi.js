@@ -563,7 +563,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     // Útvonal-sorok: a pontok + a határátlépések időrendben közéjük fésülve,
     // mindegyik dátummal ÉS pontos idővel.
     // A pontok valós ideje: a GPS-ből felismert érkezés / távozás (ha a hely el van fogadva vagy
-    // javasolt), különben a sofőr gombnyomása. Csak ott kerül ki, ahol a ponthoz nincs beírt óra.
+    // javasolt), különben a sofőr gombnyomása. A biztos / jóváhagyott GPS-idő a beírt órát is felülírja.
     const stopTimes = {};
     const _ptList = puncte.filter((p) => p && typeof p === 'object');
     try {
@@ -578,7 +578,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
           const gpsOk = s.gps_arrived_at && ['auto', 'confirmed', 'suggested'].includes(s.match_status);
           const from = gpsOk ? s.gps_arrived_at : (s.arrived_at || s.done_at);
           const to = gpsOk ? s.gps_left_at : (s.arrived_at ? s.done_at : null);
-          return from ? { from, to: to || null } : null;
+          return from ? { from, to: to || null, sure: !!(gpsOk && (s.match_status === 'auto' || s.match_status === 'confirmed')) } : null;
         };
         for (const s of sR.rows) { const t = timeOf(s); if (t) stopTimes[String(s.id)] = t; }
         const KIND = { loading: 'pickup', unloading: 'delivery' };

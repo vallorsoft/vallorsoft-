@@ -146,3 +146,17 @@ describe('fillTrackTimes — idő a GPS-útvonalból a koordinátás pontokhoz',
     expect(Object.keys(st)).toHaveLength(0);
   });
 });
+
+describe('megbízható GPS-idő az elsődleges', () => {
+  const { buildRouteRows } = require('../../lib/waybillRows');
+  const puncte = [{ tip: 'Descarcare', loc: 'A', data: '2026-10-26', time: '18:30', stopId: 7 }];
+  const t = { from: '2026-10-27T09:00:00Z', to: '2026-10-27T09:40:00Z' };
+  test('biztos állomás-idő felülírja a beírt órát (a nappal együtt)', () => {
+    const r = buildRouteRows(puncte, [], { 7: { ...t, sure: true } })[0];
+    expect([r.date, r.time, r.timeTo, r.gps]).toEqual(['2026-10-27', '11:00', '11:40', true]);
+  });
+  test('nem megbízható forrás nem írja felül a beírt órát', () => {
+    const r = buildRouteRows(puncte, [], { 7: t })[0];
+    expect([r.date, r.time]).toEqual(['2026-10-26', '18:30']);
+  });
+});
