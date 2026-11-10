@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-10 — 🕐 Menetlevél: a pontoknál egy időpont — a fel-/lerakás vége (PR #633)
+
+- A nyomtatott menetlevél pontjainál a GPS-ből jövő idő eddig „érkezés–távozás" volt; mostantól csak EGY időpont jelenik meg: a fel-/lerakás vége (a távozás), annak napjával. Ha a távozás nem ismert, az érkezés (`lib/waybillRows.js` `buildRouteRows`, a `timeTo` megszűnt). **Teszt:** 2474 teszt zöld.
+
 ## 2026-11-10 — 🛰️ Menetlevél: a megbízható GPS-idő az elsődleges (PR #632)
 
 - A nyomtatott menetlevélen a biztos (`auto`) vagy az iroda által jóváhagyott (`confirmed`) állomás GPS érkezés–távozás ideje mostantól a sofőr által beírt órát és napot is felülírja (`lib/waybillRows.js` `buildRouteRows`, `stopTimes[..].sure`). A nem megbízható források (javaslat, gombnyomás, GPS-útvonal a koordinátánál) továbbra is csak a hiányzó órát pótolják. A tárolt menetlevél-adat nem változik, csak a kiírás. **Teszt:** +2; 2474 teszt zöld.

@@ -141,7 +141,7 @@ describe('menetlevél: a pont ideje a GPS-ből', () => {
   const st = { 5: { from: '2026-03-03T08:15:00Z', to: '2026-03-03T09:40:00Z' }, 6: { from: '2026-03-03T10:00:00Z' } };
   test('beírt óra nélkül a GPS érkezés–távozás kerül ki, a valós nappal', () => {
     const r = buildRouteRows([{ tip: 'Încărcare', loc: 'Cluj', data: '2026-03-02', stopId: 5 }], [], st);
-    expect(r[0]).toMatchObject({ date: '2026-03-03', time: '10:15', timeTo: '11:40', gps: true });
+    expect(r[0]).toMatchObject({ date: '2026-03-03', time: '11:40', gps: true });
   });
   test('a sofőr által beírt óra elsőbbséget élvez; stopId / GPS-adat nélkül nincs változás', () => {
     const r = buildRouteRows([

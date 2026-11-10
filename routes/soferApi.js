@@ -637,7 +637,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       if (x.kind === 'border') {
         puncteHtml += `<tr class="row-border">${nr}<td>${_borderPill(x.direction)}</td><td>${_borderLoc(x)}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
       } else {
-        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.timeTo ? x.time + '–' + x.timeTo : x.time)}</td></tr>`;
+        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
       }
     });
     if (!puncte.length) {
