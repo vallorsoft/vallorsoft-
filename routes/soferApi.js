@@ -562,7 +562,24 @@ router.get('/api/pdf-download/:id', async (req, res) => {
 
     // Útvonal-sorok: a pontok + a határátlépések időrendben közéjük fésülve,
     // mindegyik dátummal ÉS pontos idővel.
-    const routeRows = buildRouteRows(puncte, crossings);
+    // A pontok valós ideje: a GPS-ből felismert érkezés / távozás (ha a hely el van fogadva vagy
+    // javasolt), különben a sofőr gombnyomása. Csak ott kerül ki, ahol a ponthoz nincs beírt óra.
+    const stopTimes = {};
+    try {
+      const ids = [...new Set(puncte.map((p) => (p && p.stopId != null ? String(p.stopId) : '')).filter((x) => /^\d+$/.test(x)))];
+      if (ids.length) {
+        const sR = await pool.query(
+          `SELECT id, gps_arrived_at, gps_left_at, arrived_at, done_at, match_status
+             FROM order_stops WHERE company_id = $1 AND id = ANY($2::bigint[])`, [cid, ids]);
+        for (const s of sR.rows) {
+          const gpsOk = s.gps_arrived_at && ['auto', 'confirmed', 'suggested'].includes(s.match_status);
+          const from = gpsOk ? s.gps_arrived_at : (s.arrived_at || s.done_at);
+          const to = gpsOk ? s.gps_left_at : (s.arrived_at ? s.done_at : null);
+          if (from) stopTimes[String(s.id)] = { from, to: to || null };
+        }
+      }
+    } catch (_e) { /* régi séma — marad a beírt idő */ }
+    const routeRows = buildRouteRows(puncte, crossings, stopTimes);
     const _when = (d, t) => {
       const ds = d ? escHtml(dateRo(d)) : '';
       const ts = t ? '<b style="color:#0f172a;">' + escHtml(t) + '</b>' : '';
@@ -589,7 +606,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       if (x.kind === 'border') {
         puncteHtml += `<tr class="row-border">${nr}<td>${_borderPill(x.direction)}</td><td>${_borderLoc(x)}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
       } else {
-        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
+        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.timeTo ? x.time + '–' + x.timeTo : x.time)}</td></tr>`;
       }
     });
     if (!puncte.length) {
@@ -835,7 +852,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
 
     <div class="sec-title">📍 Puncte de traseu (${routeRows.length || puncte.length})</div>
     <table class="grid-table tbl-pu">
-      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:124px;">Data și ora</th></tr></thead>
+      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:150px;">Data și ora</th></tr></thead>
       <tbody>${puncteHtml}</tbody>
     </table>
 

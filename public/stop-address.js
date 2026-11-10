@@ -42,6 +42,8 @@
     rejected_before: 'sa.sig.rejBefore', rejected_place: 'sa.sig.rejPlace', homonym: 'sa.sig.homonym',
     rest_then_moved: 'sa.sig.restMoved', break_then_moved: 'sa.sig.breakMoved', after_rest: 'sa.sig.afterRest',
     short_site: 'sa.sig.shortSite', before_prev: 'sa.sig.beforePrev',
+    saved_place: 'sa.sig.savedPlace', next_done: 'sa.sig.nextDone', next_button: 'sa.sig.nextButton',
+    visit_site: 'sa.sig.visitSite', visit_city: 'sa.sig.visitCity', pass_city: 'sa.sig.passCity',
   };
 
   function shell() {

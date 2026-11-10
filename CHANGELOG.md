@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-10 — 📍 Cím-felismerés: mentett hely + „a következő megvan → az előző is megtörtént" + GPS-idő a menetlevél pontjainál (PR #630)
+
+- **Mentett hely bővebb egyeztetése** (`lib/stopMatch.js` `savedFor`): a cég mentett helye eddig csak akkor számított, ha a fuvaron a cégnév egyezett vele. Most akkor is az állomás saját helye, ha a fuvarba a mentett hely címe / neve került (⭐ listából választva, cégnév nélkül); a tervezett település 15 km-es körzetében lévő többi mentett hely pedig külön jelet kap (`saved_place`), és ott a rövid megállás is jelölt.
+- **Következtetés több pontos fuvarnál** (`inferVisits`): ha egy későbbi állomás megvan (GPS-találat vagy a sofőr gombja), a kimaradt korábbi is megtörtént → a rendszer megnézi, járt-e a kamion a tervezett helyen (mentett hely → cég helye → helység) az előző és a következő állomás között, és azt a látogatást adja az állomásnak — javaslatként (`match_source='inferred'`), az érkezés / távozás idejével. Ha nem járt ott, nem talál ki semmit.
+- **GPS-idő a menetlevél pontjainál:** a nyomtatványon a fel-/lerakó pontoknál, ahol a sofőr nem írt be órát, a GPS-ből felismert érkezés–távozás jelenik meg (pl. `03.03.2026 10:15–11:40`), a valós nappal; ennek hiányában a sofőr gombnyomásának ideje.
+- Új jel-feliratok a „Fel- és lerakóhelyek GPS-ből" oldalon (RO+HU). **Teszt:** `tests/unit/stopInfer.test.js` (+14); 2468 teszt zöld.
+
 ## 2026-11-10 — 🕐 Menetlevél: pontos idő + határátlépés a pontok között (PR #629)
 
 - **Pontos idő a nyomtatott menetlevélen:** az útvonal-tábla „Data și ora" oszlopa minden pontnál a dátumot ÉS az órát mutatja; a fejlécben és az adat-kártyán az indulás / érkezés is dátum + óra (a Plecare / Sosire pont beírt órájából, tartalék a tárolt időpont).
