@@ -3110,12 +3110,13 @@ function feEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g
 // A pont rejtett mezői (stopId/orderId/role/time, GPS-cím jelölők) a data-meta-ban
 // utaznak, és mentéskor változatlanul visszakerülnek (különben a pont elveszítené
 // a fuvar-állomás kötését és a Plecare/Sosire óráját).
-function feRowPunct(p){p=p||{};var meta={};Object.keys(p).forEach(function(k){if(k!=='tip'&&k!=='loc'&&k!=='data')meta[k]=p[k];});
+function feRowPunct(p){p=p||{};var meta={};Object.keys(p).forEach(function(k){if(k!=='tip'&&k!=='loc'&&k!=='data'&&k!=='time')meta[k]=p[k];});
   var gpsTag=(p.loc_source==='gps')?'<span class="badge info" title="'+feEsc((typeof t==='function'?t('sa.wbPlanned'):'Planificat')+': '+(p.loc_planned||''))+'" style="grid-column:1/-1;justify-self:start;">📍 '+feEsc(typeof t==='function'?t('sa.wbGpsTag'):'Adresă GPS')+'</span>':'';
-  return '<div class="fe-row" data-meta="'+feEsc(JSON.stringify(meta))+'" style="display:grid;grid-template-columns:1fr 2fr 1.2fr auto;gap:6px;align-items:center;">'+gpsTag
+  return '<div class="fe-row" data-meta="'+feEsc(JSON.stringify(meta))+'" style="display:grid;grid-template-columns:1fr 2fr 1.1fr 0.9fr auto;gap:6px;align-items:center;">'+gpsTag
   +'<input class="input fe-p-tip" data-sg="punct_tip" placeholder="Tip" value="'+feEsc(p.tip)+'">'
   +'<input class="input fe-p-loc" data-sg="punct_loc" placeholder="Localitate" value="'+feEsc(p.loc)+'">'
   +'<input class="input fe-p-data" placeholder="Dată" value="'+feEsc(p.data)+'">'
+  +'<input class="input fe-p-time" type="time" title="Ora" value="'+feEsc(/^\d{2}:\d{2}/.test(String(p.time||''))?String(p.time).slice(0,5):'')+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
 // A menetlevél-szerkesztő tankolás/vásárlás sorai a sofőr-oldali űrlappal
@@ -3168,6 +3169,12 @@ function feToLocalDtInput(ts){
 
 // Timestamp → <input type="date"> érték (YYYY-MM-DD). UTC dátum-rész, hogy
 // a kezdő/végző dátum stabil maradjon (a szerver UTC-éjfélként tárolja).
+// Dátum + óra a datetime-local mezőbe (az indulás/érkezés pontos ideje).
+function feToDtInput(ts){
+  if(!ts) return '';
+  var d=new Date(ts); if(isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0,16);
+}
 function feToDateInput(ts){
   if(!ts) return '';
   var d=new Date(ts); if(isNaN(d.getTime())) return '';
@@ -3274,8 +3281,8 @@ function openFuvEdit(id){
     document.getElementById('feMentiuni').value=f.alte_mentiuni||'';
     var feDt=document.getElementById('feDataCompletare'); if(feDt) feDt.value=feToLocalDtInput(f.data_completare);
     var feOi=document.getElementById('feOrderIds'); if(feOi) feOi.value=Array.isArray(f.order_ids)?f.order_ids.join(', '):'';
-    var feIn=document.getElementById('feIndulasDate'); if(feIn) feIn.value=feToDateInput(f.indulas_dt);
-    var feEr=document.getElementById('feErkezesDate'); if(feEr) feEr.value=feToDateInput(f.erkezes_dt);
+    var feIn=document.getElementById('feIndulasDate'); if(feIn) feIn.value=feToDtInput(f.indulas_dt);
+    var feEr=document.getElementById('feErkezesDate'); if(feEr) feEr.value=feToDtInput(f.erkezes_dt);
     var puncte=Array.isArray(f.puncte)?f.puncte:[];
     var alim=Array.isArray(f.alimentari)?f.alimentari:[];
     var ach=Array.isArray(f.achizitii)?f.achizitii:[];
@@ -3455,7 +3462,7 @@ function _sgRenderFromMap(el, map){
 function saveFuvEdit(){
   var id=document.getElementById('feId').value;
   var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){var m={};try{m=JSON.parse(r.getAttribute('data-meta')||'{}')||{};}catch(e){m={};}
-    var o=Object.assign({},m,{tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value});
+    var o=Object.assign({},m,{tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value,time:((r.querySelector('.fe-p-time')||{}).value||'')});
     // kézi átírás után a GPS-jelölés már nem igaz
     if(o.loc_source==='gps'&&o.loc_gps&&o.loc!==o.loc_gps){delete o.loc_source;delete o.loc_gps;}
     return o;});
