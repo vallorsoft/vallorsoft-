@@ -119,8 +119,8 @@ describe('fillTrackTimes — idő a GPS-útvonalból a koordinátás pontokhoz',
     const st = fillTrackTimes(puncte, {}, track);
     const rows = buildRouteRows(puncte, [], st);
     expect(rows[1].date).toBe('2026-10-26');
-    expect(rows[1].time).toBe('11:00');        // 09:00 UTC = 11:00 román idő (októberi nyári idő vége után +2)
-    expect(rows[1].timeTo).toBe('11:40');
+    expect(rows[1].time).toBe('11:40');        // a távozás: 09:40 UTC = 11:40 román idő
+    expect(rows[1].timeTo).toBeUndefined();
     expect(rows[1].gps).toBe(true);
   });
 
@@ -153,7 +153,7 @@ describe('megbízható GPS-idő az elsődleges', () => {
   const t = { from: '2026-10-27T09:00:00Z', to: '2026-10-27T09:40:00Z' };
   test('biztos állomás-idő felülírja a beírt órát (a nappal együtt)', () => {
     const r = buildRouteRows(puncte, [], { 7: { ...t, sure: true } })[0];
-    expect([r.date, r.time, r.timeTo, r.gps]).toEqual(['2026-10-27', '11:00', '11:40', true]);
+    expect([r.date, r.time, r.timeTo, r.gps]).toEqual(['2026-10-27', '11:40', undefined, true]);
   });
   test('nem megbízható forrás nem írja felül a beírt órát', () => {
     const r = buildRouteRows(puncte, [], { 7: t })[0];
