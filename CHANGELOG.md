@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-10 — 🕐 Menetlevél: pontos idő + határátlépés a pontok között (PR #629)
+
+- **Pontos idő a nyomtatott menetlevélen:** az útvonal-tábla „Data și ora" oszlopa minden pontnál a dátumot ÉS az órát mutatja; a fejlécben és az adat-kártyán az indulás / érkezés is dátum + óra (a Plecare / Sosire pont beírt órájából, tartalék a tárolt időpont).
+- **Határátlépés a fel-/lerakók között:** a menetlevél időszakára eső ki-/belépések időrendben a pontok közé kerülnek — átkelő (helység) neve, melyik országba lépett ki / melyikből lépett be Romániába, dátum + pontos idő (román idő szerint). A nyomtatás élőben kéri le (`fetchTripCrossings`), így a GPS-ből utólag felismert és az iroda által javított átlépés is rákerül.
+- **Új közös modulok:** `lib/borderPoints.js` (átkelők neve + szomszéd ország, `describeCrossing`; a `borderAuto` is innen veszi a nevet, +5 átkelő), `lib/waybillRows.js` (`buildRouteRows` / `tripEndpoint`, tiszta függvények).
+- **Irodai szerkesztő:** az indulás / érkezés mező dátum + óra (`datetime-local`), és a pont-sorokon szerkeszthető az óra.
+- **Teszt:** `tests/unit/waybillRows.test.js` (+12) és egy valós-DB nyomtatás-teszt; 2454 teszt zöld.
+
 ## 2026-11-08 — 🧪 AI-megoldások + tanult adatok: robusztussági tesztek és javítások (PR #628)
 - **`lib/geminiJson.js`**: csonka / szöveggel körített / kódblokkos / üres (biztonsági blokk) AI-válasz nem dob nyers `SyntaxError`-t — új `parseAiJson`, érvénytelen válasz → `502` → következő modell; ha mind érvénytelen, érthető román hiba.
 - **`handlers/orderChat.js`**: objektumként / függvényként jövő AI-mező nem lesz „[object Object]” szöveg (`_str`); a sérült tanult címlista / megbízó-lista (`_locList` / `_clientList`) csak tiszta szöveget / egész id-t ad, max. 300; a „módosítottam” őr az ékezettel kezdődő szót is felismeri („átírtam”).

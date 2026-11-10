@@ -139,6 +139,52 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(Number(row.diurna_interna)).toBeGreaterThan(0);
   });
 
+  // A nyomtatványon a pontok dátuma mellett a PONTOS IDŐ is áll (indulás /
+  // érkezés is), és a határátlépés a fel-/lerakók közé kerül: átkelő neve,
+  // melyik országba / országból, dátum + óra (román idő).
+  test('GET /api/pdf-download/:id: pontos idő + határátlépés a pontok között', async () => {
+    await pool.query(
+      `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, created_at)
+       VALUES ($1,$2,'Iesire','RO','Nadlac','2026-01-01T15:20:00Z'),
+              ($1,$2,'Intrare','RO','46.1500, 20.7350','2026-01-03T10:05:00Z')`,
+      [SOFER.email, SOFER.nume]);
+    setUser(SOFER);
+    const save = await request(app).post('/api/fuvarlevel-save').send({
+      kmInceput: 0, kmSfarsit: 900,
+      indulasDt: '2026-01-01T06:30', erkezesDt: '2026-01-03T18:45',
+      puncte: [
+        { tip: 'Plecare', loc: 'Garaj-Arcus', data: '2026-01-01', time: '06:30' },
+        { tip: 'Încărcare', loc: 'Cluj-Napoca', data: '2026-01-01', time: '10:15' },
+        { tip: 'Descărcare', loc: 'Wien', data: '2026-01-02', time: '14:00' },
+        { tip: 'Sosire', loc: 'Garaj-Arcus', data: '2026-01-03', time: '18:45' },
+      ],
+    });
+    expect(save.body.success).toBe(true);
+
+    setUser(ADMIN);
+    const res = await request(app).get('/api/pdf-download/' + save.body.id);
+    expect(res.status).toBe(200);
+    const h = res.text;
+    // indulás / érkezés dátum + óra a fejlécben
+    expect(h).toContain('01.01.2026 06:30');
+    expect(h).toContain('03.01.2026 18:45');
+    // a pontok órája
+    expect(h).toContain('10:15');
+    expect(h).toContain('14:00');
+    // határátlépés: átkelő + ország + román idő (télen UTC+2)
+    expect(h).toContain('PTF Nadlac');
+    expect(h).toContain('Ieșire din România spre Ungaria');
+    expect(h).toContain('17:20');
+    expect(h).toContain('PTF Nădlac II');                // a koordinátából felismert átkelő
+    expect(h).toContain('Intrare în România din Ungaria');
+    expect(h).toContain('12:05');
+    // időrend: felrakó → kilépés → lerakó → belépés → érkezés
+    const pos = ['Cluj-Napoca', 'Ieșire din România', 'Wien', 'Intrare în România', '18:45</b></td></tr>'].map((x) => h.indexOf(x, h.indexOf('Puncte de traseu')));
+    expect(pos.every((x) => x > 0)).toBe(true);
+    expect(pos.slice().sort((a, b) => a - b)).toEqual(pos);
+    expect(h).toContain('Puncte de traseu (6)');
+  });
+
   test('GET /api/pdf-download/:id (Admin): 200 + a menetlevél + cégnév látszik (regresszió: companies.nev)', async () => {
     const id = await seedWaybill();
     setUser(ADMIN);

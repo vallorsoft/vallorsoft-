@@ -10,6 +10,7 @@ const { calculateDiurna } = require('../lib/diurna');
 const { computeFuelTotals } = require('../lib/waybillTotals');
 const { normalizeCategory } = require('../lib/expenseCategories');
 const { fetchTripCrossings } = require('../lib/tripCrossings');
+const { buildRouteRows, tripEndpoint, dateRo } = require('../lib/waybillRows');
 const { genDocId } = require('../lib/ids');
 
 // A sofőr a főoldali „🇷🇴 BE / KI" gombokat idő-picker modalon át erősíti
@@ -468,15 +469,6 @@ function escHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-// Dátum CSAK (óra nélkül), románul. UTC-ben formázunk, hogy a kiválasztott
-// dátum stabil maradjon (a date-only mezőket UTC-éjfélként tároljuk).
-function fmtDateRo(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  if (isNaN(d.getTime())) return '—';
-  return escHtml(d.toLocaleDateString('ro-RO', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }));
-}
-
 // PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
@@ -555,23 +547,64 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         + ';color:' + c.fg + ';font-size:11px;font-weight:800;white-space:nowrap;">' + escHtml(key || '—') + '</span>';
     };
 
-    // Útvonal pontok HTML
+    // ── HATÁRÁTLÉPÉSEK a menetlevél időszakára ──
+    // Élőben kérjük le (a GPS-ből utólag felismert / az iroda által javított
+    // átlépés is rákerül); ha ez nem megy, a menetlevélen tárolt napló marad.
+    let crossings = Array.isArray(f.hataratok) ? f.hataratok : [];
+    if (f.email_sofer && f.indulas_dt && f.erkezes_dt) {
+      try {
+        const tc = await fetchTripCrossings(pool, f.email_sofer,
+          new Date(f.indulas_dt).toISOString(), new Date(f.erkezes_dt).toISOString(),
+          { companyId: cid, plate: f.numar_camion || null });
+        crossings = tc.inWindow;
+      } catch (_e) { /* marad a tárolt napló */ }
+    }
+
+    // Útvonal-sorok: a pontok + a határátlépések időrendben közéjük fésülve,
+    // mindegyik dátummal ÉS pontos idővel.
+    const routeRows = buildRouteRows(puncte, crossings);
+    const _when = (d, t) => {
+      const ds = d ? escHtml(dateRo(d)) : '';
+      const ts = t ? '<b style="color:#0f172a;">' + escHtml(t) + '</b>' : '';
+      return (ds || ts) ? (ds + (ds && ts ? ' ' : '') + ts) : '—';
+    };
+    const _whenCell = 'style="white-space:nowrap;color:#475569;"';
+    const _borderPill = (dir) => {
+      const out = dir !== 'IN';
+      return '<span style="display:inline-block;padding:2px 9px;border-radius:9px;background:' + (out ? '#fef3c7' : '#cffafe')
+        + ';color:' + (out ? '#92400e' : '#155e75') + ';font-size:11px;font-weight:800;white-space:nowrap;">'
+        + (out ? 'Ieșire RO' : 'Intrare RO') + '</span>';
+    };
+    const _borderLoc = (x) => {
+      const place = x.name ? ('PTF ' + escHtml(x.name)) : (x.coords ? ('GPS ' + escHtml(x.coords)) : 'Punct de trecere necunoscut');
+      const ctry = x.countryRo ? escHtml(x.countryRo) : null;
+      const dirTxt = x.direction === 'IN'
+        ? ('Intrare în România' + (ctry ? ' din ' + ctry : ''))
+        : ('Ieșire din România' + (ctry ? ' spre ' + ctry : ''));
+      return '🛂 <b>' + place + '</b> — ' + dirTxt;
+    };
     let puncteHtml = '';
-    if (puncte.length > 0) {
-      puncte.forEach((p, i) => {
-        puncteHtml += `<tr>
-          <td style="color:#94a3b8;font-weight:700;">${i+1}.</td>
-          <td>${_punctPill(p.tip)}</td>
-          <td>${escHtml(p.loc || '—')}</td>
-          <td style="white-space:nowrap;color:#475569;">${escHtml(p.data || '—')}</td>
-        </tr>`;
-      });
-    } else {
-      // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk
-      if (f.loc_plecare) puncteHtml += `<tr><td style="color:#94a3b8;font-weight:700;">1.</td><td>${_punctPill('Plecare')}</td><td>${escHtml(f.loc_plecare)}</td><td style="white-space:nowrap;color:#475569;">—</td></tr>`;
-      if (f.loc_sosire)  puncteHtml += `<tr><td style="color:#94a3b8;font-weight:700;">2.</td><td>${_punctPill('Sosire')}</td><td>${escHtml(f.loc_sosire)}</td><td style="white-space:nowrap;color:#475569;">—</td></tr>`;
+    routeRows.forEach((x, i) => {
+      const nr = `<td style="color:#94a3b8;font-weight:700;">${i + 1}.</td>`;
+      if (x.kind === 'border') {
+        puncteHtml += `<tr class="row-border">${nr}<td>${_borderPill(x.direction)}</td><td>${_borderLoc(x)}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
+      } else {
+        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
+      }
+    });
+    if (!puncte.length) {
+      // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk (a határátlépések mellett)
+      let legacy = '';
+      if (f.loc_plecare) legacy += `<tr><td style="color:#94a3b8;font-weight:700;">•</td><td>${_punctPill('Plecare')}</td><td>${escHtml(f.loc_plecare)}</td><td ${_whenCell}>—</td></tr>`;
+      const legacyEnd = f.loc_sosire ? `<tr><td style="color:#94a3b8;font-weight:700;">•</td><td>${_punctPill('Sosire')}</td><td>${escHtml(f.loc_sosire)}</td><td ${_whenCell}>—</td></tr>` : '';
+      puncteHtml = legacy + puncteHtml + legacyEnd;
       if (!puncteHtml)   puncteHtml  = '<tr class="empty-row"><td colspan="4">Nu a fost inregistrat niciun punct de traseu.</td></tr>';
     }
+
+    // Indulás / érkezés pontos ideje a fejléchez (dátum + óra)
+    const depT = tripEndpoint(puncte, 'plecare', f.indulas_dt);
+    const arrT = tripEndpoint(puncte, 'sosire', f.erkezes_dt);
+    const _whenTxt = (e) => e.date ? escHtml(dateRo(e.date) + (e.time ? ' ' + e.time : '')) : '—';
 
     // Tankolások HTML — külön Loc / Data oszlop (a Data mostantól per-tétel)
     const _fmtItemDate = (v) => {
@@ -661,6 +694,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       .grid-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
       .grid-table .num { text-align:right; }
       .tbl-pu thead tr { background:#e0e7ff; }
+      .tbl-pu tr.row-border td { background:#fffbeb; }
       .tbl-al thead tr { background:#d1fae5; }
       .tbl-ac thead tr { background:#fef3c7; }
       .empty-row td { padding:12px; text-align:center; color:#6b7280; font-style:italic; border-bottom:0; }
@@ -733,7 +767,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
           <td class="lh-right">
             <div class="doc-badge">Foaie de parcurs</div>
             <div class="doc-serial">${escHtml(f.numar_fisa || '—')}</div>
-            <div class="doc-period">${fmtDateRo(f.indulas_dt)} → ${fmtDateRo(f.erkezes_dt)}</div>
+            <div class="doc-period">${_whenTxt(depT)} → ${_whenTxt(arrT)}</div>
           </td>
         </tr></table>
         <div class="lh-rule"></div>
@@ -758,8 +792,8 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         </tr>
         <tr><td colspan="2"><span class="lbl">ID-uri cursă:</span> ${orderIdsStr}</td></tr>
         <tr>
-          <td><span class="lbl">Data plecare:</span> <b>${fmtDateRo(f.indulas_dt)}</b></td>
-          <td><span class="lbl">Data sosire:</span> <b>${fmtDateRo(f.erkezes_dt)}</b></td>
+          <td><span class="lbl">Data plecare:</span> <b>${_whenTxt(depT)}</b></td>
+          <td><span class="lbl">Data sosire:</span> <b>${_whenTxt(arrT)}</b></td>
         </tr>
         <tr>
           <td><span class="lbl">Km început:</span> <b>${f.km_inceput || 0} km</b></td>
@@ -799,9 +833,9 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     </div>
     </div>
 
-    <div class="sec-title">📍 Puncte de traseu (${puncte.length})</div>
+    <div class="sec-title">📍 Puncte de traseu (${routeRows.length || puncte.length})</div>
     <table class="grid-table tbl-pu">
-      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:96px;">Dată</th></tr></thead>
+      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:124px;">Data și ora</th></tr></thead>
       <tbody>${puncteHtml}</tbody>
     </table>
 
