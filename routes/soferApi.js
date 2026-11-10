@@ -9,8 +9,8 @@ const { requireLogin, requireRole } = require('../middleware/auth');
 const { calculateDiurna } = require('../lib/diurna');
 const { computeFuelTotals } = require('../lib/waybillTotals');
 const { normalizeCategory } = require('../lib/expenseCategories');
-const { fetchTripCrossings } = require('../lib/tripCrossings');
-const { buildRouteRows, tripEndpoint, dateRo } = require('../lib/waybillRows');
+const { fetchTripCrossings, PLATE_SQL } = require('../lib/tripCrossings');
+const { buildRouteRows, tripEndpoint, dateRo, fillTrackTimes, coordsOf } = require('../lib/waybillRows');
 const { genDocId } = require('../lib/ids');
 
 // A sofőr a főoldali „🇷🇴 BE / KI" gombokat idő-picker modalon át erősíti
@@ -565,20 +565,51 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     // A pontok valós ideje: a GPS-ből felismert érkezés / távozás (ha a hely el van fogadva vagy
     // javasolt), különben a sofőr gombnyomása. Csak ott kerül ki, ahol a ponthoz nincs beírt óra.
     const stopTimes = {};
+    const _ptList = puncte.filter((p) => p && typeof p === 'object');
     try {
-      const ids = [...new Set(puncte.map((p) => (p && p.stopId != null ? String(p.stopId) : '')).filter((x) => /^\d+$/.test(x)))];
-      if (ids.length) {
+      const ids = [...new Set(_ptList.map((p) => (p.stopId != null ? String(p.stopId) : '')).filter((x) => /^\d+$/.test(x)))];
+      // régi pont: nincs állomás-id, csak fuvar + szerep
+      const oids = [...new Set(_ptList.filter((p) => (p.stopId == null || p.stopId === '') && p.orderId && p.role).map((p) => String(p.orderId)))];
+      if (ids.length || oids.length) {
         const sR = await pool.query(
-          `SELECT id, gps_arrived_at, gps_left_at, arrived_at, done_at, match_status
-             FROM order_stops WHERE company_id = $1 AND id = ANY($2::bigint[])`, [cid, ids]);
-        for (const s of sR.rows) {
+          `SELECT id, order_id, kind, gps_arrived_at, gps_left_at, arrived_at, done_at, match_status
+             FROM order_stops WHERE company_id = $1 AND (id = ANY($2::bigint[]) OR order_id::text = ANY($3::text[]))`, [cid, ids, oids]);
+        const timeOf = (s) => {
           const gpsOk = s.gps_arrived_at && ['auto', 'confirmed', 'suggested'].includes(s.match_status);
           const from = gpsOk ? s.gps_arrived_at : (s.arrived_at || s.done_at);
           const to = gpsOk ? s.gps_left_at : (s.arrived_at ? s.done_at : null);
-          if (from) stopTimes[String(s.id)] = { from, to: to || null };
-        }
+          return from ? { from, to: to || null } : null;
+        };
+        for (const s of sR.rows) { const t = timeOf(s); if (t) stopTimes[String(s.id)] = t; }
+        const KIND = { loading: 'pickup', unloading: 'delivery' };
+        _ptList.forEach((p, i) => {
+          if ((p.stopId != null && p.stopId !== '') || !p.orderId || !KIND[p.role]) return;
+          const m = sR.rows.filter((s) => String(s.order_id) === String(p.orderId) && s.kind === KIND[p.role]);
+          const t = m.length === 1 ? timeOf(m[0]) : null;       // csak egyértelmű esetben
+          if (t) stopTimes['#' + i] = t;
+        });
       }
     } catch (_e) { /* régi séma — marad a beírt idő */ }
+    // Ami még idő nélkül maradt, de a címében ott a koordináta: a vontató GPS-útvonalából
+    // keressük ki, mikor állt ott a kamion.
+    try {
+      const need = _ptList.some((p, i) => !/^\d{1,2}:\d{2}/.test(String(p.time || '').trim()) && !stopTimes['#' + i]
+        && !(p.stopId != null && stopTimes[String(p.stopId)]) && coordsOf(p.loc));
+      const days = _ptList.map((p) => String(p.data || '').slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+      if (need && f.numar_camion && days.length) {
+        const d0 = new Date(Date.parse(days[0] + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+        let d1 = new Date(Date.parse(days[days.length - 1] + 'T00:00:00Z') + 3 * 86400000).toISOString().slice(0, 10);
+        const cap = new Date(Date.parse(d0 + 'T00:00:00Z') + 45 * 86400000).toISOString().slice(0, 10);
+        if (d1 > cap) d1 = cap;
+        const tR = await pool.query(
+          `SELECT points_json FROM gps_track_days
+            WHERE company_id = $1 AND ${PLATE_SQL('rendszam')} = $2 AND day BETWEEN $3::date AND $4::date AND point_count > 0
+            ORDER BY day`, [cid, String(f.numar_camion).toUpperCase().replace(/[^A-Z0-9]/g, ''), d0, d1]);
+        let track = [];
+        for (const r of tR.rows) { try { const a = JSON.parse(r.points_json || '[]'); if (Array.isArray(a)) track = track.concat(a); } catch (_) {} }
+        if (track.length) fillTrackTimes(puncte, stopTimes, track);
+      }
+    } catch (_e) { /* nincs GPS-napló — marad idő nélkül */ }
     const routeRows = buildRouteRows(puncte, crossings, stopTimes);
     const _when = (d, t) => {
       const ds = d ? escHtml(dateRo(d)) : '';

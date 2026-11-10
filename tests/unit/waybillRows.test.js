@@ -99,3 +99,50 @@ describe('waybillRows.tripEndpoint + dateRo', () => {
     expect(dateRo('ieri')).toBe('ieri');
   });
 });
+
+describe('fillTrackTimes — idő a GPS-útvonalból a koordinátás pontokhoz', () => {
+  const { fillTrackTimes, buildRouteRows, coordsOf } = require('../../lib/waybillRows');
+  const T = (iso) => Date.parse(iso) / 1000;
+  const stay = (iso, min, lat, lng) => { const a = []; for (let i = 0; i <= min; i++) a.push([T(iso) + i * 60, lat, lng, 0]); return a; };
+
+  test('coordsOf: a cím végi zárójeles koordináta', () => {
+    expect(coordsOf('Hájska 1200/151, Močenok, 951 31, SK (48.22610, 17.93158)')).toEqual({ lat: 48.2261, lng: 17.93158 });
+    expect(coordsOf('Garaj-Arcus')).toBeNull();
+  });
+
+  test('idő nélküli koordinátás pont megkapja az érkezés–távozás idejét', () => {
+    const puncte = [
+      { tip: 'Plecare', loc: 'Garaj', data: '2026-10-25', time: '11:00' },
+      { tip: 'Descarcare', loc: 'Močenok (48.22610, 17.93158)', data: '2026-10-26' },
+    ];
+    const track = [[T('2026-10-26T06:00:00Z'), 47.5, 19.0, 60]].concat(stay('2026-10-26T09:00:00Z', 40, 48.2261, 17.9316));
+    const st = fillTrackTimes(puncte, {}, track);
+    const rows = buildRouteRows(puncte, [], st);
+    expect(rows[1].date).toBe('2026-10-26');
+    expect(rows[1].time).toBe('11:00');        // 09:00 UTC = 11:00 román idő (októberi nyári idő vége után +2)
+    expect(rows[1].timeTo).toBe('11:40');
+    expect(rows[1].gps).toBe(true);
+  });
+
+  test('két pont ugyanazon a helyen → két külön megállás; beírt óra érintetlen', () => {
+    const puncte = [
+      { tip: 'Descarcare', loc: 'A (48.22610, 17.93158)', data: '2026-10-26' },
+      { tip: 'Incarcare', loc: 'A (48.22602, 17.93153)', data: '2026-10-26' },
+      { tip: 'Descarcare', loc: 'A (48.22610, 17.93158)', data: '2026-10-26', time: '18:30' },
+    ];
+    const track = stay('2026-10-26T08:00:00Z', 30, 48.2261, 17.9316)
+      .concat([[T('2026-10-26T09:30:00Z'), 48.4, 18.2, 70]])
+      .concat(stay('2026-10-26T11:00:00Z', 10, 48.2261, 17.9316));
+    const st = fillTrackTimes(puncte, {}, track);
+    const rows = buildRouteRows(puncte, [], st);
+    expect(new Set([rows[0].time, rows[1].time]).size).toBe(2);
+    expect(rows[2].time).toBe('18:30');
+    expect(rows[2].gps).toBeUndefined();
+  });
+
+  test('áthaladás (2 percnél rövidebb) nem ad időt', () => {
+    const puncte = [{ tip: 'Descarcare', loc: 'A (48.22610, 17.93158)', data: '2026-10-26' }];
+    const st = fillTrackTimes(puncte, {}, [[T('2026-10-26T08:00:00Z'), 48.2261, 17.9316, 80]]);
+    expect(Object.keys(st)).toHaveLength(0);
+  });
+});

@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-10 — 🕐 Menetlevél: MINDEN pont kap pontos időt — a GPS-útvonalból is (PR #631)
+
+- **Idő a GPS-útvonalból** (`lib/waybillRows.js` `fillTrackTimes`/`trackVisits`/`coordsOf`): ha egy pontnak nincs beírt órája és az állomásából sem jön idő, de a címében ott a koordináta, a nyomtatvány a vontató GPS-pontsorából (`gps_track_days`) keresi ki, mikor állt ott a kamion (300 m-en belül, legalább 2 perc) → érkezés–távozás. Két pont ugyanazon a helyen két külön megállást kap.
+- **Régi pontok** (állomás-id nélkül, csak fuvar + szerep): ha a fuvarnak egyetlen ilyen állomása van, annak az ideje kerül ki.
+- A #630 telepítése a Fly.io átmeneti hibája miatt nem ment ki élesre — ez a kör azt is kiviszi. **Teszt:** `tests/unit/waybillRows.test.js` (+4); 2472 teszt zöld.
+
 ## 2026-11-10 — 📍 Cím-felismerés: mentett hely + „a következő megvan → az előző is megtörtént" + GPS-idő a menetlevél pontjainál (PR #630)
 
 - **Mentett hely bővebb egyeztetése** (`lib/stopMatch.js` `savedFor`): a cég mentett helye eddig csak akkor számított, ha a fuvaron a cégnév egyezett vele. Most akkor is az állomás saját helye, ha a fuvarba a mentett hely címe / neve került (⭐ listából választva, cégnév nélkül); a tervezett település 15 km-es körzetében lévő többi mentett hely pedig külön jelet kap (`saved_place`), és ott a rövid megállás is jelölt.
