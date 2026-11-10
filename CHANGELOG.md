@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-10 — 🛰️ Menetlevél: a megbízható GPS-idő az elsődleges (PR #632)
+
+- A nyomtatott menetlevélen a biztos (`auto`) vagy az iroda által jóváhagyott (`confirmed`) állomás GPS érkezés–távozás ideje mostantól a sofőr által beírt órát és napot is felülírja (`lib/waybillRows.js` `buildRouteRows`, `stopTimes[..].sure`). A nem megbízható források (javaslat, gombnyomás, GPS-útvonal a koordinátánál) továbbra is csak a hiányzó órát pótolják. A tárolt menetlevél-adat nem változik, csak a kiírás. **Teszt:** +2; 2474 teszt zöld.
+
 ## 2026-11-10 — 🕐 Menetlevél: MINDEN pont kap pontos időt — a GPS-útvonalból is (PR #631)
 
 - **Idő a GPS-útvonalból** (`lib/waybillRows.js` `fillTrackTimes`/`trackVisits`/`coordsOf`): ha egy pontnak nincs beírt órája és az állomásából sem jön idő, de a címében ott a koordináta, a nyomtatvány a vontató GPS-pontsorából (`gps_track_days`) keresi ki, mikor állt ott a kamion (300 m-en belül, legalább 2 perc) → érkezés–távozás. Két pont ugyanazon a helyen két külön megállást kap.
