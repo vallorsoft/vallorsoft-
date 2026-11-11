@@ -1460,6 +1460,7 @@
     'sa.sig.nextDone': { hu: 'a következő állomás megvan, ez előtte történt', ro: 'oprirea următoare e găsită, aceasta a fost înainte' },
     'sa.sig.nextButton': { hu: 'a sofőr a következő állomást már jelezte', ro: 'șoferul a marcat deja oprirea următoare' },
     'sa.sig.visitSite': { hu: 'a kamion járt a tervezett helyen', ro: 'camionul a fost la locul planificat' },
+    'sa.sig.visitDay': { hu: 'a kamion a tervezett nap körül ott járt', ro: 'camionul a fost acolo în jurul datei planificate' },
     'sa.sig.visitCity': { hu: 'a kamion megállt a tervezett helységben', ro: 'camionul a oprit în localitatea planificată' },
     'sa.sig.passCity': { hu: 'a kamion áthaladt a tervezett helységen', ro: 'camionul a trecut prin localitatea planificată' },
     'sa.sig.shortSite': { hu: 'rövid megállás ismert rakodóhelyen, utána továbbment', ro: 'oprire scurtă la un loc cunoscut, apoi a plecat' },
