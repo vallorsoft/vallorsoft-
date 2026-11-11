@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-11 — 🤖 Elfelejtett gomb: a javasolt GPS-találatot is beírja, a sofőr hagyja jóvá — az irodának külön nem kell (PR #637)
+
+- `lib/stopAutoEvents.js` `fillable`: a gomb pótlása mostantól nemcsak a biztos (`auto`), hanem a megerősített és a JAVASOLT (`suggested`, pontszám ≥ 30) találatnál is megtörténik, ha a kamion ott valóban megállt (puszta áthaladás — `pass_city` — nem). Sorrend, „már elment" és 15 perces feltétel változatlan.
+- `handlers/stopAutoEvents.js` `_confirmByDriver`: a sofőr „Rendben" / idő- / térképes javítása a helyet is megerősíti (`match_status='confirmed'`, `match_decided_by` = sofőr), a helymemóriába tanul és a menetlevél címét frissíti — az iroda nem kap külön megerősítendő tételt.
+- **Teszt:** `stopAutoEvents`/`stopMatchRobust` frissítve; 2401 zöld.
+
 ## 2026-11-11 — 🏷️ A fel-/lerakási címbe nem kerül hely- / cégnév (PR #636)
 
 - A címkiegészítő eddig „Hely neve, Utca, Település, …" formát írt a mezőbe (pl. „Policlinica AS, Strada Făt Frumos, Arad, 310364, RO"). Mostantól a mezőbe kerülő cím a hely/cég nevét SOHA nem tartalmazza (Photon / Nominatim / HERE / Google) — a név csak a legördülő fő sorában látszik; a cég neve a külön cég-mezőbe való.

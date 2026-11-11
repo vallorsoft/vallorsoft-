@@ -16,8 +16,16 @@ describe('planAutoFill — mikor tölti ki a rendszer a sofőr helyett', () => {
     const p = ae.planAutoFill([stop()], last, NOW);
     expect(p).toEqual([{ id: 1, kind: 'pickup', arrive: T('06:00').replace('Z', '.000Z'), done: T('07:30').replace('Z', '.000Z'), filled: 'both' }]);
   });
-  test('csak javaslat (nem biztos) → semmi', () => {
-    expect(ae.planAutoFill([stop({ match_status: 'suggested' })], last, NOW)).toEqual([]);
+  test('javaslat valódi megállással → kitölti (a sofőr hagyja jóvá)', () => {
+    const p = ae.planAutoFill([stop({ match_status: 'suggested', match_score: 45, match_detail: { signals: [['visit_day', 20], ['visit_site', 30]] } })], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([1]);
+  });
+  test('javaslat puszta áthaladásból / túl kis pontszámmal → semmi', () => {
+    expect(ae.planAutoFill([stop({ match_status: 'suggested', match_score: 30, match_detail: { signals: [['next_done', 25], ['pass_city', 5]] } })], last, NOW)).toEqual([]);
+    expect(ae.planAutoFill([stop({ match_status: 'suggested', match_score: 20 })], last, NOW)).toEqual([]);
+  });
+  test('iroda által megerősített hely → kitölti', () => {
+    expect(ae.planAutoFill([stop({ match_status: 'confirmed' })], last, NOW).length).toBe(1);
   });
   test('a kamion még ott áll (nincs utána GPS) → semmi', () => {
     expect(ae.planAutoFill([stop({ gps_left_at: T('10:55') })], last, NOW)).toEqual([]);

@@ -7,6 +7,8 @@
 
 ## 📋 Javítási napló (élő státusz)
 
+- **2026-11-11 (PR #637)** — Sofőr-jóváhagyás = hely-megerősítés: csak a SAJÁT fuvar állomásán (`LOWER(email_sofer)` + `company_id`), paraméteres SQL, audit; elvetett állomást nem ír felül.
+
 - **2026-11-11 (PR #636)** — Címből a hely-/cégnév kivéve (adattisztítás); nem biztonsági tétel, új lekérdezés nincs.
 
 - **2026-11-11 (PR #635)** — Cím-felismerés település-kinyerés javítása; nem biztonsági tétel (új lekérdezés nincs, a `route_geo` olvasás `company_id`-szűrt, paraméteres).
