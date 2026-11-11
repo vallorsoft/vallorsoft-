@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-11 — 📍 Cím-felismerés FIX: „Hely neve, Utca, Település" címnél a helység a település + mentett hely a pontos címből (PR #635)
+
+- **Hiba:** a címkiegészítőből választott címnél (pl. „Policlinica AS, Strada Făt Frumos, Arad, 310364, RO") a motor az ELSŐ vesszős darabot („Policlinica AS") vette településnek → rossz helyre geokódolt, a valódi állás −40/−100 pontot kapott, és a település környéki mentett helyek is kimaradtak → egyetlen találat sem.
+- `lib/stopMatch.js` `cityQuery`: átlépi a hely nevét (ha utca követi), az utcát, az irányítószámot, az országot; „310364 Arad" → „Arad".
+- `lib/stopMatchRunner.js`: a teljes tervezett cím pontja (kiíráskori `route_geo` koordináta, ennek hiányában a teljes cím geokódolva) → a cég helye, ha a cégnév nem található. `savedFor(…, addrGeo)`: a pontos cím 300 m-én belüli mentett hely az állomásé.
+- Migráció `db/zzz-stop-cityquery-requeue.sql`: a nyitott állomású fuvarok újraszámolása (60 nap). **Teszt:** 2396 zöld.
+
 ## 2026-11-11 — 📍 Cím-felismerés: „ott járt a tervezett napon" + mentett hely 200 m-es geozónája (PR #634)
 
 - **Ott járt → elvégezte** (`lib/stopMatch.js` `inferVisits`): a kimaradt állomás eddig csak akkor kapott helyet, ha egy KÉSŐBBI állomás megvolt. Most akkor is, ha nincs későbbi támpont (pl. az utolsó lerakó) vagy a sofőr más sorrendben rakodott: ha a kamion a tervezett nap körül (−1 … +3 nap) megállt a mentett helyen / a cég helyén (≥ 2 perc) vagy a tervezett helységben (6 km-en belül, ≥ 5 perc), az állomás a megállás pontos helyét és idejét kapja — javaslatként (`visit_day` jel). Másik állomás már felismert látogatását és a saját telephelyet nem adja oda.

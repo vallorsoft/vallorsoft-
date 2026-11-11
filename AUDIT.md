@@ -7,6 +7,8 @@
 
 ## 📋 Javítási napló (élő státusz)
 
+- **2026-11-11 (PR #635)** — Cím-felismerés település-kinyerés javítása; nem biztonsági tétel (új lekérdezés nincs, a `route_geo` olvasás `company_id`-szűrt, paraméteres).
+
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
 ### 81. lépés — Üzemanyag-riasztás, auto-útdíj, lejárat-feladat, használati kimutatás (2026-11-08, PR #624) ✅ KÉSZ
