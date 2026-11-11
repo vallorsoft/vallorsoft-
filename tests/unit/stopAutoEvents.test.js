@@ -142,3 +142,22 @@ describe('handlers/stopAutoEvents — csak a sofőr, csak a saját', () => {
     expect(pool.query.mock.calls.every((c) => !/^\s*UPDATE/.test(c[0]))).toBe(true);
   });
 });
+
+describe('ismétlődő hely a fuvarban (4. = 6. állomás, egy nappal később)', () => {
+  const last = sec('11:00');
+  test('a később ugyanott lévő állomást nem töltjük, amíg a korábbi nyitott', () => {
+    const p = ae.planAutoFill([
+      stop({ id: 4, loc: 'Arad, Strada X', firma: 'Alfa', match_status: 'suggested', match_score: 10 }),
+      stop({ id: 6, loc: 'Arad, Strada X', firma: 'Alfa', match_status: 'suggested', match_score: 50, gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
+    ], last, NOW);
+    expect(p).toEqual([]);
+    expect(p.skips.map((x) => x.reason)).toEqual(['not_sure', 'same_site_open']);
+  });
+  test('más helyű állomás nem akasztja meg', () => {
+    const p = ae.planAutoFill([
+      stop({ id: 4, loc: 'Cluj', match_status: 'unmatched' }),
+      stop({ id: 6, loc: 'Arad', match_status: 'auto', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
+    ], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([6]);
+  });
+});

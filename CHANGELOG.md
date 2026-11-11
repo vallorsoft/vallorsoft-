@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-11 — 🔁 Ismétlődő hely a fuvarban: a GPS-állás a korábbi, még nyitott állomásé (PR #639)
+
+- **Hiba:** ha ugyanaz a hely kétszer szerepel a fuvarban (pl. a 4. = a 6., az 5. = a 7. állomás, egy nappal később), a mai GPS-állást a rendszer a 6–7. állomásra írta be (és ajánlotta fel a sofőrnek), a ténylegesen elvégzett 4–5. nyitva maradt.
+- `lib/stopMatch.js` `pullBackSameSite` (az `align` végén): ha egy állást a későbbi azonos helyű állomás kapta, de a korábbi még nyitott és legalább olyan jól illik (a tervezett nap is stimmel), az állás a korábbié. `inferVisits` `free()`: azonos hely csak akkor oszthat meg egy állást, ha közöttük nincs más helyű állomás.
+- `lib/stopAutoEvents.js` `planAutoFill`: egy korábbi, még nyitott azonos helyű állomás mellett a későbbit nem tölti (`auto_skip = same_site_open`, ⏸ jelvény az adminon).
+- Migráció `db/zzz-stop-autofill-samesite-undo.sql`: a még NEM jóváhagyott ilyen téves beírások visszavonva (a sofőr gombnyomása érintetlen), a tévesen lezárt fuvar `In Curs`-ra, újrasorolás. Valós Postgres 16-on ellenőrizve.
+
 ## 2026-11-11 — 🤖 Elfelejtett gomb: egy akadály nem állítja le a többi állomás beírását + az iroda látja, miért nem írta be (PR #638)
 
 - **Hiba:** az adminon pontos (akár 160 pontos) találat látszott, de a sofőr nem kapta meg jóváhagyásra. A `planAutoFill` az első akadálynál (fel nem ismert állomás, vagy a sofőr későn nyomta meg az előző gombot) leállt, így az utána következő felismert állomásokat sem írta be.
