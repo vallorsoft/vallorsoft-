@@ -137,6 +137,88 @@ describe('inferVisits — a következő állomás megvan → az előző is megt�
   });
 });
 
+describe('inferVisits — ott járt a tervezett napon → elvégezte, csak a hely kell', () => {
+  const day = '2026-11-05';
+  // START → A (aMins állás) → B (bMins állás) → END
+  function track(aMins, bMins) {
+    const p = [[T0, START[0], START[1], 0, 1, null, null, null, null]];
+    let t = T0;
+    t = drive(p, t, START, A, 60); const a0 = t; t = stand(p, t, A, aMins);
+    t = drive(p, t, A, B, 180); const b0 = t; t = stand(p, t, B, bMins);
+    drive(p, t, B, END, 60);
+    return { p, a0, a1: a0 + aMins * 60, b0, b1: b0 + bMins * 60 };
+  }
+  test('utolsó állomás, későbbi támpont nélkül: megállt a helységben → a megállás pontos helye', () => {
+    const k = track(40, 9);
+    const stops = [{ id: 1, loc: 'Copșa Mică', data: day }, { id: 2, loc: 'Arad', data: day }];
+    const cands = [{ from: k.a0, to: k.a1, lat: A[0], lng: A[1] }];
+    const res = [{ candIdx: 0 }, { candIdx: null }];
+    const out = sm.inferVisits(stops, res, cands, [{}, { cityGeo: { lat: B[0] + 0.02, lng: B[1] } }], k.p);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ stopIdx: 1, level: 'city', stopped: true, mode: 'day', score: 35 });
+    expect(Math.abs(out[0].lat - B[0])).toBeLessThan(0.001);
+    expect(out[0].from).toBeGreaterThanOrEqual(k.b0);
+    expect(out[0].signals.map((x) => x[0])).toEqual(['visit_day', 'visit_city']);
+  });
+  test('más sorrendben rakodott: a kimaradt állomás a tervezett napon, a másik látogatása nélkül', () => {
+    // terv: B, majd A — a sofőr előbb A-nál, utána B-nél járt; a párosítás csak A-t találta meg
+    const k = track(40, 12);
+    const stops = [{ id: 1, loc: 'Arad', data: day }, { id: 2, loc: 'Copșa Mică', data: day }];
+    const cands = [{ from: k.a0, to: k.a1, lat: A[0], lng: A[1] }];
+    const res = [{ candIdx: null }, { candIdx: 0 }];
+    const out = sm.inferVisits(stops, res, cands, [{ cityGeo: { lat: B[0], lng: B[1] } }, {}], k.p);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ stopIdx: 0, mode: 'day', level: 'city' });
+    expect(out[0].from).toBeGreaterThanOrEqual(k.b0);
+  });
+  test('mentett helyen 2 perc is elég; ismeretlen ponton az áthaladás / 2 perc nem', () => {
+    const k = track(40, 2);
+    const stops = [{ id: 1, loc: 'Copșa Mică', data: day }, { id: 2, loc: 'Arad', data: day }];
+    const cands = [{ from: k.a0, to: k.a1, lat: A[0], lng: A[1] }];
+    const res = () => [{ candIdx: 0 }, { candIdx: null }];
+    const site = sm.inferVisits(stops, res(), cands, [{}, { memory: [{ lat: B[0], lng: B[1] + 0.002 }] }], k.p);
+    expect(site[0]).toMatchObject({ level: 'site', mode: 'day', score: 50 });
+    expect(sm.inferVisits(stops, res(), cands, [{}, { cityGeo: { lat: B[0] + 0.02, lng: B[1] } }], k.p)).toEqual([]);
+  });
+  test('nem a tervezett nap körül járt ott / nincs tervezett nap / saját telephely → nincs találat', () => {
+    const k = track(40, 15);
+    const cands = [{ from: k.a0, to: k.a1, lat: A[0], lng: A[1] }];
+    const exp = [{}, { cityGeo: { lat: B[0], lng: B[1] } }];
+    const mk = (d) => [{ id: 1, loc: 'Copșa Mică' }, { id: 2, loc: 'Arad', data: d }];
+    expect(sm.inferVisits(mk('2026-11-20'), [{ candIdx: 0 }, { candIdx: null }], cands, exp, k.p)).toEqual([]);
+    expect(sm.inferVisits(mk(null), [{ candIdx: 0 }, { candIdx: null }], cands, exp, k.p)).toEqual([]);
+    const hq = [{}, { cityGeo: { lat: B[0] + 0.04, lng: B[1] }, hq: { lat: B[0], lng: B[1] } }];
+    expect(sm.inferVisits(mk(day), [{ candIdx: 0 }, { candIdx: null }], cands, hq, k.p)).toEqual([]);
+  });
+  test('másik állomás már felismert látogatását nem adja oda', () => {
+    const k = track(40, 15);
+    const stops = [{ id: 1, loc: 'Arad', firma: 'X', data: day }, { id: 2, loc: 'Arad Vest', firma: 'Y', data: day }];
+    const cands = [{ from: k.b0, to: k.b1, lat: B[0], lng: B[1] }];
+    const out = sm.inferVisits(stops, [{ candIdx: 0 }, { candIdx: null }], cands, [{}, { cityGeo: { lat: B[0], lng: B[1] } }], k.p);
+    expect(out).toEqual([]);
+  });
+});
+
+describe('mentett hely geozónája (legalább 200 m) + a saját mentett helyen nincs téves büntetés', () => {
+  const cand = (lat, lng) => ({ from: T0, to: T0 + 1800, dur: 1800, dwell: 1800, lat, lng, day: '2026-11-05', maneuvers: 0, night: 0, road_m: null, place: null });
+  test('kis megadott sugárnál is legalább 200 m a zóna', () => {
+    expect(sm.zoneM({ radius_m: 30 })).toBeGreaterThanOrEqual(200);
+    expect(sm.zoneM({})).toBeGreaterThanOrEqual(200);
+    // ~280 m-re a mentett ponttól (a telephely másik pontja)
+    const sp = sm.scorePair({ loc: 'Arad', data: '2026-11-05' }, cand(B[0] + 0.0025, B[1]), { memory: [{ lat: B[0], lng: B[1], radius_m: 30 }] });
+    expect(sp.signals.some((x) => x[0] === 'memory')).toBe(true);
+  });
+  test('rosszul geokódolt település és a saját telephely nem bünteti a mentett helyet', () => {
+    const sp = sm.scorePair({ loc: 'Arad', data: '2026-11-05' }, cand(B[0], B[1]),
+      { memory: [{ lat: B[0], lng: B[1] }], cityGeo: { lat: 44.4, lng: 26.1 }, hq: { lat: B[0], lng: B[1] } });
+    const keys = sp.signals.map((x) => x[0]);
+    expect(keys).toContain('memory');
+    expect(keys).not.toContain('city_dist');
+    expect(keys).not.toContain('home_base');
+    expect(sp.score).toBeGreaterThanOrEqual(sm.AUTO_SCORE);
+  });
+});
+
 describe('menetlevél: a pont ideje a GPS-ből', () => {
   const st = { 5: { from: '2026-03-03T08:15:00Z', to: '2026-03-03T09:40:00Z' }, 6: { from: '2026-03-03T10:00:00Z' } };
   test('beírt óra nélkül a GPS érkezés–távozás kerül ki, a valós nappal', () => {

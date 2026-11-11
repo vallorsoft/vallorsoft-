@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-11 — 📍 Cím-felismerés: „ott járt a tervezett napon" + mentett hely 200 m-es geozónája (PR #634)
+
+- **Ott járt → elvégezte** (`lib/stopMatch.js` `inferVisits`): a kimaradt állomás eddig csak akkor kapott helyet, ha egy KÉSŐBBI állomás megvolt. Most akkor is, ha nincs későbbi támpont (pl. az utolsó lerakó) vagy a sofőr más sorrendben rakodott: ha a kamion a tervezett nap körül (−1 … +3 nap) megállt a mentett helyen / a cég helyén (≥ 2 perc) vagy a tervezett helységben (6 km-en belül, ≥ 5 perc), az állomás a megállás pontos helyét és idejét kapja — javaslatként (`visit_day` jel). Másik állomás már felismert látogatását és a saját telephelyet nem adja oda.
+- **Helységben a pontos megállás:** a helység-szintű találat a leghosszabb ottani megállás helyére mutat, nem a helységben töltött idő átlagos pontjára.
+- **Mentett hely geozónája** (`zoneM`): a megadott sugár, de legalább 200 m + GPS-tűrés — a telephely másik pontján rakodás is a mentett helyhez tartozik.
+- **Hibajavítás:** a saját mentett helyen álló jelöltet eddig lepontozhatta a rosszul geokódolt település (−40 / −100), a saját telephely (−50) és a hely-kategória (−15), így a mentett hely felismerés nélkül maradhatott. Ezek a saját mentett helyen már nem büntetnek.
+- **Teszt:** `tests/unit/stopInfer.test.js` (+7); 2481 teszt zöld.
+
 ## 2026-11-10 — 🕐 Menetlevél: a pontoknál egy időpont — a fel-/lerakás vége (PR #633)
 
 - A nyomtatott menetlevél pontjainál a GPS-ből jövő idő eddig „érkezés–távozás" volt; mostantól csak EGY időpont jelenik meg: a fel-/lerakás vége (a távozás), annak napjával. Ha a távozás nem ismert, az érkezés (`lib/waybillRows.js` `buildRouteRows`, a `timeTo` megszűnt). **Teszt:** 2474 teszt zöld.
