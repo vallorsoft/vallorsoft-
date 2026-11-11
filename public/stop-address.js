@@ -204,7 +204,12 @@
 
   // 🤖 a rendszer pótolta a sofőr elfelejtett gombját (GPS) — és mit szólt hozzá a sofőr
   function autoBadge(r) {
-    if (!r.auto_filled) return '';
+    if (!r.auto_filled) {
+      // miért nem írta be a rendszer a sofőrnek (nyitott, felismert állomás)
+      var sk = !r.done_at && r.match_detail && r.match_detail.auto_skip;
+      if (!sk || !sk.reason) return '';
+      return '<div style="margin-top:4px;"><span class="badge warn" title="' + _e(dt(sk.at)) + '">⏸ ' + _e(_t('sa.skip.' + sk.reason, sk.reason)) + '</span></div>';
+    }
     var t = r.auto_ack_at
       ? (r.auto_ack_action === 'ok' ? _t('sa.autoAckOk', 'Șoferul a confirmat') : r.auto_ack_action === 'map' ? _t('sa.autoAckMap', 'Șoferul a corectat pe hartă') : _t('sa.autoAckTime', 'Șoferul a corectat ora'))
       : _t('sa.autoAckWait', 'Așteaptă confirmarea șoferului');

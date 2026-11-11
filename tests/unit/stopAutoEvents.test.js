@@ -34,9 +34,27 @@ describe('planAutoFill — mikor tölti ki a rendszer a sofőr helyett', () => {
     const p = ae.planAutoFill([stop({ arrived_at: T('06:05') })], last, NOW);
     expect(p[0].filled).toBe('done'); expect(p[0].arrive).toBeNull();
   });
-  test('sorrend: az előző állomás nincs kész és nem tölthető → a későbbit sem', () => {
+  test('a fel nem ismert állomás nyitva marad, de a későbbi felismertet nem akasztja meg', () => {
     const p = ae.planAutoFill([stop({ match_status: 'unmatched' }), stop({ id: 2, kind: 'delivery', gps_arrived_at: T('09:00'), gps_left_at: T('10:00') })], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([2]);
+    expect(p.skips).toEqual([{ id: 1, reason: 'not_sure' }]);
+  });
+  test('a sofőr az előző állomást későn nyomta le → a GPS-távozás a horgony', () => {
+    const p = ae.planAutoFill([
+      stop({ arrived_at: T('06:00'), done_at: T('10:30') }),           // a gombot csak később nyomta
+      stop({ id: 2, kind: 'delivery', gps_arrived_at: T('08:30'), gps_left_at: T('10:00') }),
+    ], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([2]);
+  });
+  test('az érkezést a GPS-távozás után nyomta → a kész legalább az érkezés', () => {
+    const p = ae.planAutoFill([stop({ arrived_at: T('08:00') })], last, NOW);
+    expect(p[0].filled).toBe('done');
+    expect(Date.parse(p[0].done)).toBeGreaterThan(Date.parse(T('08:00')));
+  });
+  test('még ott áll → a későbbiek is várnak, okkal', () => {
+    const p = ae.planAutoFill([stop({ gps_left_at: T('10:55') }), stop({ id: 2, kind: 'delivery', gps_arrived_at: T('10:58'), gps_left_at: T('10:59') })], last, NOW);
     expect(p).toEqual([]);
+    expect(p.skips.map((x) => x.reason)).toEqual(['still_there', 'wait_prev']);
   });
   test('több állomás sorban, a sofőr által kész állomás horgony', () => {
     const p = ae.planAutoFill([
@@ -46,7 +64,7 @@ describe('planAutoFill — mikor tölti ki a rendszer a sofőr helyett', () => {
     expect(p.map((x) => x.id)).toEqual([2]);
   });
   test('a GPS-állás az előző kész ELŐTT kezdődik → nem hihető', () => {
-    const p = ae.planAutoFill([stop({ done_at: T('09:30') }), stop({ id: 2, kind: 'delivery', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') })], last, NOW);
+    const p = ae.planAutoFill([stop({ done_at: T('09:30'), gps_arrived_at: null, gps_left_at: null }), stop({ id: 2, kind: 'delivery', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') })], last, NOW);
     expect(p).toEqual([]);
   });
   test('egy későbbi gombnyomás felső korlát', () => {

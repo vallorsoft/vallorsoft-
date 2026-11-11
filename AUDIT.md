@@ -7,6 +7,7 @@
 
 ## 📋 Javítási napló (élő státusz)
 
+- **2026-11-11 (PR #638)** — Gomb-pótlás akadály-kezelés: az ok-jelölés (`auto_skip`) és az újrafuttatás `company_id`-szűrt, paraméteres; a sofőr gombnyomását továbbra sem írja felül (`done_at IS NULL`).
 - **2026-11-11 (PR #637)** — Sofőr-jóváhagyás = hely-megerősítés: csak a SAJÁT fuvar állomásán (`LOWER(email_sofer)` + `company_id`), paraméteres SQL, audit; elvetett állomást nem ír felül.
 
 - **2026-11-11 (PR #636)** — Címből a hely-/cégnév kivéve (adattisztítás); nem biztonsági tétel, új lekérdezés nincs.

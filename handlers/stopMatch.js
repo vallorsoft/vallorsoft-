@@ -205,6 +205,7 @@ handlers.stopMatchDecide = async function (req, res, args) {
         await _learn(cid, cur, 'accept');
       }
       const x = await wb.applyStop(cid, id);
+      _bgRerun(cid, cur.order_id);
       audit.fromReq(req, 'order.stop_address.apply', 'order', cur.order_id, { stop_id: id, points: x.points });
       return res.json({ result: { ok: true, waybills: x.waybills || 0, points: x.points || 0, total_waybills: x.total_waybills || 0 } });
     } else if (action === 'unapply') {
@@ -220,6 +221,8 @@ handlers.stopMatchDecide = async function (req, res, args) {
     if (action !== 'reject' || cur.waybill_apply) {
       try { wbRes = await wb.applyStop(cid, id, { revert: action === 'reject' }); } catch (e) { console.warn('[StopMatch] menetlevél-rátétel hiba', e.message); }
     }
+    // a megerősített hely után az elfelejtett gombok pótlása is azonnal fusson (a sofőrnek felajánlva)
+    if (action !== 'reject') _bgRerun(cid, cur.order_id);
     audit.fromReq(req, 'order.stop_address.' + action, 'order', cur.order_id, { stop_id: id, points: wbRes ? wbRes.points || 0 : 0 });
     return res.json({ result: { ok: true, waybills: wbRes && wbRes.ok ? wbRes.waybills || 0 : 0,
       total_waybills: wbRes && wbRes.ok ? wbRes.total_waybills || 0 : 0 } });

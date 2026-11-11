@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-11 — 🤖 Elfelejtett gomb: egy akadály nem állítja le a többi állomás beírását + az iroda látja, miért nem írta be (PR #638)
+
+- **Hiba:** az adminon pontos (akár 160 pontos) találat látszott, de a sofőr nem kapta meg jóváhagyásra. A `planAutoFill` az első akadálynál (fel nem ismert állomás, vagy a sofőr későn nyomta meg az előző gombot) leállt, így az utána következő felismert állomásokat sem írta be.
+- `lib/stopAutoEvents.js` `planAutoFill`: a fel nem ismert / nem biztos állomás nyitva marad (a sofőr megnyomhatja), de a későbbieket nem akasztja meg. Az előző kész állomás időhorgonya a GPS szerinti távozás, ha a sofőr később nyomta meg a gombot. Ha a sofőr az érkezést a távozás után nyomta, a kész legalább az érkezés ideje (eddig leállt). Csak a „még ott áll" / „15 percnél frissebb" állítja meg a későbbieket.
+- Az ok tárolva: `order_stops.match_detail.auto_skip = {reason, at}` (nem biztos / még ott áll / sorrend / későbbi gombnyomás / nincs sofőr / státusz / kikapcsolva); a „Fel- és lerakóhelyek GPS-ből" oldalon ⏸ jelvény mutatja (RO+HU).
+- `handlers/stopMatch.js`: az iroda elfogadás / jelölt / térkép / kézi cím / rátétel után azonnal újrafut a fuvar (eddig a döntött fuvar kimaradt az újrasorolásból) → a pótlás és a sofőr-ablak nem vár a következő körre.
+- Migráció `db/zzz-stop-autofill-skip-requeue.sql`: az utolsó 30 nap nyitott, felismert állomású fuvarjai újra sorba.
+
 ## 2026-11-11 — 🤖 Elfelejtett gomb: a javasolt GPS-találatot is beírja, a sofőr hagyja jóvá — az irodának külön nem kell (PR #637)
 
 - `lib/stopAutoEvents.js` `fillable`: a gomb pótlása mostantól nemcsak a biztos (`auto`), hanem a megerősített és a JAVASOLT (`suggested`, pontszám ≥ 30) találatnál is megtörténik, ha a kamion ott valóban megállt (puszta áthaladás — `pass_city` — nem). Sorrend, „már elment" és 15 perces feltétel változatlan.
