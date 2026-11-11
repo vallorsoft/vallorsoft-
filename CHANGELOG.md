@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-11 — 🏷️ A fel-/lerakási címbe nem kerül hely- / cégnév (PR #636)
+
+- A címkiegészítő eddig „Hely neve, Utca, Település, …" formát írt a mezőbe (pl. „Policlinica AS, Strada Făt Frumos, Arad, 310364, RO"). Mostantól a mezőbe kerülő cím a hely/cég nevét SOHA nem tartalmazza (Photon / Nominatim / HERE / Google) — a név csak a legördülő fő sorában látszik; a cég neve a külön cég-mezőbe való.
+- Új közös `lib/placeName.js` `stripPlaceName`: mentéskor minden állomás-cím (`lib/orderStops.js`, a fuvar top-mezői is) ezen megy át; csak akkor vág, ha a 2. darab utca és utána még település áll.
+- Migráció `db/zzz-strip-place-name-loc.sql`: a meglévő állomások címéből levágja a hely nevét (a mirror-trigger a fuvar loc-mezőit is frissíti). **Teszt:** 2399 zöld.
+
 ## 2026-11-11 — 📍 Cím-felismerés FIX: „Hely neve, Utca, Település" címnél a helység a település + mentett hely a pontos címből (PR #635)
 
 - **Hiba:** a címkiegészítőből választott címnél (pl. „Policlinica AS, Strada Făt Frumos, Arad, 310364, RO") a motor az ELSŐ vesszős darabot („Policlinica AS") vette településnek → rossz helyre geokódolt, a valódi állás −40/−100 pontot kapott, és a település környéki mentett helyek is kimaradtak → egyetlen találat sem.
