@@ -83,7 +83,7 @@ describe('stopMatch — fuzz: hibás / véletlen GPS-adaton sem dob, érvényes 
         // pihenő utáni rövid állás tanult adat nélkül sosem „biztos"
         if (x.status === 'auto' && x.candIdx != null) expect(cands[x.candIdx].hop).not.toBe(true);
       }
-      // a gomb-pótlás döntése is: csak auto, sorrendben, kész ≥ érkezés
+      // a gomb-pótlás döntése is: csak tölthető (biztos / javasolt valódi megállással), sorrendben, kész ≥ érkezés
       const st = res.map((x, i) => {
         const c = x.candIdx != null ? cands[x.candIdx] : null;
         return { id: i + 1, kind: stops[i].kind, match_status: x.status,
@@ -96,7 +96,7 @@ describe('stopMatch — fuzz: hibás / véletlen GPS-adaton sem dob, érvényes 
       for (const p of plan) {
         const i = st.findIndex((s) => s.id === p.id);
         expect(i).toBe(prevIdx + 1); prevIdx = i;               // nem ugrik át állomást
-        expect(st[i].match_status).toBe('auto');
+        expect(ae.fillable(st[i])).toBe(true);                  // biztos, megerősített vagy valódi megállású javaslat
         if (p.arrive) expect(Date.parse(p.done)).toBeGreaterThan(Date.parse(p.arrive));
       }
       // térképes javítás: bárhová koppint, nem dob

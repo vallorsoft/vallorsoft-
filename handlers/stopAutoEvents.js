@@ -6,6 +6,7 @@
 //    correctAutoStopTime  — idő-alapú javítás (érkezés / kész)
 //    getAutoStopMap       — térkép az átnézéshez: a felismert pont + a többi állás + a nap útvonala
 //    correctAutoStopMap   — térképes javítás: a kijelölt helyen talált GPS-állás ideje lesz az új idő
+//  A sofőr jóváhagyása / javítása a helyet is MEGERŐSÍTI (confirmed) — az irodának külön nem kell.
 //  CSAK Sofőr, csak a SAJÁT fuvarja (LOWER(email_sofer)), company_id-szűrt,
 //  paraméteres SQL, audit minden íráson. A tényleges (reverse-geokódolt) cím
 //  szövege a sofőrhöz NEM kerül — a térképen csak a pont látszik.
@@ -60,6 +61,23 @@ async function _ownStop(u, id) {
   return rows[0] || null;
 }
 
+// A sofőr jóváhagyása / javítása = megerősített hely (az irodának külön nem kell):
+// match_status='confirmed', helymemória, menetlevél-cím. Best-effort.
+async function _confirmByDriver(u, stopId) {
+  try {
+    const r = await pool.query(
+      `UPDATE order_stops SET match_status='confirmed', match_decided_by=$3, needs_manual=false
+        WHERE id=$1 AND company_id=$2 AND actual_lat IS NOT NULL AND COALESCE(match_status,'') <> 'rejected'
+        RETURNING id, order_id, kind, loc, firma, actual_lat, actual_lng, actual_address, actual_city`,
+      [stopId, u.company_id, String(u.email || '').slice(0, 255)]);
+    const st = r.rows[0];
+    if (!st) return;
+    const runner = require('../lib/stopMatchRunner');
+    try { await runner.learnPlace(u.company_id, st); } catch (_) {}
+    try { await require('../lib/stopWaybill').applyStop(u.company_id, st.id); } catch (e) { console.warn('[StopAuto] menetlevél-rátétel hiba', st.id, e.message); }
+  } catch (e) { console.warn('[StopAuto] sofőr-megerősítés hiba', stopId, e.message); }
+}
+
 function _notifyOffice(u, stop, what) {
   try {
     const { sendPushToRole } = require('../services/push');
@@ -112,8 +130,10 @@ handlers.ackAutoStopEvents = async function (req, res, args) {
           AND LOWER(o.email_sofer) = LOWER($3) AND s.auto_filled IS NOT NULL AND s.auto_ack_at IS NULL
         RETURNING s.id, s.match_detail`, [ids, u.company_id, u.email]);
     audit.fromReq(req, 'order.stop_auto.ack', 'order_stop', ids.join(',').slice(0, 200), { count: r.rowCount });
-    // tanulás: a sofőr megerősítette a felismert helyet → a győztes jelek erősödnek (helymemóriát csak az iroda ír)
+    // tanulás: a sofőr megerősítette a felismert helyet → a győztes jelek erősödnek
     await _learn(u.company_id, (r.rows || []).map((x) => ({ signals: x.match_detail && x.match_detail.signals, ok: true })));
+    // a sofőr jóváhagyása a hely megerősítése is — az irodának külön nem kell
+    for (const x of r.rows || []) await _confirmByDriver(u, x.id);
     return res.json({ result: { ok: true, acked: r.rowCount } });
   } catch (err) {
     console.error('ackAutoStopEvents hiba:', err.message);
@@ -140,6 +160,7 @@ handlers.correctAutoStopTime = async function (req, res, args) {
         WHERE id = $1 AND company_id = $2 AND auto_ack_at IS NULL`,
       [s.id, u.company_id, arr, done, JSON.stringify(orig)]);
     audit.fromReq(req, 'order.stop_auto.correct_time', 'order_stop', String(s.id), { order: s.order_id, orig, arrived_at: arr, done_at: done });
+    await _confirmByDriver(u, s.id);   // a hely ugyanaz, csak az idő változott
     _notifyOffice(u, s, 'oră');
     return res.json({ result: { ok: true } });
   } catch (err) {
@@ -202,10 +223,10 @@ handlers.correctAutoStopMap = async function (req, res, args) {
     await pool.query(
       `UPDATE order_stops SET arrived_at = COALESCE($3::timestamptz, arrived_at), done_at = $4::timestamptz,
               actual_lat = $5, actual_lng = $6, actual_address = $7, gps_arrived_at = $8::timestamptz, gps_left_at = $4::timestamptz,
-              match_status = 'suggested', match_source = 'driver', matched_at = NOW(),
+              match_status = 'confirmed', match_source = 'driver', match_decided_by = $10, needs_manual = false, matched_at = NOW(),
               auto_ack_at = NOW(), auto_ack_action = 'map', auto_orig = $9::jsonb, updated_at = NOW()
         WHERE id = $1 AND company_id = $2 AND auto_ack_at IS NULL`,
-      [s.id, u.company_id, arr, toIso, d.lat, d.lng, runner.coordText(d.lat, d.lng), fromIso, JSON.stringify(orig)]);
+      [s.id, u.company_id, arr, toIso, d.lat, d.lng, runner.coordText(d.lat, d.lng), fromIso, JSON.stringify(orig), String(u.email || '').slice(0, 255)]);
     audit.fromReq(req, 'order.stop_auto.correct_map', 'order_stop', String(s.id), { order: s.order_id, orig, lat: d.lat, lng: d.lng, from: fromIso, to: toIso });
     // tanulás: ha a sofőr MÁSHOL jelölte meg (≥ 250 m), a felismert hely rossz volt → jel-súly le + elvetett hely
     if (s.actual_lat != null && gt.distM([0, s.actual_lat, s.actual_lng], [0, d.lat, d.lng]) >= MOVED_M) {
@@ -222,7 +243,8 @@ handlers.correctAutoStopMap = async function (req, res, args) {
           WHERE id=$1 AND company_id=$2 AND match_source='driver'`,
         [s.id, cid, String(runner.formatAddress(place, d.lat, d.lng) || '').slice(0, 500),
           place ? (place.city || place.municipality || null) : null, place ? place.country : null]);
-      if (s.waybill_apply === true) await require('../lib/stopWaybill').applyStop(cid, s.id);
+      try { await runner.learnPlace(cid, { ...s, actual_lat: d.lat, actual_lng: d.lng, actual_address: runner.formatAddress(place, d.lat, d.lng) }); } catch (_) {}
+      await require('../lib/stopWaybill').applyStop(cid, s.id);
     })().catch((e) => console.warn('[StopAuto] térképes javítás utómunka hiba', s.id, e.message));
     return res.json({ result: { ok: true, arrived_at: arr, done_at: toIso } });
   } catch (err) {
