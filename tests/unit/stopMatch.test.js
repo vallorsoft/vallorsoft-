@@ -84,8 +84,22 @@ describe('stopMatch motor', () => {
     expect(keys).toContain('refuel');
   });
 
+  test('savedFor: a tervezett pontos cím közelében lévő mentett hely az állomásé', () => {
+    const rows = [{ label: 'Rampa', lat: 46.1801, lng: 21.3101, radius_m: 100 }, { label: 'Depo', lat: 46.19, lng: 21.33 }];
+    const r = sm.savedFor({ loc: 'Policlinica AS, Strada Făt Frumos, Arad', firma: 'Vesna GC' }, rows, null, { lat: 46.18, lng: 21.31 });
+    expect(r.memory.map((m) => m.label)).toEqual(['Rampa']);
+    expect(r.saved.map((m) => m.label)).toEqual(['Depo']);   // település nélkül is a környékbeli mentett hely
+  });
+
   test('cityQuery / norm', () => {
     expect(sm.cityQuery('Str. Fabricii 12, Arad, Romania')).toBe('Arad');
+    // a címkiegészítő „Hely neve, Utca, Település, Irsz., Ország" formája: nem a hely neve a település
+    expect(sm.cityQuery('Policlinica AS, Strada Făt Frumos, Arad, 310364, RO')).toBe('Arad');
+    expect(sm.cityQuery('Kaufland, Calea Victoriei 10, București, RO')).toBe('București');
+    expect(sm.cityQuery('310364 Arad, RO')).toBe('Arad');
+    expect(sm.cityQuery('DN1 km 12, Bod, Brașov')).toBe('Bod');
+    expect(sm.cityQuery('Copșa Mică')).toBe('Copșa Mică');
+    expect(sm.cityQuery('Arad, Strada X 2')).toBe('Arad');
     expect(sm.norm('Brașov')).toBe('brasov');
   });
 });
