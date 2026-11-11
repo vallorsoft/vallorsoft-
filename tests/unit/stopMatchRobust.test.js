@@ -92,10 +92,12 @@ describe('stopMatch — fuzz: hibás / véletlen GPS-adaton sem dob, érvényes 
       const lastPt = pts.length ? pts[pts.length - 1][0] : null;
       let plan;
       expect(() => { plan = ae.planAutoFill(st, lastPt, (lastPt || T0) * 1000 + 3600e3); }).not.toThrow();
-      let prevIdx = -1;
+      let prevIdx = -1, prevDoneT = -Infinity;
       for (const p of plan) {
         const i = st.findIndex((s) => s.id === p.id);
-        expect(i).toBe(prevIdx + 1); prevIdx = i;               // nem ugrik át állomást
+        expect(i).toBeGreaterThan(prevIdx); prevIdx = i;        // sorrendben
+        for (let k = 0; k < i; k++) if (!plan.some((q) => q.id === st[k].id)) expect(p.skips === undefined || plan.skips.some((x) => x.id === st[k].id)).toBe(true);
+        expect(Date.parse(p.done)).toBeGreaterThanOrEqual(prevDoneT); prevDoneT = Date.parse(p.done) - ae.ORDER_SLACK_SEC * 1000;
         expect(ae.fillable(st[i])).toBe(true);                  // biztos, megerősített vagy valódi megállású javaslat
         if (p.arrive) expect(Date.parse(p.done)).toBeGreaterThan(Date.parse(p.arrive));
       }
