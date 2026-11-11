@@ -357,3 +357,27 @@ describe('lib/placeName stripPlaceName', () => {
     expect(stripPlaceName('Depozit, Arad')).toBe('Depozit, Arad');
   });
 });
+
+describe('pullBackSameSite — az azonos helyű korábbi állomás kapja az állást', () => {
+  const sm2 = require('../../lib/stopMatch');
+  const st = (loc, firma, o) => Object.assign({ loc, firma }, o);
+  test('4,5 = 6,7 → a mai állás a 4–5.-é', () => {
+    const stops = [st('A', 'a'), st('B', 'b'), st('A', 'a'), st('B', 'b')];
+    const pick = [null, null, 0, 1];
+    const S = [[{ score: 60 }, { score: 0 }], [{ score: 0 }, { score: 60 }], [{ score: 50 }, { score: 0 }], [{ score: 0 }, { score: 50 }]];
+    sm2.pullBackSameSite(stops, pick, S);
+    expect(pick).toEqual([0, 1, null, null]);
+  });
+  test('ha a korábbi rosszabbul illik (más nap), marad', () => {
+    const stops = [st('A', 'a'), st('A', 'a')];
+    const pick = [null, 0];
+    sm2.pullBackSameSite(stops, pick, [[{ score: 20 }], [{ score: 60 }]]);
+    expect(pick).toEqual([null, 0]);
+  });
+  test('a sofőr által kész korábbi állomás nem kap', () => {
+    const stops = [st('A', 'a', { done_at: '2026-11-10T10:00:00Z' }), st('A', 'a')];
+    const pick = [null, 0];
+    sm2.pullBackSameSite(stops, pick, [[{ score: 60 }], [{ score: 60 }]]);
+    expect(pick).toEqual([null, 0]);
+  });
+});
