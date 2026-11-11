@@ -343,3 +343,17 @@ describe('stopMatch — pihenő / szünet után a valódi rakodóhely', () => {
     expect(sm.scorePair(stop[0], brk, exp[0]).signals.map((x) => x[0])).toContain('break_then_moved');
   });
 });
+
+describe('lib/placeName stripPlaceName', () => {
+  const { stripPlaceName } = require('../../lib/placeName');
+  test('a hely / cég neve kikerül a címből', () => {
+    expect(stripPlaceName('Policlinica AS, Strada Făt Frumos, Arad, 310364, RO')).toBe('Strada Făt Frumos, Arad, 310364, RO');
+    expect(stripPlaceName('Kaufland, Calea Victoriei 10, București, RO')).toBe('Calea Victoriei 10, București, RO');
+  });
+  test('település vagy utca elöl → változatlan', () => {
+    expect(stripPlaceName('Arad, Strada X 2, RO')).toBe('Arad, Strada X 2, RO');
+    expect(stripPlaceName('Strada X 2, Arad, RO')).toBe('Strada X 2, Arad, RO');
+    expect(stripPlaceName('Copșa Mică')).toBe('Copșa Mică');
+    expect(stripPlaceName('Depozit, Arad')).toBe('Depozit, Arad');
+  });
+});

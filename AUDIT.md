@@ -7,6 +7,8 @@
 
 ## 📋 Javítási napló (élő státusz)
 
+- **2026-11-11 (PR #636)** — Címből a hely-/cégnév kivéve (adattisztítás); nem biztonsági tétel, új lekérdezés nincs.
+
 - **2026-11-11 (PR #635)** — Cím-felismerés település-kinyerés javítása; nem biztonsági tétel (új lekérdezés nincs, a `route_geo` olvasás `company_id`-szűrt, paraméteres).
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
