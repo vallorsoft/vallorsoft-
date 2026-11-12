@@ -102,7 +102,7 @@ handlers.getMyAutoStopEvents = async function (req, res) {
            FROM order_stops s
            JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
           WHERE s.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
-            AND s.auto_filled IS NOT NULL AND s.auto_ack_at IS NULL AND o.status <> 'Anulat'
+            AND s.auto_filled IS NOT NULL AND s.auto_ack_at IS NULL AND o.status NOT IN ('Anulat','Finalizat')
           ORDER BY COALESCE(s.arrived_at, s.done_at), s.order_id, COALESCE(s.seq_index, 999999), s.stop_index
           LIMIT 50`, [u.company_id, u.email])).rows;
     } catch (e) {
