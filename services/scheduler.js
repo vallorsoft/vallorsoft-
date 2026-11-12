@@ -1736,7 +1736,10 @@ function startStopMatchScheduler() {
         if (n >= limit || Date.now() - t0 > BUDGET_MS) break;
         if (!(await allowed(q.company_id))) continue;
         n++;
-        try { await runner.matchOrder(q.company_id, q.id, { recheck: q.recheck === true }); }
+        try {
+          await runner.matchOrder(q.company_id, q.id, { recheck: q.recheck === true });
+          if (q.status === 'Finalizat') await runner.markClosedReviewed(q.id);
+        }
         catch (e) {
           console.warn('[StopMatch] fuvar hiba', q.id, e.message);
           await pool.query(
@@ -1744,6 +1747,7 @@ function startStopMatchScheduler() {
              VALUES ($1,$2,'error',1,NOW(),false,$3)
              ON CONFLICT (order_id) DO UPDATE SET status='error', attempts=stop_match_state.attempts+1, attempted_at=NOW(), requeued=false, note=EXCLUDED.note`,
             [q.id, q.company_id, String(e.message || '').slice(0, 300)]).catch(() => {});
+          if (q.status === 'Finalizat') await runner.markClosedReviewed(q.id);
         }
       }
       if (n) console.log('[StopMatch] feldolgozva', n, 'fuvar /', queue.length, 'esedékes');

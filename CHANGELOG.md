@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-12 — 🔒 Lezárt fuvar: utólag egyszer ellenőrizve, utána többet nem keresünk rá (PR #646)
+
+- **Kérés:** a már lezárt fuvart utólag egyszer kérje le; ha nem tud alakítani rajta, fejezze be teljesen, többet ne keressen rá.
+- `lib/stopMatchRunner.js` `pickQueue`: lezárt (`Finalizat`) fuvar KIZÁRÓLAG az egyszeri utólagos ellenőrzésre (`CLOSED_ONCE_SQL`: a lezárás napja után, reggel 5-től, amikor a nap GPS-adata teljes; csak ha erre a lezárásra még nem volt) vagy az iroda kézi újrasorolására kerül sorba. A heti újraellenőrzés, a részleges / GPS-hiányos újrapróba és a gomb-keresés (`PRESS_DUE_SQL`) csak nyitott fuvarra fut. Eddig a lezárt fuvar óránként újra sorba kerülhetett, amíg a GPS-napok nem lettek teljesek, és a többi ág is elővette.
+- Az ellenőrzés után a `closed_review_at` mindig beíródik — akkor is, ha a futás nem talált GPS-t vagy hibára futott (`markClosedReviewed`, az ütemezőből). Újranyitott, majd újra lezárt fuvarnál az új lezárásra megint egy ellenőrzés jár.
+- Teszt: új `stopClosedOnce.test.js`; valós Postgres 16-on végigpróbálva (lezárás napján nem, másnap 5 előtt nem, 6-kor igen, utána és egy hét múlva sem, kézi újrasorolásra igen, újbóli lezárás után egyszer igen).
+
 ## 2026-11-12 — ⚙️ Állomás-felismerés terhelése: 25 perc, csak új GPS-adattal, igazságos sor (PR #645)
 
 - **Kérés:** nem túl sok-e a 15 perces futtatás, elbírja-e 1000 fuvarnál; ezért a 3 javaslat + 25 perces gyakoriság.
