@@ -111,14 +111,33 @@ describe('handlers/stopAutoEvents — csak a sofőr, csak a saját', () => {
     expect(res.json.mock.calls[0][0].result.items).toHaveLength(1);
   });
   test('rendben: csak a saját, még nyitott tételek', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));   // jóváhagyás előtti ellenőrzés: érintett fuvarok
     pool.query.mockResolvedValueOnce({ rows: [{ id: 5 }], rowCount: 1 });
     pool.query.mockResolvedValue(rows([]));
     const res = resMock();
     await h.ackAutoStopEvents(req(drv), res, [{ ids: [5, 'x'] }]);
-    const [sql, params] = pool.query.mock.calls[0];
+    const [sql0, params0] = pool.query.mock.calls[0];
+    expect(sql0).toMatch(/LOWER\(o\.email_sofer\) = LOWER\(\$3\)/);
+    expect(params0).toEqual([[5], 7, 'a@b.ro']);
+    const [sql, params] = pool.query.mock.calls[1];
     expect(sql).toMatch(/auto_ack_at IS NULL/);
     expect(params).toEqual([[5], 7, 'a@b.ro']);
     expect(res.json.mock.calls[0][0].result.acked).toBe(1);
+  });
+  test('jóváhagyás előtti ellenőrzés: a nem stimmelő beírás visszanyílik, nem lesz jóváhagyva', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ order_id: 'O1' }]));
+    pool.query.mockResolvedValueOnce(rows([
+      { id: 4, loc: 'A', done_at: '2026-11-11T09:00:00Z', data: '2026-11-11' },
+      { id: 5, loc: 'A', done_at: '2026-11-11T12:00:00Z', data: '2026-11-12', auto_filled: 'both', auto_ack_at: null,
+        match_status: 'suggested', arrived_at: '2026-11-11T11:00:00Z', gps_arrived_at: '2026-11-11T11:00:00Z', gps_left_at: '2026-11-11T12:00:00Z' },
+    ]));
+    pool.query.mockResolvedValue({ rows: [], rowCount: 1 });
+    const res = resMock();
+    await h.ackAutoStopEvents(req(drv), res, [{ ids: [5] }]);
+    const out = res.json.mock.calls[0][0].result;
+    expect(out.acked).toBe(0);
+    expect(out.reverted).toEqual([5]);
+    expect(pool.query.mock.calls.some((c) => /SET done_at = NULL/.test(c[0]))).toBe(true);
   });
   test('idő-javítás: idegen / már átnézett állomás → hiba', async () => {
     pool.query.mockResolvedValueOnce(rows([]));

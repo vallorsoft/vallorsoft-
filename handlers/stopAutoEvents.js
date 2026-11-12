@@ -123,18 +123,40 @@ handlers.ackAutoStopEvents = async function (req, res, args) {
     const a = (args && args[0]) || {};
     const ids = (Array.isArray(a.ids) ? a.ids : [a.id]).map((x) => parseInt(x, 10)).filter((x) => isFinite(x) && x > 0).slice(0, 100);
     if (!ids.length) return _err(res, 'Parametri invalizi');
+    // jóváhagyás előtt újraellenőrzés: a fuvar teljes lánca (sorrend, azonos hely, tervezett nap, GPS-idő)
+    const reverted = [];
+    try {
+      const own = (await pool.query(
+        `SELECT DISTINCT s.order_id FROM order_stops s
+           JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
+          WHERE s.id = ANY($1::bigint[]) AND s.company_id = $2 AND LOWER(o.email_sofer) = LOWER($3)
+            AND s.auto_filled IS NOT NULL AND s.auto_ack_at IS NULL`, [ids, u.company_id, u.email])).rows;
+      for (const o of own) {
+        const stops = (await pool.query(autoEv.STOPS_SQL, [o.order_id, u.company_id])).rows;
+        const bad = autoEv.verifyChain(stops).filter((b) => ids.includes(Number(b.id)));
+        if (bad.length) {
+          await autoEv.revertFills(u.company_id, o.order_id, bad);
+          for (const b of bad) reverted.push(Number(b.id));
+        }
+      }
+    } catch (e) { console.warn('[StopAuto] jóváhagyás előtti ellenőrzés hiba', e.message); }
+    const okIds = ids.filter((x) => !reverted.includes(x));
+    if (!okIds.length) {
+      audit.fromReq(req, 'order.stop_auto.verify_fail', 'order_stop', reverted.join(',').slice(0, 200), { count: reverted.length });
+      return res.json({ result: { ok: true, acked: 0, reverted } });
+    }
     const r = await pool.query(
       `UPDATE order_stops s SET auto_ack_at = NOW(), auto_ack_action = 'ok'
          FROM orders o
         WHERE s.id = ANY($1::bigint[]) AND s.company_id = $2 AND o.id = s.order_id AND o.company_id = s.company_id
           AND LOWER(o.email_sofer) = LOWER($3) AND s.auto_filled IS NOT NULL AND s.auto_ack_at IS NULL
-        RETURNING s.id, s.match_detail`, [ids, u.company_id, u.email]);
-    audit.fromReq(req, 'order.stop_auto.ack', 'order_stop', ids.join(',').slice(0, 200), { count: r.rowCount });
+        RETURNING s.id, s.match_detail`, [okIds, u.company_id, u.email]);
+    audit.fromReq(req, 'order.stop_auto.ack', 'order_stop', okIds.join(',').slice(0, 200), { count: r.rowCount, reverted: reverted.length });
     // tanulás: a sofőr megerősítette a felismert helyet → a győztes jelek erősödnek
     await _learn(u.company_id, (r.rows || []).map((x) => ({ signals: x.match_detail && x.match_detail.signals, ok: true })));
     // a sofőr jóváhagyása a hely megerősítése is — az irodának külön nem kell
     for (const x of r.rows || []) await _confirmByDriver(u, x.id);
-    return res.json({ result: { ok: true, acked: r.rowCount } });
+    return res.json({ result: { ok: true, acked: r.rowCount, reverted } });
   } catch (err) {
     console.error('ackAutoStopEvents hiba:', err.message);
     return _err(res, 'Eroare de server');
