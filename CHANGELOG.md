@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-12 — 🔒 Lezárt fuvar: nincs több felajánlás, háttér-ellenőrzés + csak időjavítás (PR #643)
+
+- **Kérés:** ha a fuvar lezárult, a sofőrnek ne legyen több felajánlás; a háttérben fusson újra az ellenőrzés, és ha az eredmény nem jó, automatikusan javítsa — de csak az időt, a dátumot nem.
+- `lib/stopAutoEvents.js`: `Finalizat` fuvaron nincs beírás/felajánlás; `reviewClosed` + `planClosedFix` — a rendszer által beírt állomás idejét a friss újraszámolás (`match_detail.review`) alapján javítja, ha ugyanaz a hely (≤ 300 m), legalább 2/3 ellenőrzés egyezik, az eltérés > 10 perc, és **ugyanarra a napra** esik; más nap → nem javít, `review_note = closed_date_differs` (az irodának). A még át nem nézett tételek `auto_ack_action='closed'`. A sofőr saját gombnyomásához és a sofőr által javított (idő/térkép) állomáshoz nem nyúl.
+- `lib/stopMatchRunner.js`: lezárt fuvarnál a rögzítés (pin) nélkül, szabadon újraszámol, az eredményt `review`-ként menti; a fuvar a lezárás után (30 napig) újra sorba kerül, amíg a napok GPS-adata teljes (`stop_match_state.closed_review_at`, migráció `db/zzz-stop-closed-review.sql`).
+- `handlers/stopAutoEvents.js`: lezárt fuvar tételei nem jelennek meg a sofőrnek. Admin: 🤖 „Lezárt fuvar — háttérben ellenőrizve", 🕐 „Óra automatikusan javítva", ⚠️ „a GPS más napot mutat".
+- Teszt: `stopVerify.test.js` +4 eset; valódi Postgres 16-on is.
+
 ## 2026-11-12 — 🔁 Állomás-felismerés munkamenete: 3 független ellenőrzés + jóváhagyás előtti és záró újraellenőrzés (PR #642)
 
 - **Kérés:** fuvar → címek → dátumok a pontokhoz → GPS-útvonal az adott napról → a találatot még kétszer ellenőrizni, 3-ból 2 egyezés kell → felajánlás a sofőrnek → jóváhagyáskor újraellenőrzés → beírás → a végén az egész fuvar újra.

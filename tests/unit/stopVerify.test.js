@@ -85,3 +85,30 @@ describe('visszavont beírás nem jön vissza ugyanabból az állásból', () =>
     expect(p.map((x) => x.id)).toEqual([1]);
   });
 });
+
+describe('lezárt fuvar — csak az óra javítható, a nap nem', () => {
+  const st = (o) => ({ id: 1, auto_filled: 'both', auto_ack_action: null, match_status: 'suggested', actual_lat: 46.17, actual_lng: 21.31,
+    arrived_at: T('2026-11-11', '08:00'), done_at: T('2026-11-11', '09:00'), ...o });
+  test('ugyanaz a nap, más óra → javítás', () => {
+    const r = ae.planClosedFix([st({ match_detail: { review: { from: T('2026-11-11', '10:00'), to: T('2026-11-11', '11:30'), lat: 46.1701, lng: 21.3101, votes: 3 } } })]);
+    expect(r.fixes).toHaveLength(1);
+    expect(r.fixes[0].done).toBe(T('2026-11-11', '11:30').replace('Z', '.000Z'));
+    expect(r.fixes[0].arrive).toBe(T('2026-11-11', '10:00').replace('Z', '.000Z'));
+  });
+  test('más nap → nem javít, csak jelez', () => {
+    const r = ae.planClosedFix([st({ match_detail: { review: { from: T('2026-11-12', '10:00'), to: T('2026-11-12', '11:00'), lat: 46.17, lng: 21.31, votes: 3 } } })]);
+    expect(r.fixes).toHaveLength(0);
+    expect(r.notes[0].reason).toBe('closed_date_differs');
+  });
+  test('más hely / kevés egyező ellenőrzés / sofőr javította / sofőr gombja → nem nyúl hozzá', () => {
+    const rv = { from: T('2026-11-11', '10:00'), to: T('2026-11-11', '11:00'), votes: 3 };
+    expect(ae.planClosedFix([st({ match_detail: { review: { ...rv, lat: 46.3, lng: 21.5 } } })]).fixes).toHaveLength(0);
+    expect(ae.planClosedFix([st({ match_detail: { review: { ...rv, votes: 1 } } })]).fixes).toHaveLength(0);
+    expect(ae.planClosedFix([st({ auto_ack_action: 'time', match_detail: { review: rv } })]).fixes).toHaveLength(0);
+    expect(ae.planClosedFix([st({ auto_filled: null, match_detail: { review: rv } })]).fixes).toHaveLength(0);
+  });
+  test('kis eltérés (≤ 10 perc) → nincs javítás', () => {
+    const r = ae.planClosedFix([st({ match_detail: { review: { from: T('2026-11-11', '08:05'), to: T('2026-11-11', '09:05'), votes: 2 } } })]);
+    expect(r.fixes).toHaveLength(0);
+  });
+});

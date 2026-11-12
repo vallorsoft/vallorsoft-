@@ -219,10 +219,14 @@
       return '<div style="margin-top:4px;"><span class="badge warn" title="' + _e(dt(sk.at)) + '">⏸ ' + _e(_t('sa.skip.' + sk.reason, sk.reason)) + '</span></div>';
     }
     var t = r.auto_ack_at
-      ? (r.auto_ack_action === 'ok' ? _t('sa.autoAckOk', 'Șoferul a confirmat') : r.auto_ack_action === 'map' ? _t('sa.autoAckMap', 'Șoferul a corectat pe hartă') : _t('sa.autoAckTime', 'Șoferul a corectat ora'))
+      ? (r.auto_ack_action === 'ok' ? _t('sa.autoAckOk', 'Șoferul a confirmat') : r.auto_ack_action === 'closed' ? _t('sa.autoAckClosed', 'Cursa închisă — verificat în fundal') : r.auto_ack_action === 'map' ? _t('sa.autoAckMap', 'Șoferul a corectat pe hartă') : _t('sa.autoAckTime', 'Șoferul a corectat ora'))
       : _t('sa.autoAckWait', 'Așteaptă confirmarea șoferului');
-    var cls = r.auto_ack_at ? (r.auto_ack_action === 'ok' ? 'ok' : 'warn') : 'info';
-    return '<div style="margin-top:4px;"><span class="badge ' + cls + '" title="' + _e(dt(r.auto_filled_at)) + '">🤖 ' + _e(t) + '</span></div>';
+    var cls = r.auto_ack_at ? (r.auto_ack_action === 'ok' || r.auto_ack_action === 'closed' ? 'ok' : 'warn') : 'info';
+    var md = r.match_detail || {};
+    var extra = '';
+    if (md.time_fix) extra += ' <span class="badge info" title="' + _e(dt(md.time_fix.at)) + '">🕐 ' + _e(_t('sa.timeFixed', 'Ora corectată automat (aceeași zi)')) + '</span>';
+    if (md.review_note && md.review_note.reason) extra += ' <span class="badge warn" title="' + _e(dt(md.review_note.at)) + '">⚠️ ' + _e(_t('sa.review.' + md.review_note.reason, md.review_note.reason)) + '</span>';
+    return '<div style="margin-top:4px;"><span class="badge ' + cls + '" title="' + _e(dt(r.auto_filled_at)) + '">🤖 ' + _e(t) + '</span>' + extra + '</div>';
   }
 
   // 🔁 heti újraellenőrzés állása / ✋ kézi megerősítésre vár
