@@ -1698,11 +1698,21 @@ function startGpsTrackHistoryScheduler() {
 // Háttérben dolgozza fel a fuvarokat (új / részleges / kézzel újrasorba tett),
 // körönként legfeljebb STOP_MATCH_PER_ROUND fuvart, időkerettel. A Nominatim
 // fair-use miatt a reverse-geokód fojtott (1 kérés / 1,1 mp) és cache-elt.
+// A cím-felismerő kör mérete: alapból `base`, de ha a sor hosszabb, az egészet
+// próbálja (legfeljebb `max`-ot) — az időkeret úgyis megállítja.
+function roundSize(queued, base, max) {
+  const q = Math.max(0, Number(queued) || 0);
+  return Math.max(base, Math.min(max, q));
+}
+
 function startStopMatchScheduler() {
   const runner = require('../lib/stopMatchRunner');
   const { featureEnabled } = require('../lib/featureEnabled');
   const MIN = Math.max(2, parseInt(process.env.STOP_MATCH_INTERVAL_MIN, 10) || 5);
   const PER_ROUND = Math.max(1, Math.min(100, parseInt(process.env.STOP_MATCH_PER_ROUND, 10) || 15));
+  // A kör mérete a sor hosszához igazodik: sok esedékes fuvarnál többet dolgoz fel
+  // (legfeljebb MAX_PER_ROUND-ot), az időkereten (BUDGET_MS) belül.
+  const MAX_PER_ROUND = Math.max(PER_ROUND, Math.min(300, parseInt(process.env.STOP_MATCH_MAX_PER_ROUND, 10) || 80));
   const BUDGET_MS = 4 * 60 * 1000;
   let running = false;
   const featCache = new Map();
@@ -1719,10 +1729,11 @@ function startStopMatchScheduler() {
     const t0 = Date.now();
     try {
       let queue = [];
-      try { queue = await runner.pickQueue(PER_ROUND * 3); } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] sor hiba', e.message); return; }
+      try { queue = await runner.pickQueue(MAX_PER_ROUND * 2); } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[StopMatch] sor hiba', e.message); return; }
+      const limit = roundSize(queue.length, PER_ROUND, MAX_PER_ROUND);
       let n = 0;
       for (const q of queue) {
-        if (n >= PER_ROUND || Date.now() - t0 > BUDGET_MS) break;
+        if (n >= limit || Date.now() - t0 > BUDGET_MS) break;
         if (!(await allowed(q.company_id))) continue;
         n++;
         try { await runner.matchOrder(q.company_id, q.id, { recheck: q.recheck === true }); }
@@ -1735,7 +1746,7 @@ function startStopMatchScheduler() {
             [q.id, q.company_id, String(e.message || '').slice(0, 300)]).catch(() => {});
         }
       }
-      if (n) console.log('[StopMatch] feldolgozva', n, 'fuvar');
+      if (n) console.log('[StopMatch] feldolgozva', n, 'fuvar /', queue.length, 'esedékes');
       // régi formátumú címek (cégnévvel, koordináta nélkül) → új forma; egyszeri, idempotens
       try {
         const u = await runner.upgradeAddressFormat(200);
@@ -1924,4 +1935,5 @@ function startFuelLossScheduler() {
 module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
 // Belső segédek (nem ütemezők) — a lib/* riasztók is ezeket használják
 Object.defineProperty(module.exports, '_emailAlertToAdmins', { enumerable: false, value: _emailAlertToAdmins });
+Object.defineProperty(module.exports, '_roundSize', { enumerable: false, value: roundSize });
 Object.defineProperty(module.exports, '_alertEmailBody', { enumerable: false, value: _alertEmailBody });
