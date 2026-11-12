@@ -572,9 +572,16 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       const oids = [...new Set(_ptList.filter((p) => (p.stopId == null || p.stopId === '') && p.orderId && p.role).map((p) => String(p.orderId)))];
       if (ids.length || oids.length) {
         const sR = await pool.query(
-          `SELECT id, order_id, kind, gps_arrived_at, gps_left_at, arrived_at, done_at, match_status
+          `SELECT id, order_id, kind, gps_arrived_at, gps_left_at, arrived_at, done_at, match_status,
+                  (to_jsonb(order_stops) ->> 'auto_filled') AS auto_filled,
+                  (to_jsonb(order_stops) ->> 'auto_ack_at') AS auto_ack_at
              FROM order_stops WHERE company_id = $1 AND (id = ANY($2::bigint[]) OR order_id::text = ANY($3::text[]))`, [cid, ids, oids]);
         const timeOf = (s) => {
+          // a rendszer által (GPS-ből) beírt gomb: a sofőr ezt az időt látta / hagyta jóvá / javította —
+          // a menetlevélre is ez kerül (nem egy esetleg később átszámolt GPS-állás)
+          if (s.auto_filled && s.done_at) {
+            return { from: s.arrived_at || s.done_at, to: s.arrived_at ? s.done_at : null, sure: !!s.auto_ack_at || s.match_status === 'auto' || s.match_status === 'confirmed' };
+          }
           const gpsOk = s.gps_arrived_at && ['auto', 'confirmed', 'suggested'].includes(s.match_status);
           const from = gpsOk ? s.gps_arrived_at : (s.arrived_at || s.done_at);
           const to = gpsOk ? s.gps_left_at : (s.arrived_at ? s.done_at : null);

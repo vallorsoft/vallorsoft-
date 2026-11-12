@@ -607,6 +607,17 @@ function _collectPuncte() {
 //   kerül a menetlevélre a Plecare pillanatában. A picker-alapú út
 //   (`_applyPickerDiff`) filter nélkül hív → a régi teljes-stopos
 //   viselkedést kapja (a sofőr kézzel dönt).
+// Időbélyeg → helyi (román) nap YYYY-MM-DD. Az ISO időbélyeg UTC-ben jön; a String.slice
+// éjfél körül (pl. 01:30-as lerakás) az előző napot adná.
+function _localYmd(v) {
+  if (!v) return '';
+  var str = String(v);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  var d = new Date(str);
+  if (isNaN(d.getTime())) return str.slice(0, 10);
+  try { return d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Bucharest' }); }
+  catch (e) { return str.slice(0, 10); }
+}
 function _buildWaybillPuncteForOrder(o, filter) {
   var ymd = function (v) { return v ? String(v).slice(0, 10) : ''; };
   var stopMatchesFilter = function (s) {
@@ -616,25 +627,25 @@ function _buildWaybillPuncteForOrder(o, filter) {
   };
   var stops = Array.isArray(o && o.stops) ? o.stops : [];
   if (stops.length) {
-    var pickups = stops.filter(function (s) { return s.kind === 'pickup'   && !s.waybilled_at && stopMatchesFilter(s); })
-                      .sort(function (a, b) { return a.stop_index - b.stop_index; });
-    var deliveries = stops.filter(function (s) { return s.kind === 'delivery' && !s.waybilled_at && stopMatchesFilter(s); })
-                      .sort(function (a, b) { return a.stop_index - b.stop_index; });
+    // a fuvar állomás-sorrendjében (seq_index) — ismétlődő helynél (pl. 4. = 6. állomás) is
+    // a valódi sorrend marad, nem „minden felrakó, aztán minden lerakó"
+    var seqOf = function (s) { return s.seq_index != null ? Number(s.seq_index) : 999999; };
+    var ordered = stops.filter(function (s) { return (s.kind === 'pickup' || s.kind === 'delivery') && !s.waybilled_at && stopMatchesFilter(s); })
+                       .sort(function (a, b) { return (seqOf(a) - seqOf(b)) || ((a.kind === 'pickup' ? 0 : 1) - (b.kind === 'pickup' ? 0 : 1)) || (a.stop_index - b.stop_index); });
     // 2026-08-27 fix: a menetlevél MINDIG a SOFŐR által rögzített (valós)
     // dátumot használja — a done_at (elvégezte) ELSŐBBSÉGGEL, arrived_at
     // (megérkezett) FALLBACK-kel, csak ha egyik sincs, a tervezett s.data,
     // majd az orders.data_incarcare/descarcare. Így a menetlevélre a valós
     // fel-/lerakási időpont kerül (nem a diszpécser tervezett dátuma).
     var pickTime = function (s, plannedTop) {
-      return ymd(s.done_at) || ymd(s.arrived_at) || ymd(s.data) || ymd(plannedTop);
+      return _localYmd(s.done_at) || _localYmd(s.arrived_at) || ymd(s.data) || ymd(plannedTop);
     };
     var out = [];
-    pickups.forEach(function (s) {
-      if (s.loc) out.push([s.loc, 'Încărcare', pickTime(s, o.data_incarcare),
+    ordered.forEach(function (s) {
+      if (!s.loc) return;
+      if (s.kind === 'pickup') out.push([s.loc, 'Încărcare', pickTime(s, o.data_incarcare),
                           { orderId: o.id, role: 'loading', stopId: s.id }]);
-    });
-    deliveries.forEach(function (s) {
-      if (s.loc) out.push([s.loc, 'Descărcare', pickTime(s, o.data_descarcare),
+      else out.push([s.loc, 'Descărcare', pickTime(s, o.data_descarcare),
                           { orderId: o.id, role: 'unloading', stopId: s.id }]);
     });
     return out;
@@ -648,8 +659,8 @@ function _buildWaybillPuncteForOrder(o, filter) {
   // orders.incarcat_at → sosit_incarcare_at → data_incarcare (tervezett),
   // ugyanígy a lerakó ágon.
   var phase = o.waybill_phase;
-  var loadDate = ymd(o.incarcat_at) || ymd(o.sosit_incarcare_at) || ymd(o.data_incarcare);
-  var unloadDate = ymd(o.descarcat_at) || ymd(o.sosit_descarcare_at) || ymd(o.data_descarcare);
+  var loadDate = _localYmd(o.incarcat_at) || _localYmd(o.sosit_incarcare_at) || ymd(o.data_incarcare);
+  var unloadDate = _localYmd(o.descarcat_at) || _localYmd(o.sosit_descarcare_at) || ymd(o.data_descarcare);
   var res = [];
   if (phase === 'loading') {
     if (o.loc_incarcare) res.push([o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' }]);
@@ -1572,7 +1583,10 @@ function _autoCollectCompletedStops() {
     var any = false;
     stops.forEach(function (s) {
       if (!s || !s.done_at || s.waybilled_at) return;
-      if (sinceIso && String(s.done_at) < sinceIso) return;
+      if (sinceIso) {
+        var dT = Date.parse(s.done_at), sT = Date.parse(sinceIso);   // sinceIso: helyi idő (zóna nélkül)
+        if (isFinite(dT) && isFinite(sT) ? dT < sT : String(s.done_at) < sinceIso) return;
+      }
       picked[s.id] = true;
       any = true;
     });
