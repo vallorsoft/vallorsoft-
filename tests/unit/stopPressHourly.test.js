@@ -13,11 +13,11 @@ describe('PRESS_DUE_SQL — óránkénti keresés a nyitott állomásokra', () =
     expect(q).toMatch(/COALESCE\(o\.email_sofer,''\) <> ''/);
     expect(q).toMatch(/ms\.auto_events/);
   });
-  test('nappal 8–19 között óránként, éjjel csak az éjfél utáni egy futás', () => {
-    expect(runner.PRESS_DAY_FROM).toBe(8);
-    expect(runner.PRESS_DAY_TO).toBe(19);
-    expect(q).toMatch(/>= 8\s+AND EXTRACT\(HOUR FROM \$6::timestamptz AT TIME ZONE 'Europe\/Bucharest'\) < 19\s+AND st\.attempted_at < \$6::timestamptz - INTERVAL '55 minutes'/);
-    expect(q).toMatch(/< 8\s+AND st\.attempted_at < \(date_trunc\('day'/);
+  test('nappal 5–23 között 15 percenként, éjjel csak az éjfél utáni egy futás', () => {
+    expect(runner.PRESS_DAY_FROM).toBe(5);
+    expect(runner.PRESS_DAY_TO).toBe(23);
+    expect(q).toMatch(/>= 5\s+AND EXTRACT\(HOUR FROM \$6::timestamptz AT TIME ZONE 'Europe\/Bucharest'\) < 23\s+AND st\.attempted_at < \$6::timestamptz - INTERVAL '14 minutes'/);
+    expect(q).toMatch(/< 5\s+AND st\.attempted_at < \(date_trunc\('day'/);
   });
 });
 

@@ -112,3 +112,21 @@ describe('lezárt fuvar — csak az óra javítható, a nap nem', () => {
     expect(r.fixes).toHaveLength(0);
   });
 });
+
+describe('15 percenként egymás után: az előző körök is szavaznak', () => {
+  const S = (h) => Date.parse('2026-11-11T' + h + ':00Z') / 1000;
+  test('historyVotes: a mostani + az előző 2 kör egyező állása', () => {
+    const cur = { from: S('08:00'), to: S('09:00') };
+    const hist = [{ from: '2026-11-11T08:02:00Z', to: '2026-11-11T08:58:00Z' }, null];
+    expect(sm.historyVotes(cur, hist)).toBe(2);
+    expect(sm.historyVotes(cur, [hist[0], hist[0]])).toBe(3);
+    expect(sm.historyVotes(cur, [{ from: '2026-11-11T14:00:00Z', to: '2026-11-11T15:00:00Z' }])).toBe(1);
+    expect(sm.historyVotes(null, hist)).toBe(0);
+  });
+  test('pushHistory: legfeljebb az utolsó 3 kör marad', () => {
+    let h = [];
+    for (let i = 0; i < 5; i++) h = sm.pushHistory(h, { from: S('08:00') + i, to: S('09:00') });
+    expect(h).toHaveLength(3);
+    expect(sm.pushHistory(h, null)[2]).toBeNull();
+  });
+});
