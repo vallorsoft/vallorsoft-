@@ -226,6 +226,8 @@ describe('backfillDays (előzmény-visszatöltés)', () => {
     expect(up[1][3]).toBe('2025-01-02');
     expect(up[1][5]).toBe(0);
     expect(up[1][7]).toBe(true);
+    // points_at csak akkor lép, ha változott a pontszám (új GPS-pont jött)
+    expect(up[0]).toMatch(/points_at = CASE WHEN gps_track_days\.point_count IS DISTINCT FROM EXCLUDED\.point_count/);
   });
   test('átmeneti hiba (503) → dob, a nap nem jelölődik üresnek', async () => {
     ct.getCoordinates.mockRejectedValue(Object.assign(new Error('busy'), { status: 503 }));

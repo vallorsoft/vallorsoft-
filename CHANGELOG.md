@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-12 — ⚙️ Állomás-felismerés terhelése: 25 perc, csak új GPS-adattal, igazságos sor (PR #645)
+
+- **Kérés:** nem túl sok-e a 15 perces futtatás, elbírja-e 1000 fuvarnál; ezért a 3 javaslat + 25 perces gyakoriság.
+- `lib/stopMatchRunner.js`: `PRESS_EVERY_MIN` 24 („25 percenként", nappal 5–23 óra). Nappal csak akkor fut újra a fuvar, ha a legutóbbi ellenőrzés óta jött **új GPS-pont** a kamionra (`PRESS_NEW_GPS_SQL`, `gps_track_days.points_at`) — új adat nélkül ugyanazt adná. Az éjféli futás feltétel nélkül megy (napváltás). A sor **a legrégebben ellenőrzött fuvart** veszi előre (`ORDER BY requeued, attempted_at ASC NULLS FIRST`) — eddig a legújabb fuvarok kiszorították a régebbieket.
+- `lib/gpsTrack.js` `mergeDay`: `points_at` csak akkor lép, ha változott a nap pontszáma (az `updated_at` minden letöltéskor lépett). Migráció `db/zzz-gps-track-points-at.sql` (oszlop + feltöltés `updated_at`-ből + index).
+- `services/scheduler.js`: a kör mérete a sor hosszához igazodik (`roundSize`: alap `STOP_MATCH_PER_ROUND` 15, legfeljebb `STOP_MATCH_MAX_PER_ROUND` 80), a 4 perces időkereten belül; a napló kiírja az esedékes fuvarok számát.
+- Teszt: `stopPressHourly.test.js` (+új-GPS feltétel, sorrend, `roundSize`), `gpsTrack.test.js` (`points_at`); valós Postgres 16-on a sor-viselkedés ellenőrizve.
+
 ## 2026-11-12 — ⏱️ Állomás-felismerés 15 percenként, 3 egymás utáni keresésből 2 egyezés (PR #644)
 
 - **Kérés:** a szigorúbb ellenőrzés mellékhatásának (kevesebb felajánlás) enyhítése: a fuvart 15 percenként vizsgálja, és 3 egymás utáni keresésből 2 találat kell.
