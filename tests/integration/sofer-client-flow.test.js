@@ -1060,3 +1060,19 @@ describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
     expect(wbBlock).not.toContain('Strada Depoului 5');
   });
 });
+
+describe('menetlevél-sorok ismétlődő helyű fuvarnál', () => {
+  test('a fuvar sorrendjében, a beírt kész-idő HELYI napjával', () => {
+    const sb = load();
+    const o = { id: 'R', stops: [
+      { id: 1, kind: 'pickup', seq_index: 0, stop_index: 0, loc: 'A', done_at: '2026-11-10T23:30:00Z' },   // 01:30 helyi idő, 11-e
+      { id: 2, kind: 'delivery', seq_index: 1, stop_index: 0, loc: 'B', done_at: '2026-11-11T10:00:00Z' },
+      { id: 3, kind: 'pickup', seq_index: 2, stop_index: 1, loc: 'A', data: '2026-11-12' },
+      { id: 4, kind: 'delivery', seq_index: 3, stop_index: 1, loc: 'B', data: '2026-11-12' },
+    ] };
+    const rows = sb._buildWaybillPuncteForOrder(o);
+    expect(rows.map((r) => r[3].stopId)).toEqual([1, 2, 3, 4]);
+    expect(rows[0][2]).toBe('2026-11-11');
+    expect(rows[2][2]).toBe('2026-11-12');
+  });
+});

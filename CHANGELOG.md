@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-12 — 📌 Ismétlődő hely: a beírt állomás ideje rögzül, a menetlevélre is az kerül (PR #640)
+
+- **Hiba:** ismétlődő fel-/lerakóhelyes fuvarnál a sofőrnek percre pontos időt ajánlott fel a rendszer, de a végén (újraszámolás / menetlevél) mégsem ahhoz a dátumhoz került az érkezés / fel-/lerakás.
+- `lib/stopMatchRunner.js` `pinOf` + `lib/stopMatch.js` `scorePair` `exp.pin`: a már beírt (sofőr-gomb pótlása) vagy megerősített, kész állomás GPS-állása rögzített — az újraszámolás nem cseréli le, és egy későbbi azonos helyű állomás nem kaphatja meg.
+- `routes/soferApi.js` menetlevél-nyomtatvány: rendszer által beírt állomásnál a sofőr által látott / jóváhagyott / javított idő (`arrived_at`/`done_at`) kerül a pontra.
+- `public/sofer.js` `_buildWaybillPuncteForOrder`: a menetlevél-sorok a fuvar állomás-sorrendjében (`seq_index`), a dátum a kész-idő HELYI (román) napja (`_localYmd`; éjfél körüli rakodás nem csúszik az előző napra); az auto-gyűjtés időpont-összevetése is időbélyeg-alapú. Cache-bust `sofer.js?v=20261112pin`.
+- Teszt: `tests/unit/stopMatchPin.test.js` + `sofer-client-flow` új eset.
+
 ## 2026-11-11 — 🔁 Ismétlődő hely a fuvarban: a GPS-állás a korábbi, még nyitott állomásé (PR #639)
 
 - **Hiba:** ha ugyanaz a hely kétszer szerepel a fuvarban (pl. a 4. = a 6., az 5. = a 7. állomás, egy nappal később), a mai GPS-állást a rendszer a 6–7. állomásra írta be (és ajánlotta fel a sofőrnek), a ténylegesen elvégzett 4–5. nyitva maradt.
