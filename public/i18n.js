@@ -1402,6 +1402,7 @@
     'sa.skip.wait_prev': { hu: 'Nincs beírva a sofőrnek: egy korábbi állomásnál a kamion még ott állt', ro: 'Nu e marcat șoferului: la o etapă anterioară camionul încă staționa' },
     'sa.skip.before_prev': { hu: 'Nincs beírva a sofőrnek: a GPS-állás az előző állomás vége előtt volt (sorrend)', ro: 'Nu e marcat șoferului: staționarea GPS e înainte de finalul etapei anterioare (ordine)' },
     'sa.skip.after_next_press': { hu: 'Nincs beírva a sofőrnek: egy későbbi állomás gombját a sofőr ennél korábban nyomta meg', ro: 'Nu e marcat șoferului: șoferul a apăsat butonul unei etape ulterioare mai devreme' },
+    'sa.skip.before_plan_day': { hu: 'Nincs beírva a sofőrnek: ugyanez a hely korábban is szerepel a fuvarban, és ez a GPS-állás a tervezett nap előtti', ro: 'Nu e marcat șoferului: același loc apare mai devreme în cursă, iar oprirea GPS este înainte de ziua planificată' },
     'sa.skip.same_site_open': { hu: 'Nincs beírva a sofőrnek: egy korábbi, még nyitott állomás ugyanezen a helyen van', ro: 'Nu e marcat șoferului: o etapă anterioară, încă deschisă, este la același loc' },
     'sa.skip.no_driver': { hu: 'Nincs beírva: a fuvarnak nincs belső sofőrje', ro: 'Nu e marcat: cursa nu are șofer intern' },
     'sa.skip.order_status': { hu: 'Nincs beírva: a fuvar státusza nem engedi (pl. Parkolt / Raktárban)', ro: 'Nu e marcat: statusul cursei nu permite (ex. Parcat / În depozit)' },

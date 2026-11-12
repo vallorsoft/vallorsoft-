@@ -160,4 +160,23 @@ describe('ismétlődő hely a fuvarban (4. = 6. állomás, egy nappal később)'
     ], last, NOW);
     expect(p.map((x) => x.id)).toEqual([6]);
   });
+  test('ismétlődő hely: a holnapra tervezett állomás nem kapja a mai állást', () => {
+    const day = new Date(Date.parse(T('09:00'))).toISOString().slice(0, 10);
+    const next = new Date(Date.parse(day + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10);
+    const p = ae.planAutoFill([
+      stop({ id: 5, loc: 'Arad', kind: 'delivery', done_at: T('07:00') }),
+      stop({ id: 6, loc: 'Cluj', match_status: 'unmatched' }),
+      stop({ id: 7, loc: 'Arad', kind: 'delivery', data: next, match_status: 'auto', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
+    ], last, NOW);
+    expect(p).toEqual([]);
+    expect(p.skips.map((x) => x.reason)).toEqual(['not_sure', 'before_plan_day']);
+  });
+  test('ismétlődő hely a saját tervezett napján beírható', () => {
+    const day = new Date(Date.parse(T('09:00'))).toISOString().slice(0, 10);
+    const p = ae.planAutoFill([
+      stop({ id: 5, loc: 'Arad', kind: 'delivery', done_at: T('07:00') }),
+      stop({ id: 7, loc: 'Arad', kind: 'delivery', data: day, match_status: 'auto', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
+    ], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([7]);
+  });
 });

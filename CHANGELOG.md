@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-12 — 📅 Ismétlődő hely: a holnapi állomás nem kapja a mai állást, és nem zárja le a fuvart (PR #641)
+
+- **Hiba:** ha egy hely többször szerepel a fuvarban (pl. az 5. = a 7. állomás, csak holnap), a holnapi állomás egy MAI GPS-állást kapott (a felismerés ±1 nap eltérést enged), a rendszer beírta, és mivel így minden lerakó kész volt, a fuvart lezárta — a holnapi felrakó nyitva maradt.
+- `lib/stopAutoEvents.js` `planAutoFill`: ismétlődő helyű állomásnál a tervezett nap előtti állás nem írható be (`auto_skip = before_plan_day`, ⏸ az adminon). Automatikus lezárás csak, ha a fuvar MINDEN állomása kész.
+- `lib/stopMatch.js` `scorePair` `repeatSite`: ismétlődő helyen a tervezett nap előtti állás −40 (nem lesz belőle javaslat).
+- Migráció `db/zzz-stop-autofill-plan-day-undo.sql`: a még NEM jóváhagyott ilyen beírások visszavonva, a lezárt fuvar `In Curs`-ra, újrasorolás. Valós Postgres 16-on ellenőrizve.
+
 ## 2026-11-12 — 📌 Ismétlődő hely: a beírt állomás ideje rögzül, a menetlevélre is az kerül (PR #640)
 
 - **Hiba:** ismétlődő fel-/lerakóhelyes fuvarnál a sofőrnek percre pontos időt ajánlott fel a rendszer, de a végén (újraszámolás / menetlevél) mégsem ahhoz a dátumhoz került az érkezés / fel-/lerakás.
