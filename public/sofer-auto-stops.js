@@ -138,6 +138,7 @@
   function ok(id) {
     _gas('ackAutoStopEvents', [{ ids: [id] }]).then(function (r) {
       if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
+      if (r.reverted && r.reverted.length) _toast(_t('sof.as.reverted', 'Verificarea nu a trecut — etapa a fost redeschisă și o reverificăm'), 'err');
       _remove(id);
     }).catch(function () { _toast('Eroare de rețea', 'err'); });
   }
@@ -147,6 +148,7 @@
     if (!ids.length) return close();
     _gas('ackAutoStopEvents', [{ ids: ids }]).then(function (r) {
       if (!r || !r.ok) return _toast((r && r.err) || 'Eroare', 'err');
+      if (r.reverted && r.reverted.length) _toast(_t('sof.as.reverted', 'Verificarea nu a trecut — etapa a fost redeschisă și o reverificăm'), 'err');
       S.items = []; _remove(-1);
     }).catch(function () { _toast('Eroare de rețea', 'err'); });
   }

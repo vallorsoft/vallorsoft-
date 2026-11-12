@@ -202,6 +202,14 @@
     el.innerHTML = html;
   }
 
+  // 🔁 3 független ellenőrzésből hány adta ugyanezt az állást
+  function votesBadge(r) {
+    var v = r.match_detail && r.match_detail.votes;
+    if (typeof v !== 'number') return '';
+    var cls = v >= 2 ? 'ok' : 'warn';
+    return ' <span class="badge ' + cls + '" title="' + _e(_t('sa.votesTip', 'Verificări independente care au dat același rezultat')) + '">🔁 ' + v + '/3</span>';
+  }
+
   // 🤖 a rendszer pótolta a sofőr elfelejtett gombját (GPS) — és mit szólt hozzá a sofőr
   function autoBadge(r) {
     if (!r.auto_filled) {
@@ -279,7 +287,7 @@
         + '<td>' + (st ? '<span class="badge ' + st.cls + '">' + _t(st.k, st.d) + '</span>' : '<span class="badge">' + _t('sa.f.none', 'Neprocesat') + '</span>')
         + (r.match_score != null ? '<div class="text-muted" style="font-size:12px;margin-top:3px;">' + _e(r.match_score) + ' ' + _t('sa.points', 'pct') + '</div>' : '')
         + (r.match_source === 'retry' ? '<div style="margin-top:3px;"><span class="badge info" title="' + _t('sa.retryTip', 'Locația anterioară a fost respinsă — sistemul a găsit una nouă și a scris-o pe foaia de parcurs') + '">🔁 ' + _t('sa.retry', 'Locație nouă după respingere') + '</span></div>' : '')
-        + autoBadge(r) + recheckBadge(r) + '</td>'
+        + autoBadge(r) + votesBadge(r) + recheckBadge(r) + '</td>'
         + '<td style="white-space:nowrap;">'
         + ((r.match_status === 'auto' || r.match_status === 'suggested') ? '<button class="btn ok" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'confirm\')" title="' + _t('sa.a.confirm', 'Acceptă') + '">✓</button> ' : '')
         + (r.match_status !== 'rejected' && r.match_status ? '<button class="btn danger" style="padding:5px 10px;" onclick="StopAddress.decide(' + r.id + ',\'reject\')" title="' + _t('sa.a.reject', 'Respinge') + '">✕</button> ' : '')

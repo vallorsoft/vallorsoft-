@@ -63,6 +63,7 @@ describe('handlers/stopAutoEvents — tanulás a sofőr döntéséből', () => {
   beforeEach(() => { reset(); runner.recordFeedback.mockClear(); runner.recordBadPlace.mockClear(); });
 
   test('„Rendben" → a győztes jelek elfogadott visszajelzést kapnak', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });   // jóváhagyás előtti ellenőrzés
     pool.query.mockResolvedValueOnce({ rows: [{ id: 5, match_detail: { signals: [['city_name', 20], ['date', 10]] } }], rowCount: 1 });
     const r = await call('ackAutoStopEvents', { ids: [5] });
     expect(r.ok).toBe(true);

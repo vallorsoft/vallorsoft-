@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-12 — 🔁 Állomás-felismerés munkamenete: 3 független ellenőrzés + jóváhagyás előtti és záró újraellenőrzés (PR #642)
+
+- **Kérés:** fuvar → címek → dátumok a pontokhoz → GPS-útvonal az adott napról → a találatot még kétszer ellenőrizni, 3-ból 2 egyezés kell → felajánlás a sofőrnek → jóváhagyáskor újraellenőrzés → beírás → a végén az egész fuvar újra.
+- `lib/stopMatchRunner.js` + `lib/stopMatch.js` `matchWindows`/`agreeVotes`: a fő párosítás mellett ugyanazon a napi útvonalon még 2 független párosítás fut (tanult adatok nélkül; szigorú dátummal, `strictDate`); `match_detail.votes` = hány adta ugyanazt az állást (0–3). Az admin oldalon 🔁 N/3 jelvény.
+- `lib/stopAutoEvents.js`: a sofőrnek csak ≥ 2/3 egyezésnél ajánl fel (`checks_disagree` ok, a következő körben újra ellenőrzi). Új `verifyChain` (időrend, nyitott azonos hely, tervezett nap, GPS-idő egyezés) + `revertFills`: a beírások után az egész fuvar újra ellenőrizve, a nem stimmelő beírás visszavonva (a fuvar `In Curs`-ra, újrasorolva); az elvetett állás `verify_fail`-ként megmarad, nem kerül vissza ugyanabból.
+- `handlers/stopAutoEvents.js` `ackAutoStopEvents`: jóváhagyás előtt újraellenőrzés; ami nem stimmel, nem lesz jóváhagyva, hanem újra nyílik (`reverted`), a sofőr értesítést kap.
+- Teszt: `tests/unit/stopVerify.test.js` + bővített handler-tesztek; valódi Postgres 16-on is.
+
 ## 2026-11-12 — 📅 Ismétlődő hely: a holnapi állomás nem kapja a mai állást, és nem zárja le a fuvart (PR #641)
 
 - **Hiba:** ha egy hely többször szerepel a fuvarban (pl. az 5. = a 7. állomás, csak holnap), a holnapi állomás egy MAI GPS-állást kapott (a felismerés ±1 nap eltérést enged), a rendszer beírta, és mivel így minden lerakó kész volt, a fuvart lezárta — a holnapi felrakó nyitva maradt.
