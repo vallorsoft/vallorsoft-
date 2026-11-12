@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-11-12 — ⏱️ Állomás-felismerés 15 percenként, 3 egymás utáni keresésből 2 egyezés (PR #644)
+
+- **Kérés:** a szigorúbb ellenőrzés mellékhatásának (kevesebb felajánlás) enyhítése: a fuvart 15 percenként vizsgálja, és 3 egymás utáni keresésből 2 találat kell.
+- `lib/stopMatchRunner.js`: a nyitott állomású fuvar napközben (5–23 óra, helyi idő) 15 percenként újra ellenőrizve (`PRESS_EVERY_MIN` 14, `PRESS_DAY_FROM/TO` 5/23; éjjel éjfél után egyszer).
+- `lib/stopMatch.js` `historyVotes`/`pushHistory`: minden körben a fő találat bekerül a `match_detail.vote_hist`-be (utolsó 3 kör); a szavazat = max(a körön belüli 3 független keresés, a 3 egymás utáni kör) → elég, ha 3 egymás utáni 15 perces körből 2 ugyanazt az állást találja.
+- A körön belüli 2. keresés enyhítve: csak a tanult jel-súlyokat hagyja el, a mentett helyeket megtartja (eddig a mentett hely nélkül a rövid lerakás gyakran nem jött ki → hamis „nem egyezik").
+- Teszt: `stopVerify.test.js` +2 eset, `stopPressHourly.test.js` frissítve.
+
 ## 2026-11-12 — 🔒 Lezárt fuvar: nincs több felajánlás, háttér-ellenőrzés + csak időjavítás (PR #643)
 
 - **Kérés:** ha a fuvar lezárult, a sofőrnek ne legyen több felajánlás; a háttérben fusson újra az ellenőrzés, és ha az eredmény nem jó, automatikusan javítsa — de csak az időt, a dátumot nem.
