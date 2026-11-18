@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-18 — 🛂 Határátkelő: Borș II valós koordinátája (PR #652)
+- `lib/borderPoints.js` `CROSSING_POINTS`: a Borș II koordinátája a valós GPS-pontra javítva (47.19785, 21.85274; eddig ~14 km-re volt, ezért a menetlevélen „GPS 47.19785, 21.85274" állt név helyett). A nyomtatvány élőben olvassa → a régi menetlevelek is a nevet mutatják.
+- Teszt +1.
+
 ## 2026-11-18 — 🛣️ Menetlevél: több Plecare / Sosire esetén a legelső / legutolsó kapja a fejléc km-ét (PR #651)
 - `lib/waybillRows.js` `applyDriverKm`: a fejléc `km_inceput` IDŐRENDBEN a legelső Plecare sorra, a `km_sfarsit` a legutolsó Sosire sorra kerül (eddig a lista sorrendje döntött; óra nélkül indulásnál a nap eleje, érkezésnél a nap vége; egyenlőségnél a lista sorrendje). A többi Plecare / Sosire sor a GPS-ből kap km-et.
 - Teszt +1; valós Postgres 16-tal 2537 zöld.
