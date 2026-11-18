@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-11-18 — ⚙️ Fly.io: terhelési küszöb — egy belépés nem ébreszt új gépet (PR #653)
+- `fly.toml` `[http_service.concurrency]` `type="requests"`, `soft_limit=40`, `hard_limit=60`. Eddig nem volt megadva → a Fly alacsony alapértéke miatt az admin-oldal betöltése (sok párhuzamos kérés) egyszerre 2 gépet indított. A 3 `fra` gép tartaléknak megmarad: a küszöb fölött a proxy továbbra is automatikusan ébreszti őket.
+
 ## 2026-11-18 — 🛂 Határátkelő: Borș II valós koordinátája (PR #652)
 - `lib/borderPoints.js` `CROSSING_POINTS`: a Borș II koordinátája a valós GPS-pontra javítva (47.19785, 21.85274; eddig ~14 km-re volt, ezért a menetlevélen „GPS 47.19785, 21.85274" állt név helyett). A nyomtatvány élőben olvassa → a régi menetlevelek is a nevet mutatják.
 - Teszt +1.
