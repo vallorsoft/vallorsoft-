@@ -47,3 +47,27 @@ test('rendszám nélkül nincs GPS-lekérés, km sincs', async () => {
   expect(routeRows[0].km).toBeUndefined();
   expect(pool.query.mock.calls.some((c) => /gps_track_days/.test(c[0]))).toBe(false);
 });
+
+test('indulás / érkezés km-e a sofőr által beírt km_inceput / km_sfarsit (a GPS-t felülírja)', async () => {
+  const f = {
+    numar_camion: 'B 104 VLR', km_inceput: 99950, km_sfarsit: 101020, puncte: [
+      { tip: 'Plecare', loc: 'Arcus', data: '2026-03-02', time: '07:00' },
+      { tip: 'Descarcare', loc: 'Budapest', data: '2026-03-02', stopId: 7 },
+      { tip: 'Sosire', loc: 'Arcus', data: '2026-03-02', time: '18:00' },
+    ],
+  };
+  const { routeRows } = await buildWaybillRoute(mockPool(), 1, f);
+  expect(routeRows.map((r) => r.km)).toEqual([99950, 100500, 101020]);
+});
+
+test('sofőri km GPS nélkül is rákerül; 0 / üres nem ír felül', async () => {
+  const { applyDriverKm, buildRouteRows } = require('../../lib/waybillRows');
+  const rows = buildRouteRows([
+    { tip: 'Plecare', loc: 'A', data: '2026-03-02' },
+    { tip: 'Sosire', loc: 'A', data: '2026-03-03' },
+  ], []);
+  rows[1].km = 500;
+  applyDriverKm(rows, 1200, 0);
+  expect(rows[0].km).toBe(1200);
+  expect(rows[1].km).toBe(500);
+});
