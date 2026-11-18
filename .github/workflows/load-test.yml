@@ -1,0 +1,48 @@
+name: Terheléses teszt (load test)
+
+# KÉZI workflow: N virtuális admin + M virtuális sofőr egyszerre használja
+# az éles oldalt — CSAK OLVASÓ műveletek (scripts/load-test.js). Közben a
+# Fly dashboardon (Metrics / Machines) nézhető a CPU, memória, gép-indulás.
+#
+# HASZNÁLAT (mobilról):
+#  1) Egyszer: GitHub → Settings → Secrets and variables → Actions →
+#     New repository secret: LOADTEST_ADMIN_EMAIL, LOADTEST_ADMIN_PASSWORD,
+#     LOADTEST_DRIVER_EMAIL, LOADTEST_DRIVER_PASSWORD (egy teszt-admin és
+#     egy teszt-sofőr fiók, 2FA nélkül). Secret nélkül csak a nyilvános
+#     oldalakat terheli.
+#  2) Actions → „Terheléses teszt" → Run workflow.
+#  3) Az eredmény-táblázat a futás összegzőjén (Summary) jelenik meg.
+
+on:
+  workflow_dispatch:
+    inputs:
+      admins:
+        description: 'Virtuális adminok száma'
+        default: '10'
+      drivers:
+        description: 'Virtuális sofőrök száma'
+        default: '10'
+      duration:
+        description: 'Időtartam (másodperc)'
+        default: '180'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Terhelés futtatása
+        env:
+          BASE_URL: https://vallorsoft.fly.dev
+          ADMINS: ${{ github.event.inputs.admins }}
+          DRIVERS: ${{ github.event.inputs.drivers }}
+          DURATION_SEC: ${{ github.event.inputs.duration }}
+          ADMIN_EMAIL: ${{ secrets.LOADTEST_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.LOADTEST_ADMIN_PASSWORD }}
+          DRIVER_EMAIL: ${{ secrets.LOADTEST_DRIVER_EMAIL }}
+          DRIVER_PASSWORD: ${{ secrets.LOADTEST_DRIVER_PASSWORD }}
+        run: node scripts/load-test.js
