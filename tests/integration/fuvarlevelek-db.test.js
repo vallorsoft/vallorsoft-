@@ -179,7 +179,7 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(h).toContain('Intrare în România din Ungaria');
     expect(h).toContain('12:05');
     // időrend: felrakó → kilépés → lerakó → belépés → érkezés
-    const pos = ['Cluj-Napoca', 'Ieșire din România', 'Wien', 'Intrare în România', '18:45</b></td></tr>'].map((x) => h.indexOf(x, h.indexOf('Puncte de traseu')));
+    const pos = ['Cluj-Napoca', 'Ieșire din România', 'Wien', 'Intrare în România', '18:45</b></td>'].map((x) => h.indexOf(x, h.indexOf('Puncte de traseu')));
     expect(pos.every((x) => x > 0)).toBe(true);
     expect(pos.slice().sort((a, b) => a - b)).toEqual(pos);
     expect(h).toContain('Puncte de traseu (6)');
