@@ -26,6 +26,16 @@ primary_region = "waw"   # Varsó — a legközelebbi EU-régió Romániához (f
   min_machines_running = 1        # 1 példány mindig fusson (scheduler/IMAP-poll miatt)
   processes = ["app"]
 
+  # Terhelési küszöb (egyszerre feldolgozás alatt álló kérés / gép).
+  # Nélküle a Fly alacsony alapértéket használ → egy admin-oldal betöltése
+  # (sok párhuzamos JS/CSS/RPC kérés) már új gépet ébresztett.
+  # soft_limit fölött új gép indul; hard_limit fölött erre a gépre nem megy több.
+  # Óvatos értékek az 512 MB-os gépekhez (nehéz PDF/AI/GPS kérések).
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 40
+    hard_limit = 60
+
   # Liveness check — a beépített /healthz végpont (mindig 200, ha fut a process)
   [[http_service.checks]]
     interval = "15s"
