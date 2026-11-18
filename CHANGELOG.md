@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-18 — 🔎 Landing SEO: kulcsszavas cím/leírás + strukturált adatok + 4 új GYIK (PR #655)
+- `public/index.html`: kulcsszavas `<title>` és meta description (program transport marfă, dispecerat, gestiune flotă, GPS, foaie de parcurs, diurnă, e-Factura, UIT e-Transport), `og:image`, schema.org JSON-LD (Organization + SoftwareApplication + FAQPage — az URL-eket a `routes/seo.js` az `APP_URL`-re cseréli).
+- 4 új GYIK-kérdés (TMS, menetlevél + diurna, UIT, GPS-követés) RO+HU (`landing.js`); hero-jelvény és egy funkció-sor kulcsszavasabb szöveggel. Cache-bust `landing.js?v=20261118seo`.
+
 ## 2026-11-18 — 🛡️ Bot-/túlterhelés-védelem + keresőmotor-láthatóság + GDPR-kiegészítés (PR #654)
 - Új `lib/botShield.js`: általános kérés-korlát (felhasználónként 600/perc, névtelenül IP-nként 120/perc, követő-link 30/perc; `RATE_LIMIT_*` env), 20 MB-os kérés-törzs csak bejelentkezve (névtelen max. 200 KB), 413/400 válasz a túl nagy / hibás kérésre, böngésző-gyorsítótár a `?v=` verziózott JS/CSS-re (1 nap).
 - Új `routes/seo.js`: `robots.txt` (landing/blog/jogi oldalak indexelhetők, belső felületek tiltva, sitemap-hivatkozás); a landing canonical / og:url címe az `APP_URL`-ből; opcionális Google Search Console ellenőrzés (`GOOGLE_SITE_VERIFICATION` env). A sitemap az `APP_URL`-t használja, és a jogi oldalakat is tartalmazza.
