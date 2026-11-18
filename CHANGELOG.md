@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-18 — 🛣️ Menetlevél: az indulás és érkezés km-e mindig a sofőr által beírt érték (PR #649)
+- `lib/waybillRows.js` `applyDriverKm`: a „Km bord (GPS)" oszlopban a Plecare sor a fejléc `km_inceput`, a Sosire sor a `km_sfarsit` értékét kapja (0-nál nagyobb értéknél felülírja a GPS-t); a köztes pontok (fel-/lerakás, határátlépés) továbbra is a GPS-naplóból.
+- `lib/waybillRouteData.js` `buildWaybillRoute` hívja → a nyomtatvány és a háttér-pillanatkép egyezik. Migráció `db/waybill-route-odo-driver-km.sql`: a tárolt pillanatképek újraszámolása.
+- Teszt +2 eset.
+
 ## 2026-11-18 — 🛣️ Menetlevél km-óra: visszamenőleg minden menetlevélre + a GPS-ből felismert hely is ad időt (PR #648)
 
 - **Kérés:** a GPS-napló útvonalából vett pontos km-óra állás a régi menetlevelekre is kerüljön rá, ne csak az újakra.
