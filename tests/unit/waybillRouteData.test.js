@@ -71,3 +71,20 @@ test('sofőri km GPS nélkül is rákerül; üres érték is a fejléccel egyez�
   expect(rows[0].km).toBe(1200);
   expect(rows[1].km).toBe(0);           // a GPS-érték sem marad meg — mindig a fejléc értéke
 });
+
+test('több Plecare / Sosire: a fejléc km csak a LEGELSŐ Plecare-re és a LEGUTOLSÓ Sosire-re kerül', async () => {
+  const f = {
+    numar_camion: 'B 104 VLR', km_inceput: 99950, km_sfarsit: 101020, puncte: [
+      { tip: 'Sosire', loc: 'Arcus', data: '2026-03-02', time: '18:00' },     // ez a későbbi Sosire
+      { tip: 'Plecare', loc: 'Arcus', data: '2026-03-02', time: '10:30' },    // második Plecare
+      { tip: 'Sosire', loc: 'Arcus', data: '2026-03-02', time: '10:00' },     // korábbi Sosire
+      { tip: 'Plecare', loc: 'Arcus', data: '2026-03-02', time: '05:30' },    // ez a legelső Plecare
+    ],
+  };
+  const { routeRows } = await buildWaybillRoute(mockPool(), 1, f);
+  const byTime = Object.fromEntries(routeRows.map((r) => [r.tip + ' ' + r.time, r.km]));
+  expect(byTime['Plecare 05:30']).toBe(99950);      // legelső Plecare = fejléc
+  expect(byTime['Sosire 18:00']).toBe(101020);      // legutolsó Sosire = fejléc
+  expect(byTime['Plecare 10:30']).toBe(100000);     // a köztes Plecare / Sosire a GPS-ből
+  expect(byTime['Sosire 10:00']).toBe(100000);
+});

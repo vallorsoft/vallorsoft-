@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-18 — 🛣️ Menetlevél: több Plecare / Sosire esetén a legelső / legutolsó kapja a fejléc km-ét (PR #651)
+- `lib/waybillRows.js` `applyDriverKm`: a fejléc `km_inceput` IDŐRENDBEN a legelső Plecare sorra, a `km_sfarsit` a legutolsó Sosire sorra kerül (eddig a lista sorrendje döntött; óra nélkül indulásnál a nap eleje, érkezésnél a nap vége; egyenlőségnél a lista sorrendje). A többi Plecare / Sosire sor a GPS-ből kap km-et.
+- Teszt +1; valós Postgres 16-tal 2537 zöld.
+
 ## 2026-11-18 — 🛣️ Menetlevél: az indulás / érkezés km-e kivétel nélkül egyezik a fejléccel (PR #650)
 - `lib/waybillRows.js` `applyDriverKm`: a Plecare / Sosire sor km-e MINDIG a fejléc `km_inceput` / `km_sfarsit` értéke (a sofőr által előtöltött vagy beírt), üres értéknél is (0, mint a fejlécben), tizedessel együtt — ezekhez a sorokhoz a GPS-t sosem használja. Eddig 0 / üres értéknél a GPS-állás maradt → a két hely eltérhetett.
 - Teszt frissítve; valós Postgres 16-tal 2536 zöld.
