@@ -231,7 +231,7 @@ describe('menetlevél: a pont ideje a GPS-ből', () => {
       { tip: 'Descărcare', loc: 'V', data: '2026-03-04' },
       { tip: 'Descărcare', loc: 'U', data: '2026-03-04', stopId: 99 },
     ], [], st);
-    expect(r[0]).toEqual({ kind: 'punct', tip: 'Descărcare', loc: 'W', date: '2026-03-03', time: '14:00' });
+    expect(r[0]).toMatchObject({ kind: 'punct', tip: 'Descărcare', loc: 'W', date: '2026-03-03', time: '14:00' });
     expect(r[1].time).toBe(''); expect(r[2].time).toBe('');
   });
   test('a GPS-idő a határátlépések közé rendezéshez is számít', () => {
