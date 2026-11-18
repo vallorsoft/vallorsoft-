@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-18 — 🛣️ Menetlevél km-óra: visszamenőleg minden menetlevélre + a GPS-ből felismert hely is ad időt (PR #PRNUM)
+## 2026-11-18 — 🛣️ Menetlevél km-óra: visszamenőleg minden menetlevélre + a GPS-ből felismert hely is ad időt (PR #648)
 
 - **Kérés:** a GPS-napló útvonalából vett pontos km-óra állás a régi menetlevelekre is kerüljön rá, ne csak az újakra.
 - **Új `lib/waybillRouteData.js`** `buildWaybillRoute` — az útvonal-sorok (pontok + határátlépések, idő + km-óra) egyetlen forrása; a nyomtatvány (`/api/pdf-download/:id`) és a háttér-feltöltés is ezt használja.
