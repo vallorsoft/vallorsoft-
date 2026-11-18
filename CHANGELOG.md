@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-11-18 — 🛣️ Menetlevél km-óra: visszamenőleg minden menetlevélre + a GPS-ből felismert hely is ad időt (PR #PRNUM)
+
+- **Kérés:** a GPS-napló útvonalából vett pontos km-óra állás a régi menetlevelekre is kerüljön rá, ne csak az újakra.
+- **Új `lib/waybillRouteData.js`** `buildWaybillRoute` — az útvonal-sorok (pontok + határátlépések, idő + km-óra) egyetlen forrása; a nyomtatvány (`/api/pdf-download/:id`) és a háttér-feltöltés is ezt használja.
+- **Visszamenőleges feltöltés:** migráció `db/waybill-route-odo.sql` (`fuvarlevelek.route_odo` JSONB + `route_odo_at`); a fuvar-km ütemező körében körönként 20 menetlevél (a legújabbak elöl) megkapja a pontonkénti km-óra pillanatképet — a régiek is; a 30 napon belüli, még hiányos menetlevél naponta újraszámolódik (a GPS-napok utólag is töltődnek). A nyomtatvány élőben számol, a tárolt kép csak tartalék.
+- **Több pont kap km-et:** óra nélküli, koordináta nélküli pontnál a GPS-ből felismert tényleges hely (`order_stops.actual_lat/lng`) alapján keresi ki a GPS-útvonalon, mikor állt ott a kamion → idő és km-óra is.
+- **Javítva:** a valódi-DB nyomtatvány-teszt a táblázat sorvégére illesztett (az új oszlop miatt bukott — a #647 CI-jét is ez akaszthatta meg).
+- Teszt: új `waybillRouteData.test.js`; valós Postgres 16-tal **2534 Jest zöld**.
+
 ## 2026-11-18 — 🛣️ Menetlevél: km-óra állás a GPS-ből minden útvonal-ponthoz (PR #647)
 
 - **Kérés:** a nyomtatott menetlevél útvonal-táblájába (indulás, fel-/lerakás, határátlépés, érkezés — minden pont) kerüljön a GPS-ből automatikusan a km-óra állás, új oszlopban.
