@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-18 — 🛣️ Menetlevél: km-óra állás a GPS-ből minden útvonal-ponthoz (PR #PRNUM)
+## 2026-11-18 — 🛣️ Menetlevél: km-óra állás a GPS-ből minden útvonal-ponthoz (PR #647)
 
 - **Kérés:** a nyomtatott menetlevél útvonal-táblájába (indulás, fel-/lerakás, határátlépés, érkezés — minden pont) kerüljön a GPS-ből automatikusan a km-óra állás, új oszlopban.
 - `lib/waybillRows.js`: `buildRouteRows` minden sorhoz valós időpontot (`ts`, epoch mp) ad — a GPS-időből, a határátlépés időpontjából, vagy a beírt román helyi időből (`roLocalToEpoch`, téli/nyári idő helyesen); új `odoAt` (az időpont előtti utolsó ismert km-óra, max. 12 óra régi — álló kamionnál a km nem változik —, különben az utána következő első, max. 2 óra) és `fillRowOdometer` (óra nélküli indulásnál a nap első, érkezésnél a nap utolsó állása).
