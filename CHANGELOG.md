@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-18 — 🛡️ Bot-/túlterhelés-védelem + keresőmotor-láthatóság + GDPR-kiegészítés (PR #654)
+- Új `lib/botShield.js`: általános kérés-korlát (felhasználónként 600/perc, névtelenül IP-nként 120/perc, követő-link 30/perc; `RATE_LIMIT_*` env), 20 MB-os kérés-törzs csak bejelentkezve (névtelen max. 200 KB), 413/400 válasz a túl nagy / hibás kérésre, böngésző-gyorsítótár a `?v=` verziózott JS/CSS-re (1 nap).
+- Új `routes/seo.js`: `robots.txt` (landing/blog/jogi oldalak indexelhetők, belső felületek tiltva, sitemap-hivatkozás); a landing canonical / og:url címe az `APP_URL`-ből; opcionális Google Search Console ellenőrzés (`GOOGLE_SITE_VERIFICATION` env). A sitemap az `APP_URL`-t használja, és a jogi oldalakat is tartalmazza.
+- GDPR / jogi oldalak: `privacy.html` (jogos érdek: visszaélés-védelem — az IP / fiók-azonosító csak memóriában, 1 percig; keresőmotorok csak a publikus oldalakat indexelik, személyes adat nem megy hozzájuk) + `security.html` v1.1 (általános kérés-korlát, kérés-méret, robots.txt).
+- Teszt +10 (`tests/unit/botShield.test.js`).
+
 ## 2026-11-18 — ⚙️ Fly.io: terhelési küszöb — egy belépés nem ébreszt új gépet (PR #653)
 - `fly.toml` `[http_service.concurrency]` `type="requests"`, `soft_limit=40`, `hard_limit=60`. Eddig nem volt megadva → a Fly alacsony alapértéke miatt az admin-oldal betöltése (sok párhuzamos kérés) egyszerre 2 gépet indított. A 3 `fra` gép tartaléknak megmarad: a küszöb fölött a proxy továbbra is automatikusan ébreszti őket.
 
