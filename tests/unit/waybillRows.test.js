@@ -33,6 +33,11 @@ describe('borderPoints.describeCrossing', () => {
     expect(nearestCrossingName(47.115, 21.81)).toBe('Borș');
     expect(nearestCrossingName(45.9, 24.9)).toBeNull();
   });
+  test('Borș II a valós GPS-koordinátáról felismerve', () => {
+    expect(nearestCrossingName(47.19785, 21.85274)).toBe('Borș II');
+    const d = describeCrossing({ direction: 'IN', locatie: 'GPS 47.19785, 21.85274' });
+    expect(d).toMatchObject({ name: 'Borș II', country: 'HU' });
+  });
 });
 
 describe('waybillRows.buildRouteRows', () => {
