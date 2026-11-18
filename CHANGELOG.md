@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-18 — ⚡ GPS-pontsor: felezéses (bináris) keresés a háttér-feldolgozásban (PR #656)
+- Új `lib/sortedSearch.js` `lowerBoundT`: időrendbe rendezett GPS-pontsoron log2(N) lépésben ugrik a keresett időponthoz. Bekötve az állomás-felismerés manőver-számításába (`lib/stopMatch.js`, eddig minden álláshoz a teljes pontsor elejéről pörgetett) és a menetlevél GPS-időinél (`lib/waybillRows.js` `trackVisits`). Az eredmény változatlan (véletlen összevetés-teszt), csak kevesebb CPU. A `odoAt`/`pointAt` már eddig is így keresett.
+- Teszt +3 (`tests/unit/sortedSearch.test.js`).
+
 ## 2026-11-18 — 🔎 Landing SEO: kulcsszavas cím/leírás + strukturált adatok + 4 új GYIK (PR #655)
 - `public/index.html`: kulcsszavas `<title>` és meta description (program transport marfă, dispecerat, gestiune flotă, GPS, foaie de parcurs, diurnă, e-Factura, UIT e-Transport), `og:image`, schema.org JSON-LD (Organization + SoftwareApplication + FAQPage — az URL-eket a `routes/seo.js` az `APP_URL`-re cseréli).
 - 4 új GYIK-kérdés (TMS, menetlevél + diurna, UIT, GPS-követés) RO+HU (`landing.js`); hero-jelvény és egy funkció-sor kulcsszavasabb szöveggel. Cache-bust `landing.js?v=20261118seo`.
