@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-18 — 🛣️ Menetlevél: az indulás / érkezés km-e kivétel nélkül egyezik a fejléccel (PR #650)
+- `lib/waybillRows.js` `applyDriverKm`: a Plecare / Sosire sor km-e MINDIG a fejléc `km_inceput` / `km_sfarsit` értéke (a sofőr által előtöltött vagy beírt), üres értéknél is (0, mint a fejlécben), tizedessel együtt — ezekhez a sorokhoz a GPS-t sosem használja. Eddig 0 / üres értéknél a GPS-állás maradt → a két hely eltérhetett.
+- Teszt frissítve; valós Postgres 16-tal 2536 zöld.
+
 ## 2026-11-18 — 🛣️ Menetlevél: az indulás és érkezés km-e mindig a sofőr által beírt érték (PR #649)
 - `lib/waybillRows.js` `applyDriverKm`: a „Km bord (GPS)" oszlopban a Plecare sor a fejléc `km_inceput`, a Sosire sor a `km_sfarsit` értékét kapja (0-nál nagyobb értéknél felülírja a GPS-t); a köztes pontok (fel-/lerakás, határátlépés) továbbra is a GPS-naplóból.
 - `lib/waybillRouteData.js` `buildWaybillRoute` hívja → a nyomtatvány és a háttér-pillanatkép egyezik. Migráció `db/waybill-route-odo-driver-km.sql`: a tárolt pillanatképek újraszámolása.

@@ -34,7 +34,7 @@ test('óra nélküli lerakó a GPS-ből felismert hely koordinátájával kap id
     ],
   };
   const { routeRows } = await buildWaybillRoute(mockPool(), 1, f);
-  expect(routeRows.map((r) => r.km)).toEqual([100000, 100500, 101000]);
+  expect(routeRows.map((r) => r.km)).toEqual([0, 100500, 0]);   // indulás/érkezés: a fejléc (itt üres → 0)
   expect(f.puncte[1]._lat).toBeUndefined();          // a tárolt sor nem kap segédmezőt
   const snap = odoSnapshot(routeRows);
   expect(snap.found).toBe(3);
@@ -44,7 +44,7 @@ test('óra nélküli lerakó a GPS-ből felismert hely koordinátájával kap id
 test('rendszám nélkül nincs GPS-lekérés, km sincs', async () => {
   const pool = mockPool();
   const { routeRows } = await buildWaybillRoute(pool, 1, { puncte: [{ tip: 'Plecare', loc: 'A', data: '2026-03-02', time: '07:00' }] });
-  expect(routeRows[0].km).toBeUndefined();
+  expect(routeRows[0].km).toBe(0);                     // indulás: a fejléc értéke (üres → 0), nem GPS
   expect(pool.query.mock.calls.some((c) => /gps_track_days/.test(c[0]))).toBe(false);
 });
 
@@ -60,7 +60,7 @@ test('indulás / érkezés km-e a sofőr által beírt km_inceput / km_sfarsit (
   expect(routeRows.map((r) => r.km)).toEqual([99950, 100500, 101020]);
 });
 
-test('sofőri km GPS nélkül is rákerül; 0 / üres nem ír felül', async () => {
+test('sofőri km GPS nélkül is rákerül; üres érték is a fejléccel egyező (0)', async () => {
   const { applyDriverKm, buildRouteRows } = require('../../lib/waybillRows');
   const rows = buildRouteRows([
     { tip: 'Plecare', loc: 'A', data: '2026-03-02' },
@@ -69,5 +69,5 @@ test('sofőri km GPS nélkül is rákerül; 0 / üres nem ír felül', async () 
   rows[1].km = 500;
   applyDriverKm(rows, 1200, 0);
   expect(rows[0].km).toBe(1200);
-  expect(rows[1].km).toBe(500);
+  expect(rows[1].km).toBe(0);           // a GPS-érték sem marad meg — mindig a fejléc értéke
 });
