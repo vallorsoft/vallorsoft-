@@ -205,7 +205,7 @@
   <main class="policy-content">
 
     <h1>Politica de Securitate a Informațiilor</h1>
-    <p class="last-update">Versiune: 1.0 · Ultima actualizare: 14.06.2026</p>
+    <p class="last-update">Versiune: 1.1 · Ultima actualizare: 18.11.2026</p>
 
     <p>
       Prezenta Politică de Securitate stabilește principiile și măsurile aplicate de
@@ -306,7 +306,9 @@
     <p>Platforma implementează măsuri de protecție împotriva atacurilor web frecvente:</p>
     <ul>
       <li><strong>Content Security Policy (CSP)</strong> — prin Helmet.js, restricționează sursele de script/style la CDN-uri autorizate;</li>
-      <li><strong>Rate limiting</strong> — pe endpoint-urile de autentificare și resetare parolă;</li>
+      <li><strong>Rate limiting</strong> — pe endpoint-urile de autentificare și resetare parolă, plus o limită generală de cereri pe minut (per utilizator autentificat, respectiv per adresă IP pentru vizitatorii neautentificați și linkurile publice de urmărire);</li>
+      <li><strong>Limitarea dimensiunii cererilor</strong> — cererile neautentificate sunt limitate la 200 KB; încărcările mari sunt permise doar utilizatorilor autentificați;</li>
+      <li><strong>Motoare de căutare</strong> — prin <code>robots.txt</code> sunt excluse de la indexare interfețele interne, API-ul și linkurile de urmărire a curselor;</li>
       <li><strong>SQL Injection</strong> — toate interogările utilizează parametri ($1, $2…), niciodată concatenare de string-uri;</li>
       <li><strong>XSS</strong> — date externe escapate înainte de randare HTML;</li>
       <li><strong>CSRF</strong> — sesiuni securizate cu SameSite;</li>

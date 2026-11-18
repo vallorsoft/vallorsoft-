@@ -49,7 +49,7 @@ router.get('/api/blog/:slug', async (req, res) => {
 // GET /sitemap.xml — SEO sitemap
 router.get('/sitemap.xml', async (req, res) => {
   try {
-    const base = (process.env.APP_URL || 'https://vallorsoft.ro').replace(/\/$/, '');
+    const base = require('../lib/appUrl').appBaseUrl('https://vallorsoft.fly.dev');
     const r = await pool.query(
       `SELECT slug, updated_at, published_at FROM blog_posts WHERE is_published=TRUE ORDER BY published_at DESC`
     );
@@ -58,7 +58,7 @@ router.get('/sitemap.xml', async (req, res) => {
       return `  <url><loc>${base}/blog/${p.slug}</loc><lastmod>${lastmod}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`;
     }).join('\n');
 
-    const staticUrls = ['/', '/blog', '/register', '/login'].map(path => {
+    const staticUrls = ['/', '/blog', '/register', '/login', '/terms', '/privacy', '/cookies', '/dpa', '/security'].map(path => {
       return `  <url><loc>${base}${path}</loc><changefreq>weekly</changefreq><priority>${path==='/'?'1.0':'0.6'}</priority></url>`;
     }).join('\n');
 

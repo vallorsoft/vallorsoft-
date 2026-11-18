@@ -140,17 +140,20 @@ if (rateLimit) {
 // express.json ELŐTT mountoljuk (saját express.raw-val a route-on belül).
 app.use(require('./routes/stripe-webhook'));
 
-// 20 MB elég a dokumentum-feltöltésekhez (base64 ~15 MB-os fájl); az 50 MB-os
-// limit mellett pár párhuzamos kérés kifektethette volna az 512 MB-os példányt.
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ limit: '20mb', extended: true }));
+// Bot-/túlterhelés-védelem (lib/botShield.js): a kérés-törzset a session UTÁN
+// olvassuk — 20 MB csak bejelentkezve, névtelenül 200 KB; általános kérés-korlát.
+const botShield = require('./lib/botShield');
 
 // Health-check végpontok — auth/session ELŐTT, könnyűek (load balancer / uptime).
 app.use(require('./routes/health'));
 
 // Statikus fajlok CSAK a nem-vedett eleresi utakra (public mappan belul a HTML fajlok
 // nem szolgalhatoak ki kozvetlenul - a route-ok vedelme lejjebb tortenik)
-app.use(express.static(path.join(__dirname, 'public')));
+// Keresőmotor: robots.txt + landing a valódi canonical címmel (a static ELŐTT).
+app.use(require('./routes/seo'));
+// Böngésző-gyorsítótár: ?v= verziózott JS/CSS 1 napig, minden más újraellenőrzéssel.
+app.use(botShield.staticCache);
+app.use(express.static(path.join(__dirname, 'public'), { cacheControl: false }));
 
 // Strukturált kérés-naplózás (a statikus fájlokat már a fenti static kiszolgálta,
 // így itt csak az API-/oldal-kérések naplózódnak).
@@ -186,6 +189,9 @@ app.use(session({
 // Munkamenet-újraellenőrzés: letiltott/törölt/lefokozott user, lejárt cég-előfizetés,
 // jelszócsere, letiltott portál-belépő → a régi session nem él tovább 7 napig.
 app.use(require('./middleware/sessionRevalidate').sessionRevalidate);
+// Általános kérés-korlát (felhasználónként / névtelenül IP-nként) + kérés-törzs.
+app.use(botShield.apiRateLimit);
+app.use(botShield.bodyParsers);
 
 // ===== ROUTE-OK MOUNTOLASA =====
 app.use(require('./routes/firebase'));
@@ -224,6 +230,13 @@ app.use('/api', (req, res) => {
 });
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  // Túl nagy / hibás JSON törzs (pl. bot) — nem szerverhiba, nem naplózzuk hibaként.
+  if (!res.headersSent && err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ success: false, message: 'Cererea este prea mare.' });
+  }
+  if (!res.headersSent && err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ success: false, message: 'Cerere invalidă.' });
+  }
   log.error('unhandled-route-error', { id: req.id, path: req.path, err: err && err.message, stack: err && err.stack });
   errorReporter.capture(err, { id: req.id, path: req.path, method: req.method });
   if (res.headersSent) return next(err);
