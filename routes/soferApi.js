@@ -10,7 +10,7 @@ const { calculateDiurna } = require('../lib/diurna');
 const { computeFuelTotals } = require('../lib/waybillTotals');
 const { normalizeCategory } = require('../lib/expenseCategories');
 const { fetchTripCrossings, PLATE_SQL } = require('../lib/tripCrossings');
-const { buildRouteRows, tripEndpoint, dateRo, fillTrackTimes, coordsOf } = require('../lib/waybillRows');
+const { buildRouteRows, tripEndpoint, dateRo, fillTrackTimes, fillRowOdometer } = require('../lib/waybillRows');
 const { genDocId } = require('../lib/ids');
 
 // A sofőr a főoldali „🇷🇴 BE / KI" gombokat idő-picker modalon át erősíti
@@ -597,13 +597,15 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         });
       }
     } catch (_e) { /* régi séma — marad a beírt idő */ }
-    // Ami még idő nélkül maradt, de a címében ott a koordináta: a vontató GPS-útvonalából
-    // keressük ki, mikor állt ott a kamion.
+    // A vontató GPS-pontsora az út idejére: (1) ami még idő nélkül maradt, de a címében ott a
+    // koordináta, ebből keressük ki, mikor állt ott a kamion; (2) minden pont km-óra állása.
+    let track = [];
     try {
-      const need = _ptList.some((p, i) => !/^\d{1,2}:\d{2}/.test(String(p.time || '').trim()) && !stopTimes['#' + i]
-        && !(p.stopId != null && stopTimes[String(p.stopId)]) && coordsOf(p.loc));
-      const days = _ptList.map((p) => String(p.data || '').slice(0, 10)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-      if (need && f.numar_camion && days.length) {
+      const days = _ptList.map((p) => String(p.data || '').slice(0, 10))
+        .concat([f.indulas_dt, f.erkezes_dt].filter(Boolean).map((v) => { const d = new Date(v); return isNaN(d) ? '' : d.toISOString().slice(0, 10); }))
+        .concat((crossings || []).map((c) => { const d = new Date(c && c.datetime); return isNaN(d) ? '' : d.toISOString().slice(0, 10); }))
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+      if (f.numar_camion && days.length) {
         const d0 = new Date(Date.parse(days[0] + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
         let d1 = new Date(Date.parse(days[days.length - 1] + 'T00:00:00Z') + 3 * 86400000).toISOString().slice(0, 10);
         const cap = new Date(Date.parse(d0 + 'T00:00:00Z') + 45 * 86400000).toISOString().slice(0, 10);
@@ -612,12 +614,14 @@ router.get('/api/pdf-download/:id', async (req, res) => {
           `SELECT points_json FROM gps_track_days
             WHERE company_id = $1 AND ${PLATE_SQL('rendszam')} = $2 AND day BETWEEN $3::date AND $4::date AND point_count > 0
             ORDER BY day`, [cid, String(f.numar_camion).toUpperCase().replace(/[^A-Z0-9]/g, ''), d0, d1]);
-        let track = [];
         for (const r of tR.rows) { try { const a = JSON.parse(r.points_json || '[]'); if (Array.isArray(a)) track = track.concat(a); } catch (_) {} }
+        track.sort((a, b) => (Array.isArray(a) && Array.isArray(b) ? a[0] - b[0] : 0));
         if (track.length) fillTrackTimes(puncte, stopTimes, track);
       }
-    } catch (_e) { /* nincs GPS-napló — marad idő nélkül */ }
+    } catch (_e) { /* nincs GPS-napló — marad idő / km-óra nélkül */ }
     const routeRows = buildRouteRows(puncte, crossings, stopTimes);
+    if (track.length) fillRowOdometer(routeRows, track);
+    const _kmCell = (x) => '<td class="num" style="white-space:nowrap;">' + (x.km != null ? '<b>' + escHtml(x.km.toLocaleString('ro-RO')) + '</b> km' : '<span style="color:#94a3b8;">—</span>') + '</td>';
     const _when = (d, t) => {
       const ds = d ? escHtml(dateRo(d)) : '';
       const ts = t ? '<b style="color:#0f172a;">' + escHtml(t) + '</b>' : '';
@@ -642,18 +646,18 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     routeRows.forEach((x, i) => {
       const nr = `<td style="color:#94a3b8;font-weight:700;">${i + 1}.</td>`;
       if (x.kind === 'border') {
-        puncteHtml += `<tr class="row-border">${nr}<td>${_borderPill(x.direction)}</td><td>${_borderLoc(x)}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
+        puncteHtml += `<tr class="row-border">${nr}<td>${_borderPill(x.direction)}</td><td>${_borderLoc(x)}</td><td ${_whenCell}>${_when(x.date, x.time)}</td>${_kmCell(x)}</tr>`;
       } else {
-        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.time)}</td></tr>`;
+        puncteHtml += `<tr>${nr}<td>${_punctPill(x.tip)}</td><td>${escHtml(x.loc || '—')}</td><td ${_whenCell}>${_when(x.date, x.time)}</td>${_kmCell(x)}</tr>`;
       }
     });
     if (!puncte.length) {
       // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk (a határátlépések mellett)
       let legacy = '';
-      if (f.loc_plecare) legacy += `<tr><td style="color:#94a3b8;font-weight:700;">•</td><td>${_punctPill('Plecare')}</td><td>${escHtml(f.loc_plecare)}</td><td ${_whenCell}>—</td></tr>`;
-      const legacyEnd = f.loc_sosire ? `<tr><td style="color:#94a3b8;font-weight:700;">•</td><td>${_punctPill('Sosire')}</td><td>${escHtml(f.loc_sosire)}</td><td ${_whenCell}>—</td></tr>` : '';
+      if (f.loc_plecare) legacy += `<tr><td style="color:#94a3b8;font-weight:700;">•</td><td>${_punctPill('Plecare')}</td><td>${escHtml(f.loc_plecare)}</td><td ${_whenCell}>—</td><td class="num">—</td></tr>`;
+      const legacyEnd = f.loc_sosire ? `<tr><td style="color:#94a3b8;font-weight:700;">•</td><td>${_punctPill('Sosire')}</td><td>${escHtml(f.loc_sosire)}</td><td ${_whenCell}>—</td><td class="num">—</td></tr>` : '';
       puncteHtml = legacy + puncteHtml + legacyEnd;
-      if (!puncteHtml)   puncteHtml  = '<tr class="empty-row"><td colspan="4">Nu a fost inregistrat niciun punct de traseu.</td></tr>';
+      if (!puncteHtml)   puncteHtml  = '<tr class="empty-row"><td colspan="5">Nu a fost inregistrat niciun punct de traseu.</td></tr>';
     }
 
     // Indulás / érkezés pontos ideje a fejléchez (dátum + óra)
@@ -890,7 +894,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
 
     <div class="sec-title">📍 Puncte de traseu (${routeRows.length || puncte.length})</div>
     <table class="grid-table tbl-pu">
-      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:150px;">Data și ora</th></tr></thead>
+      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:150px;">Data și ora</th><th class="num" style="width:96px;">Km bord (GPS)</th></tr></thead>
       <tbody>${puncteHtml}</tbody>
     </table>
 

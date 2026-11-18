@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-18 — 🛣️ Menetlevél: km-óra állás a GPS-ből minden útvonal-ponthoz (PR #647)
+
+- **Kérés:** a nyomtatott menetlevél útvonal-táblájába (indulás, fel-/lerakás, határátlépés, érkezés — minden pont) kerüljön a GPS-ből automatikusan a km-óra állás, új oszlopban.
+- `lib/waybillRows.js`: `buildRouteRows` minden sorhoz valós időpontot (`ts`, epoch mp) ad — a GPS-időből, a határátlépés időpontjából, vagy a beírt román helyi időből (`roLocalToEpoch`, téli/nyári idő helyesen); új `odoAt` (az időpont előtti utolsó ismert km-óra, max. 12 óra régi — álló kamionnál a km nem változik —, különben az utána következő első, max. 2 óra) és `fillRowOdometer` (óra nélküli indulásnál a nap első, érkezésnél a nap utolsó állása).
+- `routes/soferApi.js` `/api/pdf-download/:id`: a vontató `gps_track_days` pontsora mindig betöltődik az út idejére (pontok + indulás/érkezés + határátlépések napjai), és az útvonal-tábla új **„Km bord (GPS)"** oszlopot kap; GPS-adat nélkül „—". A tárolt `puncte` nem módosul.
+- Teszt: `waybillRows.test.js` +4 eset. **2445 Jest zöld.**
+
 ## 2026-11-12 — 🔒 Lezárt fuvar: utólag egyszer ellenőrizve, utána többet nem keresünk rá (PR #646)
 
 - **Kérés:** a már lezárt fuvart utólag egyszer kérje le; ha nem tud alakítani rajta, fejezze be teljesen, többet ne keressen rá.

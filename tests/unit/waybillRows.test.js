@@ -160,3 +160,39 @@ describe('megbízható GPS-idő az elsődleges', () => {
     expect([r.date, r.time]).toEqual(['2026-10-26', '18:30']);
   });
 });
+
+describe('km-óra a GPS-ből minden útvonal-ponthoz', () => {
+  const { fillRowOdometer, odoAt, roLocalToEpoch } = require('../../lib/waybillRows');
+  const T = (iso) => Math.floor(Date.parse(iso) / 1000);
+  const track = [
+    [T('2026-03-02T05:00:00Z'), 46, 25, 0, 1, 100000],
+    [T('2026-03-02T09:00:00Z'), 47, 21, 80, 1, 100400],
+    [T('2026-03-02T12:00:00Z'), 47.5, 19, 0, 0, 100650],
+    [T('2026-03-03T15:00:00Z'), 48, 17, 0, 0, 101200],
+  ];
+  test('roLocalToEpoch: román helyi idő (téli, UTC+2)', () => {
+    expect(roLocalToEpoch('2026-03-02', '07:00')).toBe(T('2026-03-02T05:00:00Z'));
+    expect(roLocalToEpoch('2026-07-02', '07:00')).toBe(T('2026-07-02T04:00:00Z'));
+  });
+  test('odoAt: az időpont előtti utolsó állás, különben az utána következő', () => {
+    expect(odoAt(track, T('2026-03-02T10:00:00Z'))).toBe(100400);
+    expect(odoAt(track, T('2026-03-02T04:00:00Z'))).toBe(100000);
+    expect(odoAt(track, T('2026-03-01T00:00:00Z'))).toBeNull();
+  });
+  test('indulás / határ / lerakás / érkezés mind km-t kap', () => {
+    const rows = buildRouteRows(
+      [{ tip: 'Plecare', loc: 'Arcus', data: '2026-03-02', time: '07:00' },
+       { tip: 'Descarcare', loc: 'Győr', data: '2026-03-03', time: '' },
+       { tip: 'Sosire', loc: 'Arcus', data: '2026-03-03' }],
+      [{ datetime: '2026-03-02T09:30:00Z', direction: 'OUT', locatie: 'Nădlac' }]);
+    fillRowOdometer(rows, track);
+    expect(rows[0].km).toBe(100000);
+    expect(rows.find((r) => r.kind === 'border').km).toBe(100400);
+    expect(rows[rows.length - 1].km).toBe(101200);
+  });
+  test('GPS nélkül nincs km', () => {
+    const rows = buildRouteRows([{ tip: 'Plecare', loc: 'A', data: '2026-03-02', time: '07:00' }], []);
+    fillRowOdometer(rows, []);
+    expect(rows[0].km).toBeUndefined();
+  });
+});
