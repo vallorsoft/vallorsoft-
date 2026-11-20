@@ -402,6 +402,13 @@ window.WaybillDocs = (function () {
     });
   }
 
+  // Kétoldalas nyomtatás: minden dokumentum páratlan (elülső) oldalon kezdődjön.
+  // Ha az eddigi oldalszám páratlan, az új dokumentum ELÉ egy üres A4 kerül —
+  // így a páratlan oldalas dokumentum után üres hátoldal jön, a végére nem.
+  function padToEven(out) {
+    if (out.getPageCount() % 2 === 1) out.addPage([595.28, 841.89]);
+  }
+
   // A kijelölt dokumentumok egy PDF-be, típus-csoportonként (a lista sorrendjében).
   function _pdf() {
     if (!window.PDFLib) { note(tt('wbd.noPdfLib', 'Biblioteca PDF nu este încărcată.'), 'err'); return; }
@@ -416,6 +423,7 @@ window.WaybillDocs = (function () {
         if (btn) { btn.disabled = true; btn.textContent = '⏳ ' + (i + 1) + '/' + ids.length; }
         var id = ids[i++];
         if (String(id).indexOf('wb:') === 0) {
+          padToEven(out);
           return renderWaybillInto(out, String(id).slice(3))
             .catch(function () { skipped.push(tt('wbd.waybillItself', '📋 Foaia de parcurs')); }).then(next);
         }
@@ -423,7 +431,10 @@ window.WaybillDocs = (function () {
           var mime = String(d.mime || '').toLowerCase();
           if (mime === 'application/pdf') {
             return P.PDFDocument.load(dataToBytes(d.data), { ignoreEncryption: true }).then(function (src) {
-              return out.copyPages(src, src.getPageIndices()).then(function (pages) { pages.forEach(function (p) { out.addPage(p); }); });
+              return out.copyPages(src, src.getPageIndices()).then(function (pages) {
+                if (pages.length) padToEven(out);
+                pages.forEach(function (p) { out.addPage(p); });
+              });
             });
           }
           if (mime.indexOf('image/') === 0) {
@@ -435,6 +446,7 @@ window.WaybillDocs = (function () {
               var W = 595.28, H = 841.89, M = 24;
               var sc = Math.min((W - 2 * M) / img.width, (H - 2 * M) / img.height, 1);
               var w = img.width * sc, h = img.height * sc;
+              padToEven(out);
               out.addPage([W, H]).drawImage(img, { x: (W - w) / 2, y: (H - h) / 2, width: w, height: h });
             });
           }
