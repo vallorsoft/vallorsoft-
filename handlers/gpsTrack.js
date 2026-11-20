@@ -1,5 +1,6 @@
 // ============================================================
-//  handlers/gpsTrack.js — GPS útvonal-előzmény (napi bontás, max. 62 nap)
+//  handlers/gpsTrack.js — GPS útvonal-előzmény (napi bontás; térkép max. 30 nap,
+//    afölött — a megőrzési mélységig, ~2 év — csak km-összesítő)
 //    gpsTrackVehicles  — a cég GPS-párosított járművei + hány nap van mentve
 //    gpsTrackRange     — egy jármű útvonala egy időszakra: úthálózatra
 //                        illesztett vonal, km (út / km-óra / GPS), menetek
@@ -18,7 +19,8 @@ const fc = require('../lib/fuelCheck');
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
 const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-const MAX_DAYS = 62;
+const MAP_MAX_DAYS = 30;                  // ennél hosszabb időszakra NINCS térkép, csak km-adat
+const MAX_DAYS = gt.HISTORY_DAYS;         // km-összesítő a teljes megőrzési mélységig (~2 év)
 const ONDEMAND_BACKFILL_DAYS = 6;         // kérésenként ennyi hiányzó múltbeli napot tölt le a HÁTTÉRBEN
 const HISTORY_DAYS = gt.HISTORY_DAYS;
 const BG_MATCH_DAYS = 6;                  // kérésenként ennyi még nem illesztett napot illeszt a HÁTTÉRBEN
@@ -103,6 +105,65 @@ async function buildFuelCheck(cid, plate, from, to, all, lf, kmOdo, fuelCnt) {
       receipt_l: receiptL, hist_l100: hist, nominal_l100: nominal }) };
   } catch (e) { console.warn('[FuelCheck] fogyasztás-ellenőrzés hiba', plate, e.message); out.consumption = { ok: false }; }
   return out;
+}
+
+// 30 napnál hosszabb időszak: csak km — a pontsort (points_json) NEM töltjük be,
+// a mentett illesztett km-et (km_road) összegezzük; csak a még nem illesztett
+// napoknál olvassuk a pontokat a GPS-pontokból becsült km-hez.
+async function kmOnlyRange(cid, plate, from, to, now, today) {
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `SELECT day::text AS day, point_count, km_road, km_raw, matched_count, matched_at
+         FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND day BETWEEN $3::date AND $4::date
+          AND point_count > 0 ORDER BY day`, [cid, plate, from, to]));
+  } catch (e) {
+    if (e && e.code === '42P01') return { migration_pending: true };
+    throw e;
+  }
+  const isMatched = (r) => r.matched_count === r.point_count && r.km_road != null;
+  const pendDays = rows.filter((r) => !isMatched(r) && r.point_count > 1).map((r) => r.day);
+  const est = {};
+  if (pendDays.length) {
+    const p = await pool.query(
+      `SELECT company_id, rendszam, day::text AS day, points_json, point_count, matched_count, matched_at
+         FROM gps_track_days WHERE company_id=$1 AND rendszam=$2 AND day = ANY($3::date[])`, [cid, plate, pendDays]);
+    for (const r of p.rows) {
+      let pts = [];
+      try { pts = JSON.parse(r.points_json || '[]'); } catch (_) {}
+      est[r.day] = Math.round(gt.sumKm(pts) * 100) / 100;
+    }
+    // a még nem illesztett napok illesztése a háttérben (mint a térképes nézetnél)
+    const mk = cid + '|' + plate;
+    if (!_matchJobs.has(mk)) {
+      const batch = p.rows.filter((r) => !(r.day === today && r.matched_at && now - new Date(r.matched_at).getTime() < 10 * 60000))
+        .sort((a, b) => (a.day < b.day ? 1 : -1)).slice(0, BG_MATCH_DAYS);
+      if (batch.length) {
+        _matchJobs.set(mk, (async () => {
+          try {
+            for (const r of batch) {
+              try { await gt.matchAndSaveDay(r); }
+              catch (e) { console.warn('[GpsTrack] háttér-illesztés hiba', plate, r.day, e.message); }
+            }
+          } finally { _matchJobs.delete(mk); }
+        })());
+      }
+    }
+  }
+  const days = [];
+  let kmRoad = 0, pending = 0;
+  for (const r of rows) {
+    const matched = isMatched(r);
+    const k = matched ? parseFloat(r.km_road) : (est[r.day] != null ? est[r.day] : (parseFloat(r.km_raw) || 0));
+    if (!matched) pending++;
+    kmRoad += k;
+    days.push({ day: r.day, km: Math.round(k * 100) / 100, matched });
+  }
+  return {
+    days,
+    totals: days.length ? { km_road: Math.round(kmRoad * 100) / 100, day_count: days.length, pending_days: pending } : null,
+    match_running: _matchJobs.has(cid + '|' + plate),
+  };
 }
 
 handlers.gpsTrackVehicles = async function (req, res) {
@@ -222,6 +283,13 @@ handlers.gpsTrackRange = async function (req, res, args) {
           }
         } catch (e) { liveErr = e.message; console.warn('[GpsTrack] élő frissítés hiba', plate, e.message); }
       }
+    }
+
+    if (span > MAP_MAX_DAYS) {
+      const km = await kmOnlyRange(cid, plate, from, to, now, today);
+      if (km.migration_pending) return res.json({ result: { ok: true, days: [], totals: null, km_only: true, migration_pending: true } });
+      return res.json({ result: Object.assign({ ok: true, km_only: true, map_max_days: MAP_MAX_DAYS, rendszam: plate, from, to,
+        live_error: liveErr, missing_days: missing, bg_running: bgRunning, history_days: HISTORY_DAYS }, km) });
     }
 
     let rows = [];
