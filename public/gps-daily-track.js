@@ -1,5 +1,6 @@
 // public/gps-daily-track.js — GPS útvonal-előzmény (Flotta aloldal).
-// Jármű + időszak (max. 62 nap) → úthálózatra illesztett útvonal a térképen,
+// Jármű + időszak → úthálózatra illesztett útvonal a térképen (max. 30 nap; ennél
+// hosszabb — akár 1–2 éves — időszakra térkép NINCS, csak km-összesítő napokra bontva),
 // összesítő (indulás/érkezés helye, menet-/állásidő, km út szerint, km-óra,
 // üzemanyag) és napokra bontott Start/Stop lista. Adat: `gpsTrackVehicles` +
 // `gpsTrackRange` (handlers/gpsTrack.js), a mentett gps_track_days táblából.
@@ -66,6 +67,7 @@
     if (k === 'month') return [t.slice(0, 8) + '01', t];
     if (k === 'last30') return [addDays(t, -29), t];
     if (k === 'last60') return [addDays(t, -59), t];
+    if (k === 'last365') return [addDays(t, -364), t];
     return null;
   }
 
@@ -78,13 +80,13 @@
       return '<option value="' + esc(v.rendszam) + '">' + esc(label) + '</option>';
     }).join('');
     var presets = [['today', 'gtr.pToday', 'Azi'], ['yesterday', 'gtr.pYesterday', 'Ieri'], ['week', 'gtr.pWeek', 'Săptămâna curentă'],
-      ['lastweek', 'gtr.pLastWeek', 'Săptămâna trecută'], ['month', 'gtr.pMonth', 'Luna curentă'], ['last30', 'gtr.pLast30', 'Ultimele 30 de zile'], ['last60', 'gtr.pLast60', 'Ultimele 60 de zile']];
+      ['lastweek', 'gtr.pLastWeek', 'Săptămâna trecută'], ['month', 'gtr.pMonth', 'Luna curentă'], ['last30', 'gtr.pLast30', 'Ultimele 30 de zile'], ['last60', 'gtr.pLast60', 'Ultimele 60 de zile'], ['last365', 'gtr.pLast365', 'Ultimele 12 luni']];
     var t = todayLocal();
     box.innerHTML =
       '<div class="gtr-wrap">' +
         '<div class="gtr-side glass">' +
           '<h2 class="h-title" style="margin-bottom:4px;">🗺️ ' + esc(tt('gtr.title', 'Istoric traseu GPS')) + '</h2>' +
-          '<div class="gtr-hint">' + esc(tt('gtr.sub', 'Traseul complet înregistrat de GPS, pus pe drum, cu km exacți. Se păstrează ~3 luni.')) + '</div>' +
+          '<div class="gtr-hint">' + esc(tt('gtr.sub', 'Traseul complet înregistrat de GPS, pus pe drum, cu km exacți. Harta max. 30 de zile; pentru intervale mai lungi (până la 1–2 ani) doar kilometrajul.')) + '</div>' +
           '<select class="select" id="gtrVehicle">' + opts + '</select>' +
           '<div class="gtr-presets">' + presets.map(function (p) {
             return '<button type="button" class="gtr-chip' + (p[0] === 'week' ? ' on' : '') + '" data-gtr-preset="' + p[0] + '">' + esc(tt(p[1], p[2])) + '</button>';
@@ -149,9 +151,17 @@
       if (!done()) return;
       if (!r || !r.ok) { st.textContent = (r && r.err) || tt('common.error', 'Eroare'); return; }
       _data = r;
+      if (r.km_only) {
+        // 30 napnál hosszabb időszak: térkép nincs, csak km-adat
+        st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
+        if (_layers) _layers.clearLayers();
+        ['gtrFuelCheck', 'gtrToll', 'gtrList'].forEach(function (id) { var e = document.getElementById(id); if (e) e.innerHTML = ''; });
+        renderKmOnly(r);
+      } else {
       st.textContent = r.days.length ? '' : tt('gtr.noData', 'Nu există traseu salvat pentru acest interval. Colectarea pornește automat după asocierea GPS (la fiecare 15 minute).');
       renderSummary(r); renderFuelCheck(r); renderList(r); drawMap(r, silent);
       if (!silent) renderTollCard(plate, from, to, !!r.days.length);
+      }
       // a még nem illesztett napok a háttérben kerülnek útra — addig csendben újratöltünk
       var pending = (r.totals && r.totals.pending_days) || 0;
       if ((r.match_running || pending) && _autoLeft > 0) {
@@ -169,6 +179,26 @@
         st.textContent = (st.textContent ? st.textContent + ' ' : '') + '⏳ ' + tt('gtr.backfill', 'Încă {n} zi(le) se descarcă din GPS în fundal — reîncarcă peste câteva minute.', { n: r.missing_days });
       }
     }).catch(function () { if (done()) st.textContent = tt('common.error', 'Eroare'); });
+  }
+
+  // 30 napnál hosszabb időszak: csak km — összesen + havi és napi bontás
+  function renderKmOnly(r) {
+    var el = document.getElementById('gtrSummary');
+    var T = r.totals;
+    var note = '<div class="gtr-note">🗺️ ' + esc(tt('gtr.kmOnlyNote', 'Pentru intervale mai lungi de {n} de zile harta nu se afișează — doar kilometrajul.', { n: r.map_max_days || 30 })) + '</div>';
+    if (!T) { el.innerHTML = note; return; }
+    var months = {};
+    r.days.forEach(function (d) { var m = d.day.slice(0, 7); months[m] = (months[m] || 0) + (d.km || 0); });
+    var mRows = Object.keys(months).sort().reverse().map(function (m) { return row(m, km(months[m])); }).join('');
+    var dRows = r.days.slice().reverse().map(function (d) { return row(dayLabel(d.day) + (d.matched ? '' : ' ⏳'), km(d.km)); }).join('');
+    el.innerHTML = note + '<div class="gtr-sum">' +
+      '<div class="gtr-sum-h">' + esc(tt('gtr.summary', 'Sumar')) + ' · ' + esc(r.from) + ' → ' + esc(r.to) + '</div>' +
+      row(tt('gtr.kmRoad', 'Kilometraj pe drum (GPS)'), km(T.km_road), true) +
+      row(tt('gtr.kmDays', 'Zile cu activitate GPS'), String(T.day_count)) +
+      (T.pending_days ? '<div class="gtr-note">⏳ ' + esc(tt('gtr.pending', '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.', { n: T.pending_days })) + '</div>' : '') +
+      '<div class="gtr-sum-h" style="margin-top:10px">' + esc(tt('gtr.kmByMonth', 'Km pe luni')) + '</div>' + mRows +
+      '<details style="margin-top:10px"><summary class="gtr-sum-h" style="cursor:pointer">' + esc(tt('gtr.kmByDay', 'Km pe zile')) + '</summary>' + dRows + '</details>' +
+      '</div>';
   }
 
   function row(label, val, strong) { return '<div class="gtr-row"><span>' + esc(label) + '</span><b' + (strong ? ' class="gtr-strong"' : '') + '>' + esc(val) + '</b></div>'; }

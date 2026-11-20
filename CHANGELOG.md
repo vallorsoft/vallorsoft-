@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-20 — 🗺️ GPS útvonal: 30 napig térkép, afölött (akár 1–2 év) csak km (PR #PRNUM)
+- A GPS-napló eddig max. 62 napot töltött be. Most a lekérdezés a teljes megőrzési mélységig (`gt.HISTORY_DAYS`, ~2 év) mehet; **30 napnál hosszabb időszakra térkép soha nem kerül fel** (`MAP_MAX_DAYS` 30, `handlers/gpsTrack.js` `kmOnlyRange`): csak km-összesítő, havi + napi bontással. A pontsort (`points_json`) ilyenkor nem töltjük be — a mentett `km_road` összegződik, csak a még nem illesztett napoknál becsül a GPS-pontokból (és azokat a háttérben illeszti). Üzemanyag-ellenőrzés / útdíj / Start-Stop lista hosszú időszakra nem fut.
+- Kliens (`public/gps-daily-track.js`): új „Ultimele 12 luni" gomb, `renderKmOnly`; i18n `gtr.pLast365`/`kmOnlyNote`/`kmDays`/`kmByMonth`/`kmByDay` (RO+HU). Cache-bust `?v=20261120gpskm`. Teszt +1.
+
 ## 2026-11-18 — ⚡ GPS-pontsor: felezéses (bináris) keresés a háttér-feldolgozásban (PR #656)
 - Új `lib/sortedSearch.js` `lowerBoundT`: időrendbe rendezett GPS-pontsoron log2(N) lépésben ugrik a keresett időponthoz. Bekötve az állomás-felismerés manőver-számításába (`lib/stopMatch.js`, eddig minden álláshoz a teljes pontsor elejéről pörgetett) és a menetlevél GPS-időinél (`lib/waybillRows.js` `trackVisits`). Az eredmény változatlan (véletlen összevetés-teszt), csak kevesebb CPU. A `odoAt`/`pointAt` már eddig is így keresett.
 - Teszt +3 (`tests/unit/sortedSearch.test.js`).

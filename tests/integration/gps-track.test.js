@@ -52,7 +52,7 @@ describe('gpsTrackRange', () => {
     setUser(ADMIN);
     let r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2026-10-10', to: '2026-10-01' }]);
     expect(r.body.result.ok).toBe(false);
-    r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2026-07-01', to: '2026-09-15' }]);
+    r = await call('gpsTrackRange', [{ rendszam: 'B104VLR', from: '2024-01-01', to: '2026-09-15' }]);   // > 2 év
     expect(r.body.result.ok).toBe(false);
     expect(pool.query).not.toHaveBeenCalled();
   });
@@ -121,6 +121,43 @@ describe('gpsTrackRange', () => {
     expect(F.consumption.ok).toBe(true);
     const wq = pool.query.mock.calls.find((c) => /SELECT id, alimentari FROM fuvarlevelek/.test(c[0]));
     expect(wq[1]).toEqual([CID, 'B104VLR', '2026-10-01', '2026-10-01']);
+  });
+});
+
+describe('gpsTrackRange — 30 napnál hosszabb időszak: csak km', () => {
+  test('1 év: térkép-adat nélkül, km-összesítő; a pontsort csak a nem illesztett napra olvassa', async () => {
+    setUser(ADMIN);
+    const t0 = Date.parse('2026-03-02T05:00:00Z') / 1000;
+    const pts = [];
+    for (let i = 0; i <= 100; i++) pts.push([t0 + i * 60, 45.0 + i * 0.001, 25.0, 60, 1]);
+    const seen = [];
+    pool.query.mockImplementation(async (sql, params) => {
+      seen.push(sql);
+      if (/FROM vehicle_gps_map/.test(sql)) return rows([{ rendszam: 'B 104 VLR', object_id: null }]);
+      if (/FROM gps_track_days/.test(sql) && /ANY\(/.test(sql)) return rows([{ company_id: CID, rendszam: 'B 104 VLR', day: '2026-03-02',
+        points_json: JSON.stringify(pts), point_count: pts.length, matched_count: null, matched_at: null }]);
+      if (/FROM gps_track_days/.test(sql)) return rows([
+        { day: '2026-01-10', point_count: 50, km_road: 300.5, km_raw: 290, matched_count: 50 },
+        { day: '2026-02-11', point_count: 40, km_road: 200, km_raw: 190, matched_count: 40 },
+        { day: '2026-03-02', point_count: pts.length, km_road: null, km_raw: null, matched_count: null },
+      ]);
+      return rows([]);
+    });
+    const r = await call('gpsTrackRange', [{ rendszam: 'b104vlr', from: '2025-11-20', to: '2026-11-19' }]);
+    const res = r.body.result;
+    expect(res.ok).toBe(true);
+    expect(res.km_only).toBe(true);
+    expect(res.days).toHaveLength(3);
+    expect(res.days[0].segments).toBeUndefined();
+    expect(res.days[2].matched).toBe(false);
+    expect(res.days[2].km).toBeGreaterThan(10);
+    expect(res.totals.km_road).toBeCloseTo(500.5 + res.days[2].km, 1);
+    expect(res.totals.pending_days).toBe(1);
+    // a fő lekérdezés nem olvas pontsort
+    const main = seen.find((q) => /FROM gps_track_days/.test(q) && /km_road, km_raw/.test(q) && !/ANY\(/.test(q));
+    expect(main).not.toMatch(/points_json/);
+    // nincs üzemanyag-/menetlevél-lekérdezés
+    expect(seen.some((q) => /fuvarlevelek/.test(q))).toBe(false);
   });
 });
 
