@@ -90,7 +90,13 @@
           '<select class="select" id="gtrVehicle">' + opts + '</select>' +
           '<div class="gtr-presets">' + presets.map(function (p) {
             return '<button type="button" class="gtr-chip' + (p[0] === 'week' ? ' on' : '') + '" data-gtr-preset="' + p[0] + '">' + esc(tt(p[1], p[2])) + '</button>';
-          }).join('') + '</div>' +
+          }).join('') +
+            // év-választó: a teljes naptári év (jan. 1 – dec. 31), a megőrzési mélységig (~2 év)
+            '<select class="gtr-chip gtr-year" id="gtrYear" aria-label="' + esc(tt('gtr.pYear', 'An')) + '">' +
+              '<option value="">📅 ' + esc(tt('gtr.pYear', 'An')) + '…</option>' +
+              [0, 1, 2].map(function (n) { var y = Number(t.slice(0, 4)) - n; return '<option value="' + y + '">' + y + '</option>'; }).join('') +
+            '</select>' +
+          '</div>' +
           '<div class="gtr-dates">' +
             '<input class="input" type="date" id="gtrFrom" max="' + t + '">' +
             '<span>→</span>' +
@@ -118,11 +124,23 @@
         var rg = presetRange(b.getAttribute('data-gtr-preset'));
         document.getElementById('gtrFrom').value = rg[0]; document.getElementById('gtrTo').value = rg[1];
         box.querySelectorAll('[data-gtr-preset]').forEach(function (x) { x.classList.toggle('on', x === b); });
+        resetYear();
         if (document.getElementById('gtrVehicle').value) load();
       });
     });
+    var yearSel = document.getElementById('gtrYear');
+    function resetYear() { yearSel.value = ''; yearSel.classList.remove('on'); }
+    yearSel.addEventListener('change', function () {
+      var y = yearSel.value;
+      if (!/^\d{4}$/.test(y)) { resetYear(); return; }
+      document.getElementById('gtrFrom').value = y + '-01-01';
+      document.getElementById('gtrTo').value = y + '-12-31';
+      box.querySelectorAll('[data-gtr-preset]').forEach(function (x) { x.classList.remove('on'); });
+      yearSel.classList.add('on');
+      if (document.getElementById('gtrVehicle').value) load();
+    });
     ['gtrFrom', 'gtrTo'].forEach(function (id) {
-      document.getElementById(id).addEventListener('change', function () { box.querySelectorAll('[data-gtr-preset]').forEach(function (x) { x.classList.remove('on'); }); });
+      document.getElementById(id).addEventListener('change', function () { box.querySelectorAll('[data-gtr-preset]').forEach(function (x) { x.classList.remove('on'); }); resetYear(); });
     });
     document.getElementById('gtrVehicle').addEventListener('change', load);
     document.getElementById('gtrLoad').addEventListener('click', load);

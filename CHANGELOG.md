@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-11-20 — 🗺️ GPS útvonal: év-választó (jan. 1 – dec. 31) (PR #PRNUM)
+- `public/gps-daily-track.js`: a gyors-gombok mellett „📅 Év…" legördülő (az idei és az előző 2 év); kiválasztva a teljes naptári évet tölti be (`YYYY-01-01` → `YYYY-12-31`, 30 napon túl → csak km-összesítő). Gombra vagy kézi dátumra váltva a választó alaphelyzetbe áll. i18n `gtr.pYear` (RO+HU), cache-bust `?v=20261120gpsyear`.
+
 ## 2026-11-20 — 🗺️ GPS útvonal (30 napon túli km-összesítő): napi és havi átlag (PR #658)
 - `public/gps-daily-track.js` `renderKmOnly`: napi átlag km — csak az 50 km-es vagy hosszabb napokból; havi átlag km — csak az 500 km-es vagy hosszabb hónapokból (hány nap / hónap számít bele, ki van írva). Az összesítőben, a havi és a napi bontás tetején. i18n `gtr.avgDay`/`avgDayHint`/`avgMonth`/`avgMonthHint` (RO+HU), cache-bust `?v=20261120gpsavg`.
 
