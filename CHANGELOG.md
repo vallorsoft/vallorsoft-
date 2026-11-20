@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-20 — 🗺️ GPS útvonal (30 napon túli km-összesítő): napi és havi átlag (PR #PRNUM)
+## 2026-11-20 — 🗺️ GPS útvonal (30 napon túli km-összesítő): napi és havi átlag (PR #658)
 - `public/gps-daily-track.js` `renderKmOnly`: napi átlag km — csak az 50 km-es vagy hosszabb napokból; havi átlag km — csak az 500 km-es vagy hosszabb hónapokból (hány nap / hónap számít bele, ki van írva). Az összesítőben, a havi és a napi bontás tetején. i18n `gtr.avgDay`/`avgDayHint`/`avgMonth`/`avgMonthHint` (RO+HU), cache-bust `?v=20261120gpsavg`.
 
 ## 2026-11-20 — 🗺️ GPS útvonal: 30 napig térkép, afölött (akár 1–2 év) csak km (PR #657)
