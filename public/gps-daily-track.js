@@ -190,14 +190,23 @@
     var months = {};
     r.days.forEach(function (d) { var m = d.day.slice(0, 7); months[m] = (months[m] || 0) + (d.km || 0); });
     var mRows = Object.keys(months).sort().reverse().map(function (m) { return row(m, km(months[m])); }).join('');
+    // átlagok: napi — csak az 50 km-es vagy hosszabb napok; havi — csak az 500 km-es vagy hosszabb hónapok
+    var DAY_MIN = 50, MONTH_MIN = 500;
+    var dOk = r.days.filter(function (d) { return (d.km || 0) >= DAY_MIN; });
+    var mOk = Object.keys(months).filter(function (m) { return months[m] >= MONTH_MIN; });
+    var avgDay = dOk.length ? dOk.reduce(function (a, d) { return a + d.km; }, 0) / dOk.length : null;
+    var avgMonth = mOk.length ? mOk.reduce(function (a, m) { return a + months[m]; }, 0) / mOk.length : null;
+    var avgDayRow = row(tt('gtr.avgDay', 'Medie zilnică') + ' (' + tt('gtr.avgDayHint', '{n} zile ≥ {min} km', { n: dOk.length, min: DAY_MIN }) + ')', km(avgDay), true);
+    var avgMonthRow = row(tt('gtr.avgMonth', 'Medie lunară') + ' (' + tt('gtr.avgMonthHint', '{n} luni ≥ {min} km', { n: mOk.length, min: MONTH_MIN }) + ')', km(avgMonth), true);
     var dRows = r.days.slice().reverse().map(function (d) { return row(dayLabel(d.day) + (d.matched ? '' : ' ⏳'), km(d.km)); }).join('');
     el.innerHTML = note + '<div class="gtr-sum">' +
       '<div class="gtr-sum-h">' + esc(tt('gtr.summary', 'Sumar')) + ' · ' + esc(r.from) + ' → ' + esc(r.to) + '</div>' +
       row(tt('gtr.kmRoad', 'Kilometraj pe drum (GPS)'), km(T.km_road), true) +
       row(tt('gtr.kmDays', 'Zile cu activitate GPS'), String(T.day_count)) +
+      avgDayRow + avgMonthRow +
       (T.pending_days ? '<div class="gtr-note">⏳ ' + esc(tt('gtr.pending', '{n} zi(le) încă nepuse pe drum — km estimați din puncte GPS; se finalizează automat.', { n: T.pending_days })) + '</div>' : '') +
-      '<div class="gtr-sum-h" style="margin-top:10px">' + esc(tt('gtr.kmByMonth', 'Km pe luni')) + '</div>' + mRows +
-      '<details style="margin-top:10px"><summary class="gtr-sum-h" style="cursor:pointer">' + esc(tt('gtr.kmByDay', 'Km pe zile')) + '</summary>' + dRows + '</details>' +
+      '<div class="gtr-sum-h" style="margin-top:10px">' + esc(tt('gtr.kmByMonth', 'Km pe luni')) + '</div>' + avgMonthRow + mRows +
+      '<details style="margin-top:10px"><summary class="gtr-sum-h" style="cursor:pointer">' + esc(tt('gtr.kmByDay', 'Km pe zile')) + '</summary>' + avgDayRow + dRows + '</details>' +
       '</div>';
   }
 

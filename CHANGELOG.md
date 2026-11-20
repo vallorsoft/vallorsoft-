@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-11-20 — 🗺️ GPS útvonal (30 napon túli km-összesítő): napi és havi átlag (PR #658)
+- `public/gps-daily-track.js` `renderKmOnly`: napi átlag km — csak az 50 km-es vagy hosszabb napokból; havi átlag km — csak az 500 km-es vagy hosszabb hónapokból (hány nap / hónap számít bele, ki van írva). Az összesítőben, a havi és a napi bontás tetején. i18n `gtr.avgDay`/`avgDayHint`/`avgMonth`/`avgMonthHint` (RO+HU), cache-bust `?v=20261120gpsavg`.
+
 ## 2026-11-20 — 🗺️ GPS útvonal: 30 napig térkép, afölött (akár 1–2 év) csak km (PR #657)
 - A GPS-napló eddig max. 62 napot töltött be. Most a lekérdezés a teljes megőrzési mélységig (`gt.HISTORY_DAYS`, ~2 év) mehet; **30 napnál hosszabb időszakra térkép soha nem kerül fel** (`MAP_MAX_DAYS` 30, `handlers/gpsTrack.js` `kmOnlyRange`): csak km-összesítő, havi + napi bontással. A pontsort (`points_json`) ilyenkor nem töltjük be — a mentett `km_road` összegződik, csak a még nem illesztett napoknál becsül a GPS-pontokból (és azokat a háttérben illeszti). Üzemanyag-ellenőrzés / útdíj / Start-Stop lista hosszú időszakra nem fut.
 - Kliens (`public/gps-daily-track.js`): új „Ultimele 12 luni" gomb, `renderKmOnly`; i18n `gtr.pLast365`/`kmOnlyNote`/`kmDays`/`kmByMonth`/`kmByDay` (RO+HU). Cache-bust `?v=20261120gpskm`. Teszt +1.
