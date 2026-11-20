@@ -1603,6 +1603,7 @@
     'gtr.ptTimeout': { hu: 'A szerver nem válaszolt — próbáld újra.', ro: 'Serverul nu a răspuns — încearcă din nou.' },
     'gtr.lph': { hu: 'Fogyasztás óránként', ro: 'Consum pe oră' },
     'gtr.pLast60': { hu: 'Utolsó 60 nap', ro: 'Ultimele 60 de zile' },
+    'gtr.pYear': { hu: 'Év', ro: 'An' },
     'gtr.pLast365': { hu: 'Utolsó 12 hónap', ro: 'Ultimele 12 luni' },
     'gtr.kmOnlyNote': { hu: '{n} napnál hosszabb időszakra nincs térkép — csak a km-adat.', ro: 'Pentru intervale mai lungi de {n} de zile harta nu se afișează — doar kilometrajul.' },
     'gtr.kmDays': { hu: 'GPS-aktivitásos napok', ro: 'Zile cu activitate GPS' },
