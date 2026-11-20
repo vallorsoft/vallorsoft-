@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-11-20 — 🖨️ Menetlevél összefűzött PDF: kétoldalas nyomtatásra üres lap a páratlan oldalas dokumentumok után (PR #660)
+- `public/waybill-docs.js` `padToEven`: az összefűzött PDF-ben minden dokumentum (menetlevél, feltöltött PDF, minden egyes fotó) páratlan (elülső) oldalon kezdődik — ha az előző dokumentum páratlan oldalas volt, utána egy üres A4 kerül. Az utolsó dokumentum után nincs üres lap. A feltöltött fájlok nem változnak. Cache-bust `?v=20261120duplex`.
+
 ## 2026-11-20 — 🗺️ GPS útvonal: év-választó (jan. 1 – dec. 31) (PR #659)
 - `public/gps-daily-track.js`: a gyors-gombok mellett „📅 Év…" legördülő (az idei és az előző 2 év); kiválasztva a teljes naptári évet tölti be (`YYYY-01-01` → `YYYY-12-31`, 30 napon túl → csak km-összesítő). Gombra vagy kézi dátumra váltva a választó alaphelyzetbe áll. i18n `gtr.pYear` (RO+HU), cache-bust `?v=20261120gpsyear`.
 
