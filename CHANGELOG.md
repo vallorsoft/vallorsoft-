@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-21 — 💱 Valutás bonok: minden valuta felismerve + aznapi BNR árfolyam, napi BNR-mentés (PR #PRNUM)
+## 2026-11-21 — 💱 Valutás bonok: minden valuta felismerve + aznapi BNR árfolyam, napi BNR-mentés (PR #661)
 - **Napi BNR-mentés minden valutára:** új `bnr_rates` tábla (`db/bnr-rates.sql`, nem cégfüggő nyilvános adat) + `startBnrRatesScheduler` (3 óránként a BNR 10 napos XML-je, idempotens upsert) → minden napra megvan az árfolyam. `services/bnr.js` `parseBnrXml` (multiplier-rel osztva: HUF/JPY…), `getRateFor(valuta, dátum)` (aznapi vagy az utolsó előtte közzétett — hétvége/ünnep; régi dátumnál az éves BNR-fájlból tölt vissza).
 - **Bon-kiolvasás:** az AI bármely valutát ISO-kódként ad vissza (szimbólumból / országból is: lei, €, Ft, zł, Kč, лв, £, kr…; `lib/itemCurrency.js` `normalizeCurrency`); nem-RON bonnál a válasz a bon dátumára érvényes BNR árfolyamot + RON-egyenértéket is hozza (`curs_bnr`/`curs_data`/`suma_ron`).
 - **Sofőr menetlevél:** a tankolás/vásárlás sorokon valuta-választó; az összeg a bon valutájában írható, mellette élőben „≈ X RON · Curs BNR <nap>: 1 EUR = … RON" (`getBnrRateFor` RPC). Az átnéző ablakban is javítható a valuta.
