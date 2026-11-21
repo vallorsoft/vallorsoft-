@@ -4,6 +4,7 @@
 //  A handler-törzsek BÁJTRA AZONOSAK az eredetivel.
 //  Hívás: handlers.<funkcioNev>(req, res, args)
 // ============================================================
+const itemCurrency = require('../lib/itemCurrency');
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
 const { computeFuelTotals } = require('../lib/waybillTotals');
@@ -592,8 +593,9 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
       );
       if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit / acces interzis' } });
 
-      const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
-      const achizitii  = Array.isArray(d.achizitii)  ? d.achizitii  : [];
+      // Valutás bonok → RON a tétel dátumára érvényes BNR árfolyamon (lib/itemCurrency).
+      const alimentari = await itemCurrency.convertItems(Array.isArray(d.alimentari) ? d.alimentari : [], 'suma');
+      const achizitii  = await itemCurrency.convertItems(_normAchizitii(Array.isArray(d.achizitii) ? d.achizitii : []), 'pret');
       const puncte     = Array.isArray(d.puncte)      ? d.puncte      : [];
 
       const kmInc = Number(d.km_inceput || 0);
@@ -836,8 +838,9 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
         }
       }
 
-      const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
-      const achizitii  = Array.isArray(d.achizitii)  ? d.achizitii  : [];
+      // Valutás bonok → RON a tétel dátumára érvényes BNR árfolyamon (lib/itemCurrency).
+      const alimentari = await itemCurrency.convertItems(Array.isArray(d.alimentari) ? d.alimentari : [], 'suma');
+      const achizitii  = await itemCurrency.convertItems(_normAchizitii(Array.isArray(d.achizitii) ? d.achizitii : []), 'pret');
       const puncte     = Array.isArray(d.puncte)      ? d.puncte      : [];
 
       const kmInc = Number(d.km_inceput || 0);

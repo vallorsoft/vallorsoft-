@@ -6,7 +6,7 @@
 //  Multi-tenant: a cég-árfolyam company_id-re szűrt, paraméteres lekérdezés.
 // ============================================================
 const pool = require('../db');
-const { fetchBnrEurRon } = require('../services/bnr');
+const { fetchBnrEurRon, getRateFor } = require('../services/bnr');
 
 const handlers = {};
 
@@ -37,6 +37,28 @@ handlers.getBnrRate = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getBnrRate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// Egy valuta BNR árfolyama egy adott napra (RON / 1 egység) — a sofőr
+// menetlevél-űrlapja hívja, amikor a tétel valutáját / dátumát állítja.
+// Nyilvános adat, de csak bejelentkezett Sofer/Admin/Manager érheti el.
+handlers.getBnrRateFor = async function (req, res, args) {
+  try {
+    const u = req.session.user;
+    if (!u || !['Sofer', 'Admin', 'Manager'].includes(u.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    }
+    const a = (Array.isArray(args) ? args[0] : args) || {};
+    const { normalizeCurrency } = require('../lib/itemCurrency');
+    const cur = normalizeCurrency(a.currency);
+    if (!cur) return res.json({ result: { ok: false, err: 'Valută necunoscută' } });
+    const hit = await getRateFor(cur, a.date);
+    if (!hit) return res.json({ result: { ok: false, err: 'Cursul BNR nu este disponibil pentru această dată' } });
+    return res.json({ result: { ok: true, currency: hit.currency, rate: hit.rate, date: hit.date } });
+  } catch (err) {
+    console.error('getBnrRateFor hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

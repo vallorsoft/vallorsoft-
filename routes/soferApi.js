@@ -4,6 +4,7 @@
 // ============================================================
 const express = require('express');
 const router = express.Router();
+const itemCurrency = require('../lib/itemCurrency');
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { calculateDiurna } = require('../lib/diurna');
@@ -207,7 +208,9 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     }
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
-    const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
+    // Valutás bonok → RON a tétel dátumára érvényes BNR árfolyamon (lib/itemCurrency).
+    const alimentari = await itemCurrency.convertItems(Array.isArray(d.alimentari) ? d.alimentari : [], 'suma');
+    const achizitiiConv = await itemCurrency.convertItems(normalizeAchizitii(d.achizitii), 'pret');
     const cantInc = Number(d.cantInceput || 0);
     const cantSf = Number(d.cantSfarsit || 0);
     // Az AdBlue KÜLÖN számít (nem dízel) — a közös `lib/waybillTotals.js`-ben,
@@ -238,7 +241,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         cantInc, cantSf, motorinaFolosit, totalAlim, totalAdblue, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
-        JSON.stringify(normalizeAchizitii(d.achizitii)),
+        JSON.stringify(achizitiiConv),
         JSON.stringify(puncte),
         JSON.stringify(orderIds),
         indulasDt ? new Date(indulasDt) : null,
@@ -616,6 +619,15 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
       return m ? m[1] : escHtml(s);
     };
+    // 💱 Valutás bon: az eredeti összeg + a tétel napjára érvényes BNR árfolyam.
+    const _fxNote = (it, key) => {
+      const cur = String((it && it.valuta) || 'RON').toUpperCase();
+      if (cur === 'RON' || it[key + '_orig'] == null) return '';
+      const rate = Number(it.curs_bnr);
+      return `<div style="font-size:10.5px;font-weight:500;color:#475569;white-space:nowrap;">${escHtml(it[key + '_orig'])} ${escHtml(cur)}`
+        + (rate > 0 ? ` · Curs BNR ${escHtml(_fmtItemDate(it.curs_data))}: ${escHtml(rate.toFixed(4))}` : ' · curs BNR lipsă')
+        + '</div>';
+    };
     let alimHtml = '';
     if (alimentari.length > 0) {
       alimentari.forEach((a, i) => {
@@ -626,7 +638,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
           <td class="num">${escHtml(a.litru || 0)} L</td>
           <td class="num" style="color:#475569;">${escHtml(a.km || 0)} km</td>
           <td>${escHtml(a.plata || '—')}</td>
-          <td class="num" style="font-weight:700;">${a.suma ? escHtml(a.suma) + ' RON' : '—'}</td>
+          <td class="num" style="font-weight:700;">${a.suma ? escHtml(a.suma) + ' RON' : '—'}${_fxNote(a, 'suma')}</td>
         </tr>`;
       });
     } else {
@@ -642,7 +654,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
           <td style="white-space:nowrap;color:#475569;">${_fmtItemDate(ach.data)}</td>
           <td><span style="display:inline-block;padding:2px 9px;border-radius:9px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;white-space:nowrap;">${escHtml(CAT_RO[normalizeCategory(ach.categorie)])}</span></td>
           <td>${escHtml(ach.produs || '—')}</td>
-          <td class="num" style="font-weight:700;">${escHtml(ach.pret || 0)} RON</td>
+          <td class="num" style="font-weight:700;">${escHtml(ach.pret || 0)} RON${_fxNote(ach, 'pret')}</td>
           <td>${escHtml(ach.plata || '—')}</td>
         </tr>`;
       });
