@@ -161,6 +161,21 @@ describe('deletePendingReceipt', () => {
     expect(sql).toMatch(/LOWER\(email_sofer\) = LOWER\(\$3\)/i);
   });
 
+  test('orphan:true → a félretett (attached, menetlevél nélküli) sor is törölhető', async () => {
+    setUser(fixtures.sofer);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 43, kind: 'fuel' }] });
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'deletePendingReceipt',
+      arguments: [{ id: 43, orphan: true }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const sql = pool.query.mock.calls[0][0];
+    expect(sql).toMatch(/DELETE FROM driver_receipt_scans/i);
+    expect(sql).not.toMatch(/status <> 'attached'/i);
+    expect(sql).toMatch(/LOWER\(email_sofer\) = LOWER\(\$3\)/i); // csak a saját
+  });
+
   test('érvénytelen id → hiba, nincs DB-hívás', async () => {
     setUser(fixtures.sofer);
     const pool = require('../../db');

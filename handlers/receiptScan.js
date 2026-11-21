@@ -587,6 +587,10 @@ handlers.deletePendingReceipt = async function (req, res, args) {
     const id = parseInt(a.id || (Array.isArray(args) ? args[0] : args), 10);
     if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
 
+    // `orphan:true` — a sofőr a még menetlevélre nem tett, a telefonon
+    // félretett („mentett") tételt törli: ez a scan-sor már 'attached'
+    // jelölést kapott az elfogadáskor, de menetlevélhez nincs kötve.
+    const orphanOk = a.orphan === true;
     const emailGate = _isSofer(req)
       ? 'AND LOWER(email_sofer) = LOWER($3)'
       : '';
@@ -600,7 +604,7 @@ handlers.deletePendingReceipt = async function (req, res, args) {
       // menetlevél tétel-sorából kell kivenni.
       const r = await pool.query(
         `DELETE FROM driver_receipt_scans
-          WHERE id = $1 AND company_id = $2 AND status <> 'attached' ${emailGate}
+          WHERE id = $1 AND company_id = $2 ${orphanOk ? '' : "AND status <> 'attached'"} ${emailGate}
           RETURNING id, kind`,
         params
       );

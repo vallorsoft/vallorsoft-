@@ -4920,6 +4920,7 @@
     'sof.km': { hu: 'Km', ro: 'Km' },
     'sof.payment': { hu: 'Fizetés', ro: 'Plată' },
     'sof.sumRon': { hu: 'Összeg (RON)', ro: 'Sumă (RON)' },
+    'sof.pa.delMsg': { hu: 'Ez a tétel véglegesen törlődik (a bon képe és adatai is). Ha mégis kell, a bont újra le kell fotózni.', ro: 'Acest element se șterge definitiv (inclusiv imaginea și datele bonului). Dacă totuși e nevoie, bonul trebuie fotografiat din nou.' },
     'sof.rr.delTitle': { hu: 'Bon végleges törlése', ro: 'Ștergere definitivă bon' },
     'sof.rr.delMsg': { hu: 'A lefotózott bon, a kép és a kiolvasott adatok véglegesen törlődnek. Rossz fotó esetén fotózd le újra.', ro: 'Bonul fotografiat, imaginea și datele citite se șterg definitiv. Dacă poza e greșită, fotografiază din nou.' },
     'sof.rr.delOk': { hu: '🗑 Törlés', ro: '🗑 Șterge' },
