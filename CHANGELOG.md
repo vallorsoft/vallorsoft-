@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-21 — 🗑 „Korábbi tétel" ablak: tételenkénti végleges törlés (PR #PRNUM)
+## 2026-11-21 — 🗑 „Korábbi tétel" ablak: tételenkénti végleges törlés (PR #663)
 - `public/sofer.js` `pendingAddDelete` + `_renderPendingAddList`: a menetlevél kezdésekor felugró „📋 Korábbi tétel — hozzáadod?" ablak minden során 🗑 gomb (megerősítéssel). Scannelt bon: kikerül a várólistából a telefonon tárolt képpel és a szerveri sorral együtt; mentett (félretett) tétel: kikerül a listából, és ha bonból jött, a szerveri scan-sor is törlődik (`deletePendingReceipt` `orphan:true`). Ha mégis kell, a bont újra kell fotózni. A többi tétel pipája megmarad; utolsó törlés után az ablak bezárul. A sorban az összeg a bon valutájában látszik.
 - `rrAccept`: a félretett tétel megkapja a szerveri scan-azonosítót (`_pid`). i18n `sof.pa.delMsg` (RO+HU), cache-bust `?v=20261121padel`.
 
