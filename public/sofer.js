@@ -1477,6 +1477,13 @@ function openPendingAddModal(cb) {
     return;
   }
   _pendingAddCb = cb || function () {};
+  _renderPendingAddList(items);
+  m.style.display = 'flex';
+}
+
+function _renderPendingAddList(items) {
+  var list = document.getElementById('pendingAddList');
+  if (!list) return;
   _pendingAddItems = items;
   // Alap: mindegyik pipálva (a sofőr könnyen indíthat mindet vagy leszedhet)
   list.innerHTML = items.map(function (it, i) {
@@ -1487,9 +1494,12 @@ function openPendingAddModal(cb) {
       ? '<span class="pa-src pa-src-q">📷 ' + esc(t('sof.rr.kindPurchase') === kindLabel ? '' : '') + esc(t('sof.pa.srcScan')) + '</span>'
       : '<span class="pa-src pa-src-b">' + esc(t('sof.pa.srcSaved')) + '</span>';
     var d = r.data ? esc(String(r.data).slice(0, 10)) : '—';
-    var sumNum = (it.kind === 'fuel') ? (parseFloat(r.suma) || 0) : (parseFloat(r.pret) || 0);
+    var _ak = (it.kind === 'fuel') ? 'suma' : 'pret';
+    var _cur = String(r.valuta || 'RON').toUpperCase();
+    var _orig = (_cur !== 'RON' && r[_ak + '_orig'] != null && r[_ak + '_orig'] !== '') ? r[_ak + '_orig'] : r[_ak];
+    var sumNum = parseFloat(_orig) || 0;
     var sum = '';
-    if (sumNum) { try { sum = sumNum.toLocaleString(t('sof.locale')) + ' RON'; } catch (_) { sum = String(sumNum) + ' RON'; } }
+    if (sumNum) { try { sum = sumNum.toLocaleString(t('sof.locale')) + ' ' + _cur; } catch (_) { sum = String(sumNum) + ' ' + _cur; } }
     var loc = r.loc || r.produs || '—';
     var extra = '';
     if (it.kind === 'fuel') {
@@ -1504,9 +1514,59 @@ function openPendingAddModal(cb) {
       + '<div class="pa-head">' + icon + ' ' + esc(loc) + ' ' + srcBadge + '</div>'
       + '<div class="pa-sub">📅 ' + d + (sum ? ' · 💵 ' + esc(sum) : '') + (extra ? ' · ' + extra : '') + '</div>'
       + '</div>'
+      + '<button type="button" class="pa-del" title="' + esc(t('sof.rr.delTitle')) + '" aria-label="' + esc(t('sof.rr.delTitle'))
+      + '" onclick="event.preventDefault();event.stopPropagation();pendingAddDelete(' + i + ')">🗑</button>'
       + '</label>';
   }).join('');
-  m.style.display = 'flex';
+}
+
+// 🗑 Egy tétel VÉGLEGES törlése a „Korábbi tétel" ablakból (rossz fotó /
+// felesleges tétel). Bin-tétel: kikerül a mentett listából (+ a szerveri
+// scan-sor, ha van); scannelt bon: a várólistából, a telefonon tárolt
+// képpel és a szerveri sorral együtt. Ha kell, a bont újra le kell fotózni.
+function pendingAddDelete(i) {
+  var it = _pendingAddItems[i];
+  if (!it) return;
+  sofConfirm({ ico: '🗑️', title: t('sof.rr.delTitle'), msg: t('sof.pa.delMsg'), ok: t('sof.rr.delOk'), tone: 'danger' }, function () {
+    // A még pipált/pipálatlan állapotot megőrizzük a többi tételnél.
+    var keep = {};
+    document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
+      var j = parseInt(cb.getAttribute('data-idx'), 10);
+      var o = _pendingAddItems[j];
+      if (o && j !== i) keep[_pendingAddKey(o)] = cb.checked;
+    });
+    if (it.src === 'queue') {
+      _rrRemoveNow(it.id);
+    } else {
+      var bin = orphanLoad();
+      var arr = (it.kind === 'fuel') ? bin.alim : bin.ach;
+      var row = arr && arr[it.idx];
+      if (row) {
+        arr.splice(it.idx, 1);
+        orphanStore(bin);
+        if (row._pid) {
+          fetch('/api/execute', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+            body: JSON.stringify({ functionName: 'deletePendingReceipt', arguments: [{ id: row._pid, orphan: true }] })
+          }).catch(function () { /* best-effort */ });
+        }
+      }
+    }
+    toast(t('sof.rr.deleted'), 'ok');
+    var items = _collectPendingAddItems();
+    if (!items.length) { _pendingAddRows = null; _pendingAddClose(); return; }
+    _renderPendingAddList(items);
+    document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
+      var j = parseInt(cb.getAttribute('data-idx'), 10);
+      var k = _pendingAddItems[j] && _pendingAddKey(_pendingAddItems[j]);
+      if (k && Object.prototype.hasOwnProperty.call(keep, k)) cb.checked = keep[k];
+    });
+  });
+}
+function _pendingAddKey(o) {
+  if (o.src === 'queue') return 'q:' + o.id;
+  var r = o.row || {};
+  return 'b:' + o.kind + ':' + [r.data, r.loc, r.produs, r.suma, r.pret, r.litru].join('|');
 }
 
 var _pendingAddCb = null;
@@ -3761,7 +3821,12 @@ function rrAccept() {
       stateSave({ draft: draft });
     } else {
       // Nincs menetlevél — orphan binbe, majd a következő menetlevél
-      // kezdésekor a popup felajánlja hozzáadásra.
+      // kezdésekor a popup felajánlja hozzáadásra. A szerveri scan-sor
+      // azonosítója (`_pid`) is megy, hogy onnan véglegesen törölhető legyen.
+      try {
+        var _qp = rcptQueueLoad().find(function (x) { return x.id === _rrCurrentId; });
+        if (_qp && _qp.pending_id) newRow._pid = _qp.pending_id;
+      } catch (_) {}
       if (kind === 'fuel') orphanAddAlim(newRow);
       else                 orphanAddAch(newRow);
     }

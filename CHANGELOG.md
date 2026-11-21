@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-21 — 🗑 „Korábbi tétel" ablak: tételenkénti végleges törlés (PR #PRNUM)
+- `public/sofer.js` `pendingAddDelete` + `_renderPendingAddList`: a menetlevél kezdésekor felugró „📋 Korábbi tétel — hozzáadod?" ablak minden során 🗑 gomb (megerősítéssel). Scannelt bon: kikerül a várólistából a telefonon tárolt képpel és a szerveri sorral együtt; mentett (félretett) tétel: kikerül a listából, és ha bonból jött, a szerveri scan-sor is törlődik (`deletePendingReceipt` `orphan:true`). Ha mégis kell, a bont újra kell fotózni. A többi tétel pipája megmarad; utolsó törlés után az ablak bezárul. A sorban az összeg a bon valutájában látszik.
+- `rrAccept`: a félretett tétel megkapja a szerveri scan-azonosítót (`_pid`). i18n `sof.pa.delMsg` (RO+HU), cache-bust `?v=20261121padel`.
+
 ## 2026-11-21 — 🗑 Lefotózott bon végleges törlése (sofőr + iroda) (PR #662)
 - **Sofőr:** a bon-várólistán minden tétel (kiolvasásra kész, hibás ÉS feldolgozás alatti is) 🗑 gombbal törölhető, az átnéző ablak „🗑 Törlés" gombjával is — megerősítő ablak után a tétel, a telefonon megőrzött kép (IndexedDB) és a szerveri sor is törlődik. Feldolgozás közben törölt bonnál a késve érkező AI-válasz eldobódik (a szerveren közben létrejött sort is törli), és nincs újabb próbálkozás.
 - **Szerver:** `deletePendingReceipt` mostantól VÉGLEGESEN törli a `driver_receipt_scans` sort (thumbnail + kiolvasott adatok), nem csak „deleted"-re jelöl. Sofőr csak a sajátját, Admin/Manager a cégéét; menetlevélbe már betett bon itt nem törölhető (azt a menetlevél tétel-sorából kell kivenni). Audit `receipt.delete` (`permanent:true`).
