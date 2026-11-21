@@ -323,15 +323,17 @@
         // AI-scan pending vs attached badge (a sofőr fényképezte-e csak
         // felhőbe, vagy már bekerült a menetlevélbe).
         var scanBadge = '';
+        var bcHtml = '';
         if (ev.meta && ev.meta.source === 'scan') {
           if (ev.meta.pending) {
             scanBadge = ' <span class="da-scan-badge da-scan-pending">' + esc(t('da.cloud')) + '</span>';
+            // A még menetlevélbe nem tett (felhős) bon véglegesen törölhető (rossz fotó).
+            if (ev.meta.scan_id) bcHtml += ' <button type="button" class="btn ghost da-ev-photo-btn" onclick="DriverActivity.deleteScan(' + Number(ev.meta.scan_id) + ')">🗑 ' + esc(t('da.scanDel')) + '</button>';
           } else {
             scanBadge = ' <span class="da-scan-badge da-scan-attached">' + esc(t('da.attached')) + '</span>';
           }
         }
         // Határátlépés: ✏️ módosítás + „módosítva" / „sorrend?" jelzés
-        var bcHtml = '';
         if (ev.type === 'border' && ev.meta && ev.meta.bc_id) {
           _daBorders[ev.meta.bc_id] = { id: ev.meta.bc_id, tip: ev.meta.tip, at: ev.at, locatie: ev.meta.locatie || '' };
           if (ev.meta.edited) {
@@ -529,6 +531,14 @@
       _loadDriverDetail();
     }).catch(function () { toast(t('common.error'), 'err'); });
   }
+  function deleteScan(id) {
+    if (!confirm(t('da.scanDelConfirm'))) return;
+    gas('deletePendingReceipt', [{ id: id }]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      toast(t('da.scanDeleted'), 'ok');
+      _loadDriverDetail();
+    }).catch(function () { toast(t('common.error'), 'err'); });
+  }
   function closeBorderEdit() { var o = document.getElementById('daBcEdit'); if (o) o.remove(); }
   function saveBorderEdit(id) {
     var at = document.getElementById('daBcAt').value;
@@ -557,6 +567,7 @@
   // ═════════════════════════════════════════════
   window.DriverActivity = {
     mount: mount,
+    deleteScan: deleteScan,
     onRangeChange: onRangeChange,
     applyPreset: applyPreset,
     onSearch: onSearch,
