@@ -190,6 +190,55 @@ describe('deletePendingReceipt', () => {
 });
 
 // ═════════════════════════════════════════════
+//  updatePendingReceipt — a „Korábbi tétel" szerkesztő mentése
+// ═════════════════════════════════════════════
+describe('updatePendingReceipt', () => {
+  test('Sofer a SAJÁT pending bonját javítja; a mezők fehérlistán, a kézi liter nem „javított"', async () => {
+    setUser(fixtures.sofer);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 42 }] });
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'updatePendingReceipt',
+      arguments: [{ id: 42, fields: { kind: 'fuel', loc: 'MOL Arad', data: '2026-11-20', tip: 'Motorină',
+        litru: 12, km: 1000, plata: 'Hack', suma: 99.5, valuta: 'lei', produs: 'x', evil: '<script>' } }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/UPDATE driver_receipt_scans/i);
+    expect(sql).toMatch(/status = 'pending'/);
+    expect(sql).toMatch(/company_id = \$2/);
+    expect(sql).toMatch(/LOWER\(email_sofer\) = LOWER\(\$5\)/);
+    const f = JSON.parse(params[3]);
+    expect(f.litru).toBe(12);          // kézi érték marad
+    expect(f.valuta).toBe('RON');
+    expect(f.plata).toBeNull();        // fehérlistán kívül
+    expect(f.produs).toBeNull();       // tankolásnál nincs termék
+    expect(f.evil).toBeUndefined();
+  });
+
+  test('nincs találat (más sofőré / már menetlevélben) → hiba', async () => {
+    setUser(fixtures.sofer);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'updatePendingReceipt',
+      arguments: [{ id: 7, fields: { kind: 'purchase', suma: 10, valuta: 'RON' } }],
+    });
+    expect(res.body.result.ok).toBe(false);
+  });
+
+  test('érvénytelen id → hiba, nincs DB-hívás', async () => {
+    setUser(fixtures.sofer);
+    const pool = require('../../db');
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'updatePendingReceipt', arguments: [{ id: 'x', fields: {} }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+});
+
+// ═════════════════════════════════════════════
 //  listPendingReceipts
 // ═════════════════════════════════════════════
 describe('listPendingReceipts', () => {

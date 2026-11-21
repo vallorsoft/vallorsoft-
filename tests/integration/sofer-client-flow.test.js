@@ -806,6 +806,85 @@ describe('orphan bin — árva tankolás/vásárlás sorok megőrzése', () => {
 });
 
 // ================================================================
+//  ✏️ „Korábbi tétel" szerkesztő — minden adat javítható
+// ================================================================
+describe('pendingAddEdit / pendingEditSave', () => {
+  const setV = (sb, id, v) => { sb.document.getElementById(id).value = v; };
+
+  test('mentett (bin) tankolás: minden mező átírva, valuta → *_orig, _pid megmarad', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    sb.orphanStore({ alim: [{ _pid: 77, loc: 'MOL', data: '2026-11-19', tip: 'Motorină', litru: '50', km: '0', plata: 'Card', suma: '380', valuta: 'RON' }], ach: [] });
+    sb.openPendingAddModal(() => {});
+    sb.pendingAddEdit(0);
+    expect(sb.document.getElementById('pendingEditModal').style.display).toBe('flex');
+    setV(sb, 'peKind', 'fuel'); setV(sb, 'peLoc', 'OMV Nădlac'); setV(sb, 'peData', '2026-11-20');
+    setV(sb, 'peTip', 'AdBlue'); setV(sb, 'peLitru', '40'); setV(sb, 'peKm', '123456');
+    setV(sb, 'peSuma', '50'); setV(sb, 'peValuta', 'EUR'); setV(sb, 'pePlata', 'DKV');
+    sb.pendingEditSave();
+    const bin = sb.orphanLoad();
+    expect(bin.alim.length).toBe(1);
+    const r = bin.alim[0];
+    expect(r).toMatchObject({ _pid: 77, loc: 'OMV Nădlac', data: '2026-11-20', tip: 'AdBlue', litru: '40', km: '123456', plata: 'DKV', valuta: 'EUR', suma_orig: '50' });
+    expect(sb.document.getElementById('pendingEditModal').style.display).toBe('none');
+  });
+
+  test('típus-váltás: a tankolásból vásárlás lesz (átkerül a kiadások közé)', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    sb.orphanStore({ alim: [{ loc: 'MOL', data: '2026-11-19', litru: '0', suma: '20', valuta: 'RON' }], ach: [] });
+    sb.openPendingAddModal(() => {});
+    sb.pendingAddEdit(0);
+    setV(sb, 'peKind', 'purchase'); setV(sb, 'peProdus', 'Ștergătoare'); setV(sb, 'peCat', 'piese');
+    setV(sb, 'peLoc', 'MOL'); setV(sb, 'peData', '2026-11-19'); setV(sb, 'peSuma', '20');
+    setV(sb, 'peValuta', 'RON'); setV(sb, 'pePlata', 'Cash');
+    sb.pendingEditSave();
+    const bin = sb.orphanLoad();
+    expect(bin.alim.length).toBe(0);
+    expect(bin.ach[0]).toMatchObject({ produs: 'Ștergătoare', categorie: 'piese', pret: '20', valuta: 'RON', plata: 'Cash' });
+    expect(bin.ach[0].suma_orig).toBeUndefined();
+  });
+
+  test('lefotózott bon (queue): a mezők frissülnek + a szerver is értesül', async () => {
+    const calls = [];
+    const sb = load({ fetch: (u, o) => {
+      const b = (o && o.body) ? JSON.parse(o.body) : {};
+      calls.push(b);
+      const result = b.functionName === 'updatePendingReceipt' ? { ok: true } : null;
+      return Promise.resolve({ json: () => Promise.resolve({ result }) });
+    } });
+    sb._meData = { email: 'a@x.hu' };
+    sb.rcptQueueStore([{ id: 'r1', status: 'ready', kind: 'purchase', pending_id: 55,
+      fields: { kind: 'purchase', loc: 'Lidl', data: '2026-11-18', suma: 10, valuta: 'HUF', curs_bnr: 0.012, curs_data: '2026-11-18', produs: 'Apă', categorie: 'altele', plata: 'Card' } }]);
+    sb.openPendingAddModal(() => {});
+    sb.pendingAddEdit(0);
+    setV(sb, 'peKind', 'purchase'); setV(sb, 'peProdus', 'Apă minerală'); setV(sb, 'peCat', 'altele');
+    setV(sb, 'peLoc', 'Lidl Makó'); setV(sb, 'peData', '2026-11-18'); setV(sb, 'peSuma', '1500');
+    setV(sb, 'peValuta', 'HUF'); setV(sb, 'pePlata', 'Cash');
+    sb.pendingEditSave();
+    const q = sb.rcptQueueLoad()[0];
+    expect(q.fields).toMatchObject({ loc: 'Lidl Makó', produs: 'Apă minerală', suma: 1500, valuta: 'HUF', plata: 'Cash', curs_bnr: 0.012 });
+    expect(q.fields.suma_ron).toBe(18);
+    await tick();
+    const up = calls.find(c => c.functionName === 'updatePendingReceipt');
+    expect(up).toBeTruthy();
+    expect(up.arguments[0].id).toBe(55);
+  });
+
+  test('érvénytelen összeg → nem ment, hibát jelez', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    sb.orphanStore({ alim: [{ loc: 'MOL', data: '2026-11-19', suma: '380', valuta: 'RON' }], ach: [] });
+    sb.openPendingAddModal(() => {});
+    sb.pendingAddEdit(0);
+    setV(sb, 'peKind', 'fuel'); setV(sb, 'peSuma', 'abc');
+    sb.pendingEditSave();
+    expect(sb._lastToast.k).toBe('err');
+    expect(sb.orphanLoad().alim[0].suma).toBe('380');
+  });
+});
+
+// ================================================================
 //  Fejléc-gomb: a KÖVETKEZŐ állomás valós neve (nem „következő állomás")
 //  Bug: 4 lerakós fuvarnál a gombon „Etapa următoare" jelent meg — a sofőr
 //  nem látta, mi jön. Fix: mindig `_stopEventLabel(opts[0])` + több nyitott
