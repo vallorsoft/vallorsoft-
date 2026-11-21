@@ -3132,24 +3132,32 @@ function _feNormItemDate(v){
   return (typeof v === 'string' && v) ? v.slice(0,10) : _feTodayLocalDate();
 }
 
-function feRowAlim(a){a=a||{};var dt=_feNormItemDate(a.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr .7fr .7fr .8fr .8fr auto;gap:6px;align-items:center;">'
+// 💱 Valutás bon: a szerkesztő az EREDETI (bon szerinti) összeget + valutát mutatja;
+// a RON-értéket mentéskor a szerver a tétel dátumára érvényes BNR árfolyamon számolja.
+function _feCurOf(a){var v=String((a&&a.valuta)||'RON').toUpperCase();return /^[A-Z]{3}$/.test(v)?v:'RON';}
+function _feAmtShown(a,key){var o=a?a[key+'_orig']:null;return (_feCurOf(a)!=='RON'&&o!=null&&o!=='')?o:(a?a[key]:'');}
+function _feCursTitle(a,key){if(!a||_feCurOf(a)==='RON'||!a.curs_bnr)return '';return 'BNR '+(a.curs_data||'')+': 1 '+_feCurOf(a)+' = '+Number(a.curs_bnr).toFixed(4)+' RON → '+(a[key]!=null?a[key]:'')+' RON';}
+function _feCurPick(r,sel,item,key){var v=String(((r.querySelector(sel)||{}).value)||'RON').trim().toUpperCase();if(!/^[A-Z]{3}$/.test(v))v='RON';item.valuta=v;if(v!=='RON'){item[key+'_orig']=item[key];}return item;}
+function feRowAlim(a){a=a||{};var dt=_feNormItemDate(a.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr .7fr .7fr .8fr .8fr .55fr auto;gap:6px;align-items:center;" title="'+feEsc(_feCursTitle(a,'suma'))+'">'
   +'<input class="input fe-a-loc" data-sg="alim_loc" placeholder="Loc" value="'+feEsc(a.loc)+'">'
   +'<input class="input fe-a-data" type="date" value="'+feEsc(dt)+'">'
   +'<input class="input fe-a-tip" data-sg="alim_tip" placeholder="Combustibil" value="'+feEsc(a.tip||'Motorină')+'">'
   +'<input class="input fe-a-lit" type="number" placeholder="L" value="'+feEsc(a.litru)+'">'
   +'<input class="input fe-a-km" type="number" placeholder="Km" value="'+feEsc(a.km)+'">'
   +'<input class="input fe-a-plata" data-sg="alim_plata" placeholder="Plată" value="'+feEsc(a.plata||'Card')+'">'
-  +'<input class="input fe-a-suma" type="number" placeholder="Sumă" value="'+feEsc(a.suma)+'">'
+  +'<input class="input fe-a-suma" type="number" placeholder="Sumă" value="'+feEsc(_feAmtShown(a,'suma'))+'">'
+  +'<input class="input fe-a-val" maxlength="3" placeholder="RON" style="text-transform:uppercase;" value="'+feEsc(a.valuta||'RON')+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
-function feRowAch(c){c=c||{};var dt=_feNormItemDate(c.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1.4fr 1fr .8fr .8fr auto;gap:6px;align-items:center;">'
+function feRowAch(c){c=c||{};var dt=_feNormItemDate(c.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1.4fr 1fr .8fr .55fr .8fr auto;gap:6px;align-items:center;" title="'+feEsc(_feCursTitle(c,'pret'))+'">'
   +'<input class="input fe-c-loc" data-sg="ach_loc" placeholder="Loc" value="'+feEsc(c.loc)+'">'
   +'<input class="input fe-c-data" type="date" value="'+feEsc(dt)+'">'
   +'<input class="input fe-c-prod" data-sg="ach_produs" placeholder="Produs" value="'+feEsc(c.produs)+'">'
   // Kiadás-kategória (közös lista: public/expense-cat.js) — a sofőr/AI által
   // beállított érték itt is javítható, a szerver fehérlistából validál.
   +'<select class="input fe-c-cat">'+(typeof vsExpenseCatOptions==='function'?vsExpenseCatOptions(c.categorie):'')+'</select>'
-  +'<input class="input fe-c-pret" type="number" placeholder="Preț" value="'+feEsc(c.pret)+'">'
+  +'<input class="input fe-c-pret" type="number" placeholder="Preț" value="'+feEsc(_feAmtShown(c,'pret'))+'">'
+  +'<input class="input fe-c-val" maxlength="3" placeholder="RON" style="text-transform:uppercase;" value="'+feEsc(c.valuta||'RON')+'">'
   +'<input class="input fe-c-plata" data-sg="ach_plata" placeholder="Plată" value="'+feEsc(c.plata||'Card')+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
@@ -3466,8 +3474,8 @@ function saveFuvEdit(){
     // kézi átírás után a GPS-jelölés már nem igaz
     if(o.loc_source==='gps'&&o.loc_gps&&o.loc!==o.loc_gps){delete o.loc_source;delete o.loc_gps;}
     return o;});
-  var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return {loc:r.querySelector('.fe-a-loc').value,data:((r.querySelector('.fe-a-data')||{}).value||''),tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0};});
-  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value,categorie:((r.querySelector('.fe-c-cat')||{}).value||'altele')};});
+  var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return _feCurPick(r,'.fe-a-val',{loc:r.querySelector('.fe-a-loc').value,data:((r.querySelector('.fe-a-data')||{}).value||''),tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0},'suma');});
+  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return _feCurPick(r,'.fe-c-val',{loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value,categorie:((r.querySelector('.fe-c-cat')||{}).value||'altele')},'pret');});
   var payload={
     nume_sofer:document.getElementById('feNumeSofer').value,
     numar_fisa:document.getElementById('feNumarFisa').value,

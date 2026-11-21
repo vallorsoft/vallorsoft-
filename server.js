@@ -251,7 +251,7 @@ app.use((err, req, res, next) => {
 // e-mailek/push-ok/IMAP-feldolgozás), és csak a DB-migrációk UTÁN indulnak
 // (friss deploynál az első tick ne fusson hiányzó táblába). lib/schedulerLeader.js
 const schedulerLeader = require('./lib/schedulerLeader');
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler } = require('./services/scheduler');
+const { startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler } = require('./services/scheduler');
 function startAllSchedulers() {
   startIntakeScheduler();
   startExpiryScheduler();
@@ -274,6 +274,7 @@ function startAllSchedulers() {
   startStopMatchScheduler();         // tényleges fel-/lerakási címek a GPS-ből (csak Admin/Manager látja)
   startOrderRouteKmScheduler();      // fuvar teljes km (minden állomás, üres km is) + menetlevél Plecare→Sosire
   require('./services/companyBackup').startCompanyBackupScheduler(); // cégenkénti éjszakai mentés Google Drive-ba
+  startBnrRatesScheduler();          // BNR árfolyamok (minden valuta) napi mentése
   startChatHistoryCleanup();         // AI-chat beszélgetések: megőrzési idő (alap 365 nap) utáni törlés
 
   // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).

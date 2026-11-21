@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-21 — 💱 Valutás bonok: minden valuta felismerve + aznapi BNR árfolyam, napi BNR-mentés (PR #661)
+- **Napi BNR-mentés minden valutára:** új `bnr_rates` tábla (`db/bnr-rates.sql`, nem cégfüggő nyilvános adat) + `startBnrRatesScheduler` (3 óránként a BNR 10 napos XML-je, idempotens upsert) → minden napra megvan az árfolyam. `services/bnr.js` `parseBnrXml` (multiplier-rel osztva: HUF/JPY…), `getRateFor(valuta, dátum)` (aznapi vagy az utolsó előtte közzétett — hétvége/ünnep; régi dátumnál az éves BNR-fájlból tölt vissza).
+- **Bon-kiolvasás:** az AI bármely valutát ISO-kódként ad vissza (szimbólumból / országból is: lei, €, Ft, zł, Kč, лв, £, kr…; `lib/itemCurrency.js` `normalizeCurrency`); nem-RON bonnál a válasz a bon dátumára érvényes BNR árfolyamot + RON-egyenértéket is hozza (`curs_bnr`/`curs_data`/`suma_ron`).
+- **Sofőr menetlevél:** a tankolás/vásárlás sorokon valuta-választó; az összeg a bon valutájában írható, mellette élőben „≈ X RON · Curs BNR <nap>: 1 EUR = … RON" (`getBnrRateFor` RPC). Az átnéző ablakban is javítható a valuta.
+- **Tárolás:** a `suma`/`pret` MINDIG RON (statisztika/decont változatlanul helyes); az eredeti `suma_orig`/`pret_orig` + `valuta` + `curs_bnr`/`curs_data` mellette. A szerver mentéskor újraszámol (`fuvarlevel-save`, `fuvarlevelUpdate`/`Create`). Admin menetlevél-szerkesztő: valuta-oszlop, az eredeti összeg szerkeszthető. Nyomtatott menetlevélen az eredeti összeg + BNR árfolyam a RON alatt. i18n `sof.sumAmount`/`currency`/`cursBnr`/… (RO+HU), cache-bust `?v=20261121valuta`.
+
 ## 2026-11-20 — 🖨️ Menetlevél összefűzött PDF: kétoldalas nyomtatásra üres lap a páratlan oldalas dokumentumok után (PR #660)
 - `public/waybill-docs.js` `padToEven`: az összefűzött PDF-ben minden dokumentum (menetlevél, feltöltött PDF, minden egyes fotó) páratlan (elülső) oldalon kezdődik — ha az előző dokumentum páratlan oldalas volt, utána egy üres A4 kerül. Az utolsó dokumentum után nincs üres lap. A feltöltött fájlok nem változnak. Cache-bust `?v=20261120duplex`.
 

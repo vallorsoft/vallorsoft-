@@ -1944,7 +1944,18 @@ function startFuelLossScheduler() {
   return iv;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
+// ── BNR árfolyamok (MINDEN valuta) napi mentése a `bnr_rates` táblába ──
+// A BNR munkanapokon ~13:00-kor tesz közzé; 3 óránként lekérjük a 10 napos
+// XML-t (idempotens upsert), így minden napra megvan az árfolyam — a valutás
+// bonok átváltása erre épül. Első futás 30 mp-cel az indulás után.
+function startBnrRatesScheduler() {
+  const bnr = require('./bnr');
+  const tick = () => { bnr.syncDailyRates().catch((e) => console.warn('[BNR] napi szinkron hiba:', e.message)); };
+  setTimeout(tick, 30 * 1000).unref();
+  setInterval(tick, 3 * 60 * 60 * 1000).unref();
+}
+
+module.exports = { startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
 // Belső segédek (nem ütemezők) — a lib/* riasztók is ezeket használják
 Object.defineProperty(module.exports, '_emailAlertToAdmins', { enumerable: false, value: _emailAlertToAdmins });
 Object.defineProperty(module.exports, '_roundSize', { enumerable: false, value: roundSize });

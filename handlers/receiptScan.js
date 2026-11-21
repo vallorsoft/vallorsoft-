@@ -54,7 +54,9 @@ const RECEIPT_PROMPT_BASE =
   '- km = kilometrajul dacă apare pe bon (ex. bon Flota Card), altfel null. ' +
   '- plata = "Card", "Cash", "Flota Card" sau "DKV" (cea mai probabilă interpretare). ' +
   '- suma = totalul plătit ca număr (fără simbol valută, punct pentru zecimale, fără separatori de mii). ' +
-  '- valuta = "RON", "EUR", "HUF" sau "USD". ' +
+  '- suma = totalul în VALUTA BONULUI (nu converti în RON). ' +
+  '- valuta = codul ISO 4217 din 3 litere al monedei în care e emis bonul (ex. RON, EUR, HUF, PLN, CZK, BGN, CHF, GBP, USD, SEK, DKK, NOK, RSD, TRY, UAH, MDL). ' +
+  '  Deduce din simbol/text: "lei"=RON, "€"=EUR, "Ft"=HUF, "zł"=PLN, "Kč"=CZK, "лв"=BGN, "£"=GBP, "$"=USD, "kr" după țară (SEK/DKK/NOK), "din"=RSD; dacă nu reiese, după țara stației. ' +
   '- produs = descriere scurtă a articolului doar pentru kind=purchase, altfel null. ' +
   // A kategória a MENETLEVÉL kiadás-sorának fehérlistás kulcsa: az AI ne
   // csak leírja a bont, hanem be is sorolja (útdíj / komp / parkolás /
@@ -71,6 +73,23 @@ const RECEIPT_PROMPT_BASE =
 // Csak az ismert, ellenőrzött mezők kerülnek vissza a kliensre (a Gemini
 // "kreatív" kulcsait nem propagáljuk; a plata/tip fehérlistázott).
 const fuelLiters = require('../lib/fuelLiters');
+const { normalizeCurrency } = require('../lib/itemCurrency');
+const bnr = require('../services/bnr');
+
+// Nem-RON bonnál a bon DÁTUMÁRA érvényes BNR árfolyam + RON-egyenérték a
+// mezőkhöz (best-effort: hálózati hiba → az átváltás a mentéskor pótlódik).
+async function attachBnr(fields) {
+  if (!fields || !fields.valuta || fields.valuta === 'RON') return fields;
+  try {
+    const hit = await bnr.getRateFor(fields.valuta, fields.data);
+    if (hit && hit.rate) {
+      fields.curs_bnr = Math.round(hit.rate * 1e6) / 1e6;
+      fields.curs_data = hit.date;
+      if (fields.suma != null) fields.suma_ron = Math.round(fields.suma * hit.rate * 100) / 100;
+    }
+  } catch (_) { /* best-effort */ }
+  return fields;
+}
 
 function sanitize(json) {
   const kind = json && json.kind === 'fuel' ? 'fuel'
@@ -99,7 +118,7 @@ function sanitize(json) {
     km: _num(json && json.km),
     plata,
     suma: _num(json && json.suma),
-    valuta: _str(json && json.valuta, 8),
+    valuta: normalizeCurrency(json && json.valuta) || null,
     produs: _str(json && json.produs, 200),
     // Kategória CSAK vásárlásnál értelmes; ismeretlen/hiányzó → `altele`
     // (a fehérlista a `lib/expenseCategories.js`-ben, a szerver ebből
@@ -204,7 +223,7 @@ handlers.scanReceipt = async function (req, res, args) {
 
     try {
       const { json, model } = await extractJson({ systemPrompt, parts });
-      const fields = sanitize(json);
+      const fields = await attachBnr(sanitize(json));
 
       // Szerver-oldali "pending" nyilvántartás — hogy az admin/manager a
       // Sofőr-aktivitás nézetben látni tudja: a sofőrnek van-e még

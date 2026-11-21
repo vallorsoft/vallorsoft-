@@ -678,7 +678,7 @@ function _collectAlim(numeric) {
   var num = function (v) { return numeric ? (parseFloat(v) || 0) : (v || '0'); };
   var out = [];
   document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
-    out.push({
+    out.push(_rowCurApply(row, {
       loc:   (row.querySelector('.alim-loc')  || {}).value || '',
       data:  (row.querySelector('.alim-data') || {}).value || '',
       tip:   (row.querySelector('.alim-tip')  || {}).value || 'Motorină',
@@ -686,7 +686,7 @@ function _collectAlim(numeric) {
       km:    num((row.querySelector('.alim-km')   || {}).value),
       plata: (row.querySelector('.alim-plata')|| {}).value || 'Card',
       suma:  num((row.querySelector('.alim-suma') || {}).value)
-    });
+    }, 'suma', numeric));
   });
   return out;
 }
@@ -694,14 +694,14 @@ function _collectAch(numeric) {
   var num = function (v) { return numeric ? (parseFloat(v) || 0) : (v || '0'); };
   var out = [];
   document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function (row) {
-    out.push({
+    out.push(_rowCurApply(row, {
       produs: (row.querySelector('.ach-prod') || {}).value || '',
       loc:    (row.querySelector('.ach-loc')  || {}).value || '',
       data:   (row.querySelector('.ach-data') || {}).value || '',
       pret:   num((row.querySelector('.ach-pret') || {}).value),
       plata:  (row.querySelector('.ach-plata')|| {}).value || 'Card',
       categorie: (row.querySelector('.ach-cat') || {}).value || 'altele'
-    });
+    }, 'pret', numeric));
   });
   return out;
 }
@@ -1427,7 +1427,10 @@ function _receiptToRow(it) {
       litru: (f.litru != null ? String(f.litru) : '0'),
       km:    (f.km    != null ? String(f.km)    : '0'),
       plata: f.plata || 'Card',
-      suma:  (f.suma  != null ? String(f.suma)  : '0')
+      suma:  (f.suma  != null ? String(f.suma)  : '0'),
+      valuta: f.valuta || 'RON',
+      suma_orig: (f.valuta && f.valuta !== 'RON' && f.suma != null) ? String(f.suma) : undefined,
+      curs_bnr: f.curs_bnr, curs_data: f.curs_data
     };
   }
   return {
@@ -1436,7 +1439,11 @@ function _receiptToRow(it) {
     loc:    f.loc  || '',
     data:   f.data || today,
     pret:   (f.suma != null ? String(f.suma) : '0'),
-    plata:  f.plata || 'Card'
+    plata:  f.plata || 'Card',
+    categorie: f.categorie || 'altele',
+    valuta: f.valuta || 'RON',
+    pret_orig: (f.valuta && f.valuta !== 'RON' && f.suma != null) ? String(f.suma) : undefined,
+    curs_bnr: f.curs_bnr, curs_data: f.curs_data
   };
 }
 
@@ -2691,6 +2698,115 @@ function wbLocDialog(kind, cb) {
   }, 100);
 }
 
+// ============================================================
+// 💱 VALUTÁS BONOK — a tétel saját valutája + a tétel DÁTUMÁRA érvényes
+// BNR árfolyam. A sofőr az eredeti (bon szerinti) összeget írja; a RON-
+// egyenérték élőben látszik, és a szerver mentéskor újra számolja
+// (lib/itemCurrency.js). A tárolt `suma`/`pret` MINDIG RON.
+// ============================================================
+var SOF_CURRENCIES = ['RON', 'EUR', 'HUF', 'PLN', 'CZK', 'BGN', 'CHF', 'GBP', 'USD', 'SEK', 'DKK', 'NOK',
+  'RSD', 'TRY', 'UAH', 'MDL', 'ISK', 'JPY', 'CNY', 'CAD', 'AUD', 'NZD', 'AED', 'ILS', 'INR', 'KRW',
+  'MXN', 'ZAR', 'BRL', 'EGP', 'HKD', 'IDR', 'MYR', 'PHP', 'RUB', 'SGD', 'THB'];
+var _bnrRateCache = {};  // 'EUR|2026-11-20' → { rate, date }
+
+function _rowCurOf(a) {
+  var v = String((a && a.valuta) || 'RON').toUpperCase();
+  return /^[A-Z]{3}$/.test(v) ? v : 'RON';
+}
+function _rowAmountShown(a, key) {
+  var orig = a ? a[key + '_orig'] : null;
+  if (_rowCurOf(a) !== 'RON' && orig != null && orig !== '') return orig;
+  return (a && a[key]) || '0';
+}
+function _rowCurFieldHtml(a) {
+  var cur = _rowCurOf(a);
+  var list = SOF_CURRENCIES.indexOf(cur) >= 0 ? SOF_CURRENCIES : SOF_CURRENCIES.concat([cur]);
+  return '<div class="g2">'
+    + '<div class="field"><label>' + t('sof.currency') + '</label><select class="input row-val" style="padding:10px 14px;" onchange="_rowCurUpdate(this);draftSave()">'
+    + list.map(function (c) { return '<option' + (c === cur ? ' selected' : '') + '>' + c + '</option>'; }).join('')
+    + '</select></div>'
+    + '<div class="field row-cur-hint" style="justify-content:flex-end;font-size:12.5px;line-height:1.35;color:#334155;"></div>'
+    + '</div>';
+}
+function _rowCurPreset(row, a) {
+  if (a && a.curs_bnr && _rowCurOf(a) !== 'RON') {
+    row.dataset.curs = a.curs_bnr;
+    row.dataset.cursDate = a.curs_data || '';
+    row.dataset.cursKey = _rowCurOf(a) + '|' + String(a.data || '').slice(0, 10);
+  }
+}
+function _rowAmountEl(row) { return row.querySelector('.alim-suma') || row.querySelector('.ach-pret'); }
+function _rowDateEl(row) { return row.querySelector('.alim-data') || row.querySelector('.ach-data'); }
+function _fmtRoDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? (m[3] + '.' + m[2] + '.' + m[1]) : (iso || ''); }
+
+function _rowCurRender(row) {
+  var hint = row.querySelector('.row-cur-hint');
+  if (!hint) return;
+  var cur = (row.querySelector('.row-val') || {}).value || 'RON';
+  if (cur === 'RON') { hint.innerHTML = ''; return; }
+  var curs = parseFloat(row.dataset.curs);
+  if (!(curs > 0)) {
+    hint.innerHTML = row.dataset.cursErr
+      ? '<span style="color:#b45309;font-weight:600;">⚠️ ' + esc(t('sof.cursMissing')) + '</span>'
+      : '<span style="color:#64748b;">⏳ ' + esc(t('sof.cursLoading')) + '</span>';
+    return;
+  }
+  var amt = parseFloat((_rowAmountEl(row) || {}).value) || 0;
+  var ron = Math.round(amt * curs * 100) / 100;
+  hint.innerHTML = '<span style="font-weight:800;color:#0f172a;">≈ ' + esc(ron.toFixed(2)) + ' RON</span><br>'
+    + '<span>' + esc(t('sof.cursBnr')) + ' ' + esc(_fmtRoDate(row.dataset.cursDate)) + ': 1 ' + esc(cur) + ' = '
+    + esc(curs.toFixed(4)) + ' RON</span>';
+}
+
+// Bármely sor-mezőből (input/select) vagy magából a sorból hívható.
+function _rowCurUpdate(el) {
+  var row = el && el.classList && el.classList.contains('dyn-row') ? el : (el && el.closest ? el.closest('.dyn-row') : null);
+  if (!row) return;
+  var cur = (row.querySelector('.row-val') || {}).value || 'RON';
+  if (cur === 'RON') { delete row.dataset.curs; delete row.dataset.cursDate; delete row.dataset.cursKey; _rowCurRender(row); return; }
+  var day = String((_rowDateEl(row) || {}).value || _todayLocalDate()).slice(0, 10);
+  var key = cur + '|' + day;
+  if (row.dataset.cursKey === key && parseFloat(row.dataset.curs) > 0) { _rowCurRender(row); return; }
+  row.dataset.cursKey = key; delete row.dataset.curs; delete row.dataset.cursErr;
+  var apply = function (hit) {
+    if (row.dataset.cursKey !== key) return; // közben átállították
+    if (hit && hit.rate) { row.dataset.curs = hit.rate; row.dataset.cursDate = hit.date; }
+    else row.dataset.cursErr = '1';
+    _rowCurRender(row);
+    try { draftSave(); } catch (_) {}
+  };
+  _rowCurRender(row);
+  if (_bnrRateCache[key]) return apply(_bnrRateCache[key]);
+  fetch('/api/execute', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getBnrRateFor', arguments: [{ currency: cur, date: day }] })
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    var res = d && d.result;
+    if (res && res.ok) { _bnrRateCache[key] = { rate: res.rate, date: res.date }; apply(_bnrRateCache[key]); }
+    else apply(null);
+  }).catch(function () { apply(null); });
+}
+
+// A gyűjtött tételhez hozzáteszi a valutát és az átváltást.
+// amountKey: 'suma' (tankolás) | 'pret' (vásárlás). A `suma`/`pret` RON,
+// az eredeti összeg a `*_orig`-ba kerül (a szerver újraszámolja).
+function _rowCurApply(row, item, amountKey, numeric) {
+  var cur = (row.querySelector('.row-val') || {}).value || 'RON';
+  item.valuta = cur;
+  if (cur === 'RON') return item;
+  var raw = item[amountKey];
+  var amt = parseFloat(raw) || 0;
+  var curs = parseFloat(row.dataset.curs);
+  item[amountKey + '_orig'] = numeric ? amt : raw;
+  if (curs > 0) {
+    item.curs_bnr = curs;
+    item.curs_data = row.dataset.cursDate || '';
+    var ron = Math.round(amt * curs * 100) / 100;
+    item[amountKey] = numeric ? ron : String(ron);
+  }
+  return item;
+}
+
 function addAlimRow(a) {
   alimIdx++;
   a = a || {};
@@ -2700,7 +2816,7 @@ function addAlimRow(a) {
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.location') + '</label><input class="input alim-loc" list="sug-alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + esc(a.loc || '') + '" oninput="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input alim-data" type="date" value="' + esc(dt) + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input alim-data" type="date" value="' + esc(dt) + '" onchange="_rowCurUpdate(this);draftSave()"></div>'
     + '</div>'
     + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.fuelType') + '</label><select class="input alim-tip" style="padding:10px 14px;" onchange="draftSave()"><option' + (a.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option><option' + (a.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>'
@@ -2709,9 +2825,12 @@ function addAlimRow(a) {
     + '<div class="g3">'
     + '<div class="field"><label>' + t('sof.km') + '</label><input class="input alim-km" type="number" value="' + esc(a.km || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.payment') + '</label><select class="input alim-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
-    + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input alim-suma" type="number" value="' + esc(a.suma || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
-    + '</div>';
+    + '<div class="field"><label>' + t('sof.sumAmount') + '</label><input class="input alim-suma" type="number" value="' + esc(_rowAmountShown(a, 'suma')) + '" inputmode="decimal" oninput="_rowCurUpdate(this);draftSave()"></div>'
+    + '</div>'
+    + _rowCurFieldHtml(a);
+  _rowCurPreset(d, a);
   document.getElementById('alimentariContainer').appendChild(d);
+  _rowCurUpdate(d);
   // Plată visszaállítás
   if (a.plata) {
     var sel = d.querySelector('.alim-plata');
@@ -2740,11 +2859,14 @@ function addAchRow(a) {
     + '</div>'
     + '<div class="g3">'
     + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" list="sug-ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + esc(a.loc || '') + '" oninput="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + esc(dt) + '" onchange="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input ach-pret" type="number" value="' + esc(a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + esc(dt) + '" onchange="_rowCurUpdate(this);draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.sumAmount') + '</label><input class="input ach-pret" type="number" value="' + esc(_rowAmountShown(a, 'pret')) + '" inputmode="decimal" oninput="_rowCurUpdate(this);draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>' + t('sof.payment') + '</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
+    + '<div class="field"><label>' + t('sof.payment') + '</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
+    + _rowCurFieldHtml(a);
+  _rowCurPreset(d, a);
   document.getElementById('achizitiiContainer').appendChild(d);
+  _rowCurUpdate(d);
   if (a.plata) {
     var sel = d.querySelector('.ach-plata');
     if (sel) sel.value = a.plata;
@@ -3441,7 +3563,18 @@ function rrOpen(id) {
                : '<option value="' + esc2(f.categorie || 'altele') + '" selected>' + esc2(f.categorie || 'altele') + '</option>')
           + '</select></div>';
   }
-  rows += '<div class="rr-row"><label>' + t('sof.sumRon') + '</label><input id="rrSuma" type="number" value="' + esc2(f.suma != null ? f.suma : 0) + '"></div>';
+  rows += '<div class="rr-row"><label>' + t('sof.sumAmount') + '</label><input id="rrSuma" type="number" value="' + esc2(f.suma != null ? f.suma : 0) + '"></div>';
+  // 💱 A bon valutája (AI által felismert, javítható) + aznapi BNR árfolyam.
+  var _fc = _rowCurOf(f);
+  var _fl = SOF_CURRENCIES.indexOf(_fc) >= 0 ? SOF_CURRENCIES : SOF_CURRENCIES.concat([_fc]);
+  rows += '<div class="rr-row"><label>' + t('sof.currency') + '</label><select id="rrValuta">'
+        + _fl.map(function (c) { return '<option' + (c === _fc ? ' selected' : '') + '>' + c + '</option>'; }).join('')
+        + '</select></div>';
+  if (_fc !== 'RON' && f.curs_bnr) {
+    rows += '<div class="rr-row" style="font-size:12.5px;color:#334155;">💱 ' + esc2(t('sof.cursBnr')) + ' ' + esc2(_fmtRoDate(f.curs_data))
+          + ': 1 ' + esc2(_fc) + ' = ' + esc2(Number(f.curs_bnr).toFixed(4)) + ' RON'
+          + (f.suma_ron != null ? ' → <b>≈ ' + esc2(Number(f.suma_ron).toFixed(2)) + ' RON</b>' : '') + '</div>';
+  }
   rows += '<div class="rr-row"><label>' + t('sof.payment') + '</label><select id="rrPlata">' + plataOpts + '</select></div>';
   fields.innerHTML = rows;
 
@@ -3454,6 +3587,7 @@ function rrOpen(id) {
     // hogy a váltás után ne vesszen el a sofőr munkája.
     var cur = { loc: (document.getElementById('rrLoc') || {}).value, data: (document.getElementById('rrData') || {}).value,
                 suma: (document.getElementById('rrSuma') || {}).value, plata: (document.getElementById('rrPlata') || {}).value,
+                valuta: (document.getElementById('rrValuta') || {}).value,
                 categorie: (document.getElementById('rrCat') || {}).value };
     it2.fields = Object.assign({}, it2.fields || {}, cur);
     rcptQueueUpdate(_rrCurrentId, { kind: it2.kind, fields: it2.fields });
@@ -3561,6 +3695,20 @@ function rrAccept() {
     var categorie = (document.getElementById('rrCat') || {}).value || 'altele';
     newRow = { produs: produs, loc: loc, data: data, pret: suma, plata: plata, categorie: categorie };
   }
+  // 💱 Valutás bon: az eredeti összeg + valuta a sorba; a RON-értéket
+  // a sor (BNR a tétel dátumára) és mentéskor a szerver számolja.
+  var _rrCur = (document.getElementById('rrValuta') || {}).value || 'RON';
+  newRow.valuta = _rrCur;
+  if (_rrCur !== 'RON') {
+    var _amtKey = (kind === 'fuel') ? 'suma' : 'pret';
+    newRow[_amtKey + '_orig'] = suma;
+    var _rrQ = rcptQueueLoad().find(function (x) { return x.id === _rrCurrentId; });
+    var _rf = (_rrQ && _rrQ.fields) || {};
+    if (_rf.curs_bnr && _rf.valuta === _rrCur && String(_rf.data || '') === String(data)) {
+      newRow.curs_bnr = _rf.curs_bnr; newRow.curs_data = _rf.curs_data;
+      newRow[_amtKey] = String(Math.round((parseFloat(suma) || 0) * _rf.curs_bnr * 100) / 100);
+    }
+  }
 
   // Ha a menetlevél 2. lépés (fuvarStep2) nyitva van → közvetlenül a DOM-ba
   // teszem a sort (és a draftSave menti automatikusan). Ha step2 nem nyitva,
@@ -3610,7 +3758,7 @@ function rrAccept() {
       data: data,
       plata: plata,
       suma: parseFloat(suma) || null,
-      valuta: _origVal,
+      valuta: ((document.getElementById('rrValuta') || {}).value) || _origVal,
       tip:    (kind === 'fuel')     ? tip : null,
       litru:  (kind === 'fuel')     ? (parseFloat(litru) || null) : null,
       km:     (kind === 'fuel')     ? (parseFloat(km)    || null) : null,
