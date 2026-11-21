@@ -3371,6 +3371,8 @@ function _scanReceiptTry(id, payload, attempt) {
   // minden bon-scan 15 másodpercet várt az ELSŐ kérés előtt is. A sofőr
   // ennyit nézte a pörgő spinnert, mielőtt bármi elindult volna.
   var wait = (attempt < BACKOFFS.length) ? BACKOFFS[attempt] : 15000;
+  // Közben véglegesen törölt bon → nincs újabb próbálkozás.
+  if (!rcptQueueLoad().some(function (x) { return x.id === id; })) return;
 
   // A queue-elemet frissítjük, hogy a UI mutassa a próbálkozás-számot.
   if (attempt > 0) {
@@ -3382,6 +3384,7 @@ function _scanReceiptTry(id, payload, attempt) {
   }
 
   setTimeout(function () {
+    if (!rcptQueueLoad().some(function (x) { return x.id === id; })) return;
     // NINCS `keepalive:true` — a base64 kép jellemzően 100–500 KB, a
     // spec 64 KiB-re korlátozza a keepalive body-t → TypeError → .catch().
     // A perzisztens localStorage queue + a queueMaint 3 perces takarítás
@@ -3401,6 +3404,12 @@ function _scanReceiptTry(id, payload, attempt) {
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var r = (d && d.result) || {};
+        // A sofőr közben véglegesen törölte a bont → a késve érkezett
+        // eredményt eldobjuk, és a szerveren létrejött sort is töröljük.
+        if (!rcptQueueLoad().some(function (x) { return x.id === id; })) {
+          if (r.ok && r.pending_id) _rrDeleteServer(r.pending_id);
+          return;
+        }
         if (r.ok) {
           var f = r.fields || {};
           var kind = (f.kind === 'fuel' || f.kind === 'purchase')
@@ -3485,15 +3494,16 @@ function renderPendingReceipts() {
     var actions = '';
     if (it.status === 'ready') {
       actions = '<button class="btn-mini ok" onclick="rrOpen(\'' + it.id + '\')">' + t('sof.rr.review') + '</button>'
-              + '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
+              + '<button class="btn-mini err" title="' + esc(t('sof.rr.delTitle')) + '" onclick="rrRemove(\'' + it.id + '\')">🗑</button>';
     } else if (it.status === 'error') {
       // A megőrzött képből egy koppintással újraindítható a kiolvasás.
       actions = (it.hasImage
                   ? '<button class="btn-mini ok" onclick="rrRetry(\'' + it.id + '\')">' + t('sof.rr.retry') + '</button>'
                   : '')
-              + '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
+              + '<button class="btn-mini err" title="' + esc(t('sof.rr.delTitle')) + '" onclick="rrRemove(\'' + it.id + '\')">🗑</button>';
     } else {
-      actions = '<div class="spinner"></div>';
+      actions = '<div class="spinner"></div>'
+              + '<button class="btn-mini err" title="' + esc(t('sof.rr.delTitle')) + '" onclick="rrRemove(\'' + it.id + '\')">🗑</button>';
     }
     return '<div class="pending-item">'
       + thumb
@@ -3604,12 +3614,29 @@ function rrClose() {
 
 function rrDiscard() {
   if (!_rrCurrentId) { rrClose(); return; }
-  if (!confirm(t('sof.rr.confirmDiscard'))) return;
-  rrRemove(_rrCurrentId);
-  rrClose();
+  var id = _rrCurrentId;
+  rrRemove(id, function () { rrClose(); });
 }
 
-function rrRemove(id) {
+// 🗑 Bon VÉGLEGES törlése (rossz fotó): megerősítés után a helyi listáról,
+// a telefonon megőrzött képből (IndexedDB) ÉS a szerverről is törlődik.
+// Feldolgozás alatt álló bon is törölhető — a később megérkező válasz
+// eldobódik (lásd `_scanReceiptTry`).
+function rrRemove(id, afterCb) {
+  sofConfirm({ ico: '🗑️', title: t('sof.rr.delTitle'), msg: t('sof.rr.delMsg'), ok: t('sof.rr.delOk'), tone: 'danger' }, function () {
+    _rrRemoveNow(id);
+    toast(t('sof.rr.deleted'), 'ok');
+    if (afterCb) afterCb();
+  });
+}
+function _rrDeleteServer(pendingId) {
+  if (!pendingId) return;
+  fetch('/api/execute', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+    body: JSON.stringify({ functionName: 'deletePendingReceipt', arguments: [{ id: pendingId }] })
+  }).catch(function () { /* best-effort */ });
+}
+function _rrRemoveNow(id) {
   // Ha a szerveren van pending sor (pending_id), soft-delete-jük is,
   // hogy az admin/manager Sofőr-aktivitás nézetből kikerüljön.
   try {

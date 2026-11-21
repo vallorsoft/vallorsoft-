@@ -146,7 +146,7 @@ describe('attachPendingReceipt', () => {
 //  deletePendingReceipt
 // ═════════════════════════════════════════════
 describe('deletePendingReceipt', () => {
-  test('Sofer soft-delete-eli SAJÁT pending sorát; már attached-et NEM tud törölni', async () => {
+  test('Sofer VÉGLEGESEN törli SAJÁT pending sorát; már attached-et NEM tud törölni', async () => {
     setUser(fixtures.sofer);
     const pool = require('../../db');
     pool.query.mockResolvedValueOnce({ rowCount: 1 });
@@ -156,7 +156,7 @@ describe('deletePendingReceipt', () => {
     });
     expect(res.body.result.ok).toBe(true);
     const sql = pool.query.mock.calls[0][0];
-    expect(sql).toMatch(/status='deleted'/i);
+    expect(sql).toMatch(/DELETE FROM driver_receipt_scans/i);
     expect(sql).toMatch(/status <> 'attached'/i); // már-attached védve
     expect(sql).toMatch(/LOWER\(email_sofer\) = LOWER\(\$3\)/i);
   });

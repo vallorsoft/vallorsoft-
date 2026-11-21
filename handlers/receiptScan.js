@@ -594,15 +594,18 @@ handlers.deletePendingReceipt = async function (req, res, args) {
     if (_isSofer(req)) params.push(u.email);
 
     try {
+      // VÉGLEGES törlés: a sor a fotó-előnézettel (thumb_b64) és a kiolvasott
+      // adatokkal együtt kikerül a DB-ből (rossz / elrontott fotó). A már
+      // menetlevélbe tett (attached) bont nem töröljük innen — azt a
+      // menetlevél tétel-sorából kell kivenni.
       const r = await pool.query(
-        `UPDATE driver_receipt_scans
-            SET status='deleted', deleted_at=NOW(), updated_at=NOW()
+        `DELETE FROM driver_receipt_scans
           WHERE id = $1 AND company_id = $2 AND status <> 'attached' ${emailGate}
-          RETURNING id`,
+          RETURNING id, kind`,
         params
       );
       if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu s-a găsit sau este atașat la o foaie.' } });
-      try { await audit.fromReq(req, 'receipt.delete', 'receipt', String(id), {}); } catch (_) {}
+      try { await audit.fromReq(req, 'receipt.delete', 'receipt', String(id), { kind: (r.rows[0] || {}).kind || null, permanent: true }); } catch (_) {}
       return res.json({ result: { ok: true } });
     } catch (e) {
       console.warn('deletePendingReceipt DB hiba:', e.message);
