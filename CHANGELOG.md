@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-21 — 🗑 Lefotózott bon végleges törlése (sofőr + iroda) (PR #PRNUM)
+## 2026-11-21 — 🗑 Lefotózott bon végleges törlése (sofőr + iroda) (PR #662)
 - **Sofőr:** a bon-várólistán minden tétel (kiolvasásra kész, hibás ÉS feldolgozás alatti is) 🗑 gombbal törölhető, az átnéző ablak „🗑 Törlés" gombjával is — megerősítő ablak után a tétel, a telefonon megőrzött kép (IndexedDB) és a szerveri sor is törlődik. Feldolgozás közben törölt bonnál a késve érkező AI-válasz eldobódik (a szerveren közben létrejött sort is törli), és nincs újabb próbálkozás.
 - **Szerver:** `deletePendingReceipt` mostantól VÉGLEGESEN törli a `driver_receipt_scans` sort (thumbnail + kiolvasott adatok), nem csak „deleted"-re jelöl. Sofőr csak a sajátját, Admin/Manager a cégéét; menetlevélbe már betett bon itt nem törölhető (azt a menetlevél tétel-sorából kell kivenni). Audit `receipt.delete` (`permanent:true`).
 - **Iroda:** Sofőr-aktivitás idővonalán a ☁️ „csak felhőben" bonoknál 🗑 Törlés gomb. i18n `sof.rr.del*`/`da.scanDel*` (RO+HU), cache-bust `?v=20261121bondel`.
