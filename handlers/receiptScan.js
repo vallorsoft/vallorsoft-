@@ -621,6 +621,55 @@ handlers.deletePendingReceipt = async function (req, res, args) {
   }
 };
 
+// ✏️ Feldolgozott (pending) bon adatainak javítása a sofőr által — a
+// „Korábbi tétel" ablak szerkesztőjéből. A sofőr csak a SAJÁT, még
+// menetlevélbe nem tett bonját írhatja; Admin/Manager a cégéét. A mezők a
+// `sanitize` fehérlistáján mennek át, de a kézzel beírt litert NEM
+// „javítjuk" (a sofőr döntése). Az árfolyamot a mentett dátumra újraszámoljuk.
+handlers.updatePendingReceipt = async function (req, res, args) {
+  try {
+    const u = req.session && req.session.user;
+    if (!u || !(_isSofer(req) || _isAdminOrManagerReq(req))) {
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    }
+    const cid = u.company_id;
+    const a = (args && args[0]) ? args[0] : {};
+    const id = parseInt(a.id, 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+    const src = (a.fields && typeof a.fields === 'object') ? a.fields : {};
+    const kind = src.kind === 'fuel' ? 'fuel' : 'purchase';
+    const f = sanitize(Object.assign({}, src, { kind }));
+    const lit = parseFloat(src.litru);
+    f.litru = (kind === 'fuel' && Number.isFinite(lit)) ? lit : null;
+    delete f.litru_warn;
+    if (!f.valuta) f.valuta = 'RON';
+    if (kind !== 'fuel') { f.tip = null; f.litru = null; f.km = null; }
+    else { f.produs = null; f.categorie = null; }
+    await attachBnr(f);
+
+    const emailGate = _isSofer(req) ? 'AND LOWER(email_sofer) = LOWER($5)' : '';
+    const params = [id, cid, kind, JSON.stringify(f)];
+    if (_isSofer(req)) params.push(u.email);
+    try {
+      const r = await pool.query(
+        `UPDATE driver_receipt_scans SET kind = $3, fields = $4::jsonb, updated_at = NOW()
+          WHERE id = $1 AND company_id = $2 AND status = 'pending' ${emailGate}
+          RETURNING id`,
+        params
+      );
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu s-a găsit bonul sau a fost deja atașat.' } });
+      try { await audit.fromReq(req, 'receipt.update', 'receipt', String(id), { kind }); } catch (_) {}
+      return res.json({ result: { ok: true, fields: f } });
+    } catch (e) {
+      console.warn('updatePendingReceipt DB hiba:', e.message);
+      return res.json({ result: { ok: false, err: 'Eroare la salvare' } });
+    }
+  } catch (e) {
+    console.error('updatePendingReceipt hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // Belső segédek — a teszt eléri, de RPC-n nem hívhatók (nem-enumerable).
 Object.defineProperty(handlers, '_sanitize', { value: sanitize, enumerable: false });
 Object.defineProperty(handlers, '_normalizeMerchant', { value: normalizeMerchant, enumerable: false });

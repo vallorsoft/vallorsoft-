@@ -3711,3 +3711,58 @@
   cursor: pointer;
 }
 #pendingAddList .pa-del:active { transform: scale(0.94); background: #ffe4e6; }
+
+/* ✏️ Szerkesztés gomb a „Korábbi tétel" ablak soraiban (a 🗑 mellett) */
+#pendingAddList .pa-edit {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 40px; height: 40px;
+  margin-right: -6px; /* a sor 12px-es gap-je helyett 6px a 🗑-ig */
+  border-radius: 10px;
+  border: 1.5px solid #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+#pendingAddList .pa-edit:active { transform: scale(0.94); background: #dbeafe; }
+
+/* ✏️ „Korábbi tétel" szerkesztő — a #pendingAddModal (z 1000) FÖLÖTT,
+   a megerősítő (#sofConfirmModal, z 1200) ALATT. Világos, kontrasztos. */
+#pendingEditModal {
+  position: fixed; inset: 0; z-index: 1100;
+  align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(6px);
+}
+#pendingEditModal .sof-modal-card {
+  width: min(460px, 100%);
+  max-height: 92vh; overflow-y: auto;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1.5px solid #94a3b8;
+  border-radius: 18px;
+  padding: 20px 18px 16px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
+  color: #0f172a;
+}
+#pendingEditModal .pe-title { margin: 0 0 12px; font-size: 17px; font-weight: 800; color: #0f172a; }
+#pendingEditModal .pe-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+#pendingEditModal .pe-row label { font-size: 13px; font-weight: 700; color: #334155; }
+#pendingEditModal .pe-row input,
+#pendingEditModal .pe-row select {
+  min-height: 44px; padding: 10px 12px; box-sizing: border-box; width: 100%;
+  border: 1.5px solid #94a3b8; border-radius: 10px;
+  background: #fff; color: #0f172a; font-size: 16px; font-family: inherit;
+}
+#pendingEditModal .pe-row input:focus,
+#pendingEditModal .pe-row select:focus { outline: none; border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(29,78,216,0.2); }
+#pendingEditModal .pe-hint { margin: -4px 0 10px; font-size: 12px; line-height: 1.4; color: #475569; }
+#pendingEditModal .pe-btns { display: flex; gap: 10px; margin-top: 6px; }
+#pendingEditModal .pe-btn {
+  flex: 1; min-height: 50px; border-radius: 12px; font-size: 15px; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+#pendingEditModal .pe-btn.cancel { flex: 1; background: #f1f5f9; color: #0f172a; border: 1.5px solid #94a3b8; }
+#pendingEditModal .pe-btn.ok { flex: 2; background: linear-gradient(180deg,#2563eb,#1d4ed8); color: #fff; border: 1.5px solid #1e40af; }

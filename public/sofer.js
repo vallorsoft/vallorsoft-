@@ -1060,6 +1060,7 @@ var _SOF_MODALS = [
   { id: 'sofChoiceModal',     close: 'sofChoiceCancel' },
   { id: 'orphRangeModal',     close: 'orphRangeCancel' },
   { id: 'wbConfirmModal',     close: 'wbConfirmCancel' },
+  { id: 'pendingEditModal',   close: 'pendingEditCancel' },   // a Korábbi tétel FÖLÖTT nyílik → előbb ezt zárjuk
   { id: 'pendingAddModal',    close: 'pendingAddSkip' },
   { id: 'wbLocModal',         btn:   'wbLocCancel' },   // a Mégse gomb onclick-je hívja a callback-et
   { id: 'receiptReviewModal', close: 'rrClose' },
@@ -1514,6 +1515,8 @@ function _renderPendingAddList(items) {
       + '<div class="pa-head">' + icon + ' ' + esc(loc) + ' ' + srcBadge + '</div>'
       + '<div class="pa-sub">📅 ' + d + (sum ? ' · 💵 ' + esc(sum) : '') + (extra ? ' · ' + extra : '') + '</div>'
       + '</div>'
+      + '<button type="button" class="pa-edit" title="' + esc(t('sof.pe.editTitle')) + '" aria-label="' + esc(t('sof.pe.editTitle'))
+      + '" onclick="event.preventDefault();event.stopPropagation();pendingAddEdit(' + i + ')">✏️</button>'
       + '<button type="button" class="pa-del" title="' + esc(t('sof.rr.delTitle')) + '" aria-label="' + esc(t('sof.rr.delTitle'))
       + '" onclick="event.preventDefault();event.stopPropagation();pendingAddDelete(' + i + ')">🗑</button>'
       + '</label>';
@@ -1529,12 +1532,7 @@ function pendingAddDelete(i) {
   if (!it) return;
   sofConfirm({ ico: '🗑️', title: t('sof.rr.delTitle'), msg: t('sof.pa.delMsg'), ok: t('sof.rr.delOk'), tone: 'danger' }, function () {
     // A még pipált/pipálatlan állapotot megőrizzük a többi tételnél.
-    var keep = {};
-    document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
-      var j = parseInt(cb.getAttribute('data-idx'), 10);
-      var o = _pendingAddItems[j];
-      if (o && j !== i) keep[_pendingAddKey(o)] = cb.checked;
-    });
+    var keep = _pendingAddKeepChecks(i);
     if (it.src === 'queue') {
       _rrRemoveNow(it.id);
     } else {
@@ -1556,13 +1554,226 @@ function pendingAddDelete(i) {
     var items = _collectPendingAddItems();
     if (!items.length) { _pendingAddRows = null; _pendingAddClose(); return; }
     _renderPendingAddList(items);
-    document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
-      var j = parseInt(cb.getAttribute('data-idx'), 10);
-      var k = _pendingAddItems[j] && _pendingAddKey(_pendingAddItems[j]);
-      if (k && Object.prototype.hasOwnProperty.call(keep, k)) cb.checked = keep[k];
-    });
+    _pendingAddRestoreChecks(keep);
   });
 }
+// A lista pipa-állapotának mentése / visszaállítása újrarajzoláskor
+// (törlés, szerkesztés után a többi tétel pipája ne vesszen el).
+function _pendingAddKeepChecks(skipIdx) {
+  var keep = {};
+  document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
+    var j = parseInt(cb.getAttribute('data-idx'), 10);
+    var o = _pendingAddItems[j];
+    if (o && j !== skipIdx) keep[_pendingAddKey(o)] = cb.checked;
+  });
+  return keep;
+}
+function _pendingAddRestoreChecks(keep, extra) {
+  document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
+    var j = parseInt(cb.getAttribute('data-idx'), 10);
+    var k = _pendingAddItems[j] && _pendingAddKey(_pendingAddItems[j]);
+    if (!k) return;
+    if (extra && Object.prototype.hasOwnProperty.call(extra, k)) cb.checked = extra[k];
+    else if (Object.prototype.hasOwnProperty.call(keep, k)) cb.checked = keep[k];
+  });
+}
+
+// ✏️ Egy „Korábbi tétel" ÖSSZES adatának szerkesztése (típus, hely, dátum,
+// összeg a bon valutájában, valuta, fizetés; tankolásnál üzemanyag/liter/km,
+// vásárlásnál termék/kategória). Mentéskor a forrásban (mentett lista /
+// bon-várólista) frissül; a pending bon a szerveren is (`updatePendingReceipt`).
+var _pendingEdit = null;   // { item, checked }
+function pendingAddEdit(i) {
+  var it = _pendingAddItems[i];
+  var m = document.getElementById('pendingEditModal');
+  if (!it || !m) return;
+  var chk = document.querySelector('#pendingAddList .pa-chk[data-idx="' + i + '"]');
+  _pendingEdit = { item: it, checked: chk ? chk.checked : true };
+  _pendingEditRender(it.kind, it.row || {});
+  m.style.display = 'flex';
+}
+function _pendingEditRender(kind, r) {
+  var box = document.getElementById('pendingEditFields');
+  if (!box) return;
+  var isFuel = kind === 'fuel';
+  var ak = isFuel ? 'suma' : 'pret';
+  var amt = _rowAmountShown(r, ak);
+  if (amt == null || amt === '') amt = _rowAmountShown(r, isFuel ? 'pret' : 'suma');
+  var cur = _rowCurOf(r);
+  var curList = SOF_CURRENCIES.indexOf(cur) >= 0 ? SOF_CURRENCIES : SOF_CURRENCIES.concat([cur]);
+  var plata = ['Card', 'Cash', 'Flota Card', 'DKV'];
+  var dt = (typeof r.data === 'string' && r.data) ? r.data.slice(0, 10) : _todayLocalDate();
+  var fld = function (label, html) { return '<div class="pe-row"><label>' + label + '</label>' + html + '</div>'; };
+  var h = '';
+  h += fld(t('sof.rr.kind'), '<select id="peKind" onchange="_pendingEditKind()">'
+    + '<option value="fuel"' + (isFuel ? ' selected' : '') + '>⛽ ' + esc(t('sof.rr.kindFuel')) + '</option>'
+    + '<option value="purchase"' + (!isFuel ? ' selected' : '') + '>🛒 ' + esc(t('sof.rr.kindPurchase')) + '</option></select>');
+  if (!isFuel) {
+    h += fld(t('sof.product'), '<input id="peProdus" value="' + esc(r.produs || '') + '">');
+    h += fld(t('sof.category'), '<select id="peCat">'
+      + (typeof vsExpenseCatOptions === 'function'
+          ? vsExpenseCatOptions(r.categorie)
+          : '<option value="' + esc(r.categorie || 'altele') + '" selected>' + esc(r.categorie || 'altele') + '</option>')
+      + '</select>');
+  }
+  h += fld(t('sof.location'), '<input id="peLoc" value="' + esc(r.loc || '') + '">');
+  h += fld(t('sof.date'), '<input id="peData" type="date" value="' + esc(dt) + '">');
+  if (isFuel) {
+    h += fld(t('sof.fuelType'), '<select id="peTip"><option' + (r.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option>'
+      + '<option' + (r.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select>');
+    h += fld(t('sof.liters'), '<input id="peLitru" type="number" inputmode="decimal" value="' + esc(r.litru != null ? r.litru : '0') + '">');
+    h += fld(t('sof.km'), '<input id="peKm" type="number" inputmode="numeric" value="' + esc(r.km != null ? r.km : '0') + '">');
+  }
+  h += fld(t('sof.sumAmount'), '<input id="peSuma" type="number" inputmode="decimal" value="' + esc(amt != null ? amt : '0') + '">');
+  h += fld(t('sof.currency'), '<select id="peValuta">'
+    + curList.map(function (c) { return '<option' + (c === cur ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>');
+  h += '<div class="pe-hint">💱 ' + esc(t('sof.pe.amountHint')) + '</div>';
+  h += fld(t('sof.payment'), '<select id="pePlata">'
+    + plata.map(function (p) { return '<option' + ((r.plata || 'Card') === p ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select>');
+  box.innerHTML = h;
+}
+function _pendingEditVal(id) { var el = document.getElementById(id); return el ? String(el.value == null ? '' : el.value) : ''; }
+// A még be nem mentett, már beírt mezőket a típus-váltás után is megtartjuk.
+function _pendingEditCollect() {
+  var kind = _pendingEditVal('peKind') === 'fuel' ? 'fuel' : 'purchase';
+  return {
+    kind: kind,
+    loc: _pendingEditVal('peLoc').trim(),
+    data: _pendingEditVal('peData'),
+    amount: _pendingEditVal('peSuma'),
+    valuta: _pendingEditVal('peValuta') || 'RON',
+    plata: _pendingEditVal('pePlata') || 'Card',
+    tip: document.getElementById('peTip') ? _pendingEditVal('peTip') : null,
+    litru: document.getElementById('peLitru') ? _pendingEditVal('peLitru') : null,
+    km: document.getElementById('peKm') ? _pendingEditVal('peKm') : null,
+    produs: document.getElementById('peProdus') ? _pendingEditVal('peProdus').trim() : null,
+    categorie: document.getElementById('peCat') ? _pendingEditVal('peCat') : null
+  };
+}
+function _pendingEditKind() {
+  if (!_pendingEdit) return;
+  var v = _pendingEditCollect();
+  var base = Object.assign({}, (_pendingEdit.item && _pendingEdit.item.row) || {});
+  ['loc', 'data', 'valuta', 'plata'].forEach(function (k) { base[k] = v[k]; });
+  ['tip', 'litru', 'km', 'produs', 'categorie'].forEach(function (k) { if (v[k] != null) base[k] = v[k]; });
+  delete base.suma_orig; delete base.pret_orig;
+  base.suma = v.amount; base.pret = v.amount;
+  _pendingEditRender(v.kind, base);
+}
+function pendingEditCancel() {
+  var m = document.getElementById('pendingEditModal');
+  if (m) m.style.display = 'none';
+  _pendingEdit = null;
+}
+
+// A szerkesztett értékekből a menetlevél-sor (orphan bin formátum).
+// A `suma`/`pret` a menetlevélen RON — valutás tételnél az eredeti a
+// `*_orig`-ba kerül; az árfolyamot a menetlevél-sor újra lekéri (dátumra),
+// a mentést a szerver is újraszámolja (`itemCurrency.convertItems`).
+function _pendingEditToRow(old, v) {
+  var ak = v.kind === 'fuel' ? 'suma' : 'pret';
+  var amt = parseFloat(String(v.amount).replace(',', '.'));
+  if (!isFinite(amt) || amt < 0) amt = 0;
+  var row = {};
+  // A szerveri scan-azonosító (`_pid`) megmarad — a törlés ezt használja.
+  if (old && old._pid != null) row._pid = old._pid;
+  row.loc = v.loc;
+  row.data = v.data || _todayLocalDate();
+  row.plata = v.plata;
+  row.valuta = v.valuta;
+  if (v.kind === 'fuel') {
+    row.tip = v.tip === 'AdBlue' ? 'AdBlue' : 'Motorină';
+    row.litru = String(parseFloat(String(v.litru || '0').replace(',', '.')) || 0);
+    row.km = String(parseInt(v.km || '0', 10) || 0);
+  } else {
+    row.produs = v.produs || '';
+    row.categorie = v.categorie || 'altele';
+  }
+  row[ak] = String(amt);
+  if (v.valuta !== 'RON') {
+    row[ak + '_orig'] = String(amt);
+    // A régi árfolyam csak akkor marad, ha a valuta és a nap is ugyanaz.
+    if (old && old.curs_bnr && _rowCurOf(old) === v.valuta && String(old.data || '').slice(0, 10) === row.data) {
+      row.curs_bnr = old.curs_bnr; row.curs_data = old.curs_data;
+      row[ak] = String(Math.round(amt * parseFloat(old.curs_bnr) * 100) / 100);
+    }
+  }
+  return row;
+}
+
+function pendingEditSave() {
+  if (!_pendingEdit) { pendingEditCancel(); return; }
+  var it = _pendingEdit.item;
+  var v = _pendingEditCollect();
+  var amt = parseFloat(String(v.amount).replace(',', '.'));
+  if (!isFinite(amt) || amt < 0) { toast(t('sof.pe.badAmount'), 'err'); return; }
+  if (v.data && !/^\d{4}-\d{2}-\d{2}$/.test(v.data)) { toast(t('sof.wb.dateRequired'), 'err'); return; }
+  var keep = _pendingAddKeepChecks(-1);
+  var wasChecked = _pendingEdit.checked;
+  var newKey = null;
+  if (it.src === 'queue') {
+    var q = rcptQueueLoad().find(function (x) { return x.id === it.id; });
+    if (q) {
+      var oldF = q.fields || {};
+      var f = Object.assign({}, oldF, {
+        kind: v.kind, loc: v.loc, data: v.data || _todayLocalDate(), plata: v.plata,
+        valuta: v.valuta, suma: amt
+      });
+      if (v.kind === 'fuel') {
+        f.tip = v.tip === 'AdBlue' ? 'AdBlue' : 'Motorină';
+        f.litru = parseFloat(String(v.litru || '0').replace(',', '.')) || 0;
+        f.km = parseInt(v.km || '0', 10) || 0;
+        f.produs = null; f.categorie = null;
+      } else {
+        f.produs = v.produs || ''; f.categorie = v.categorie || 'altele';
+        f.tip = null; f.litru = null; f.km = null;
+      }
+      delete f.litru_warn;
+      var sameRate = oldF.curs_bnr && _rowCurOf(oldF) === v.valuta && String(oldF.data || '') === String(f.data);
+      if (v.valuta === 'RON' || !sameRate) { delete f.curs_bnr; delete f.curs_data; delete f.suma_ron; }
+      else if (f.curs_bnr) f.suma_ron = Math.round(amt * parseFloat(f.curs_bnr) * 100) / 100;
+      rcptQueueUpdate(it.id, { kind: v.kind, fields: f });
+      newKey = 'q:' + it.id;
+      if (q.pending_id) {
+        fetch('/api/execute', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ functionName: 'updatePendingReceipt', arguments: [{ id: q.pending_id, fields: f }] })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          var res = d && d.result;
+          // A szerver a dátumra érvényes BNR árfolyamot is visszaadja.
+          if (res && res.ok && res.fields && res.fields.curs_bnr) {
+            var cur = rcptQueueLoad().find(function (x) { return x.id === it.id; });
+            if (cur && cur.fields) {
+              rcptQueueUpdate(it.id, { fields: Object.assign({}, cur.fields, {
+                curs_bnr: res.fields.curs_bnr, curs_data: res.fields.curs_data, suma_ron: res.fields.suma_ron }) });
+            }
+          }
+        }).catch(function () { /* best-effort — a helyi módosítás megmarad */ });
+      }
+    }
+  } else {
+    var bin = orphanLoad();
+    var src = (it.kind === 'fuel') ? bin.alim : bin.ach;
+    var old = src && src[it.idx];
+    if (old) {
+      var row = _pendingEditToRow(old, v);
+      src.splice(it.idx, 1);
+      if (v.kind === 'fuel') bin.alim.push(row); else bin.ach.push(row);
+      orphanStore(bin);
+      newKey = _pendingAddKey({ src: 'bin', kind: v.kind, row: row });
+    }
+  }
+  pendingEditCancel();
+  toast(t('sof.pe.saved'), 'ok');
+  if (typeof renderPendingReceipts === 'function') { try { renderPendingReceipts(); } catch (_) {} }
+  var items = _collectPendingAddItems();
+  if (!items.length) { _pendingAddRows = null; _pendingAddClose(); return; }
+  _renderPendingAddList(items);
+  var extra = {};
+  if (newKey) extra[newKey] = wasChecked;
+  _pendingAddRestoreChecks(keep, extra);
+}
+
 function _pendingAddKey(o) {
   if (o.src === 'queue') return 'q:' + o.id;
   var r = o.row || {};

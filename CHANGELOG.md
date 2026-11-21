@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-21 — ✏️ „Korábbi tétel" ablak: tételenkénti szerkesztés (PR #664)
+- `public/sofer.js` `pendingAddEdit` / `pendingEditSave` + új `#pendingEditModal` (`sofer.html`): a „📋 Korábbi tétel — hozzáadod?" ablak minden során ✏️ gomb (a 🗑 mellett) → szerkesztő ablak az ÖSSZES adattal: típus (tankolás ↔ vásárlás, váltáskor a beírt közös mezők megmaradnak), helyszín, dátum, összeg a bon saját valutájában, valuta, fizetés; tankolásnál üzemanyag/liter/km, vásárlásnál termék/kategória. Mentett (félretett) tételnél a mentett lista frissül (`_pid` megmarad; valutás tételnél az eredeti a `*_orig`-ba, az árfolyam csak azonos valuta+nap esetén marad), lefotózott bonnál a várólista + a szerveri pending sor is (`updatePendingReceipt`, az árfolyamot a dátumra újraszámolja). A pipa-állapot megmarad. A vissza-gomb előbb a szerkesztőt zárja (`_SOF_MODALS`).
+- `handlers/receiptScan.js` új `updatePendingReceipt` (Sofer: csak saját; Admin/Manager: a cégéé; csak `pending` sor; `sanitize` fehérlista, a kézi litert nem „javítja"; audit `receipt.update`). i18n `sof.pe.*` (RO+HU), cache-bust `?v=20261121paedit`.
+
 ## 2026-11-21 — 🗑 „Korábbi tétel" ablak: tételenkénti végleges törlés (PR #663)
 - `public/sofer.js` `pendingAddDelete` + `_renderPendingAddList`: a menetlevél kezdésekor felugró „📋 Korábbi tétel — hozzáadod?" ablak minden során 🗑 gomb (megerősítéssel). Scannelt bon: kikerül a várólistából a telefonon tárolt képpel és a szerveri sorral együtt; mentett (félretett) tétel: kikerül a listából, és ha bonból jött, a szerveri scan-sor is törlődik (`deletePendingReceipt` `orphan:true`). Ha mégis kell, a bont újra kell fotózni. A többi tétel pipája megmarad; utolsó törlés után az ablak bezárul. A sorban az összeg a bon valutájában látszik.
 - `rrAccept`: a félretett tétel megkapja a szerveri scan-azonosítót (`_pid`). i18n `sof.pa.delMsg` (RO+HU), cache-bust `?v=20261121padel`.
