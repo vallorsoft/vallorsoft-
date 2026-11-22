@@ -14,7 +14,10 @@
 
 ---
 
-## 2026-11-22 — 🔒 Dokumentumok csak a saját szerveren: megrendelő, számla/bon, fuvar-fotó nem megy külső AI-hoz
+## 2026-11-22 — 📷 Bon-szkennelés visszakapcsolva a sofőrnél (kivétel a dokumentum-tiltás alól)
+- A tulajdonos döntése: a sofőr bon-szkennelése (tankolás/vásárlás nyugta) marad AI-val. `lib/docPrivacy.js` új `ALLOWED_FILE_KINDS = ['receipt']` + `fileAllowed()`; a `lib/geminiJson.js` fájl-blokkja csak a `fileKind: 'receipt'` jelölésű hívást engedi át, ezt kizárólag a `handlers/receiptScan.js` adja. A `scanReceipt` / `getMyBonScanEnabled` és a bon-tesztek a #665 előtti állapotra visszaállítva. Megrendelő, számla, UIT- és fuvar-fotó továbbra sem megy ki. Teszt: `docPrivacy.test.js` (más címke nem nyit kaput).
+
+## 2026-11-22 — 🔒 Dokumentumok csak a saját szerveren (PR #665): megrendelő, számla/bon, fuvar-fotó nem megy külső AI-hoz
 - Új `lib/docPrivacy.js` — kódba égetett (NEM env) `DOCS_LOCAL_ONLY = true`. **`lib/geminiJson.js`** `extractJson`: bármilyen fájl-rész (`inlineData`/`fileData`) a kérésben → hálózati hívás NÉLKÜL elutasítva (403, `DOCS_LOCAL_ONLY`).
 - **`services/order-ai`** mindig a helyi heurisztikát futtatja (a megrendelő fájlja ÉS szövege sem megy ki): fuvar-kiírás „megrendelő feltöltése", e-mailes megrendelés, beérkező újraolvasás. **Bon-scan** (`scanReceipt`) kikapcsolva, a gomb rejtve (`getMyBonScanEnabled` `usable:false`). **UIT-scan**: fotó → kézi bevitel; PDF → a szövegrétegből helyben (`extractUitCodesFromText`, „UIT" címke után).
 - A chat (szöveg) és a sofőr-fordító marad AI-val. Tesztek: új `tests/unit/docPrivacy.test.js` (valódi Gemini-kliens + `fetch`-kém: egy hívás sem megy ki), a régi AI-utas tesztek az új viselkedésre írva.
