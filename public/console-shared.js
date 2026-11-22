@@ -3039,6 +3039,7 @@ function loadWbDocCheckBand(){
 }
 
 function loadReceivedFuvarlevelek(){
+  try{ if(window.DocInbox) DocInbox.mount(); }catch(e){}
   loadMissingWaybills();
   loadWbDocCheckBand();
   loadWaybillKmGaps();

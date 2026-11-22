@@ -81,6 +81,7 @@ const handlers = Object.assign(
   require('../handlers/orderDocs'),
   require('../handlers/waybillDocs'),
   require('../handlers/waybillDocCheck'),
+  require('../handlers/docInbox'),
   require('../handlers/backup'),
 );
 

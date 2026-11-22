@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-22 — 📥 Menetlevél-iratok: csoportos feltöltés + automatikus párosítás
+- A FUVARLEVELEK oldal tetején „📥 Csoportos feltöltés" kártya (`public/doc-inbox.js`): egyszerre akár 50 PDF / fotó, vegyesen számlák és megrendelők. Feltöltés soronként (haladásjelző), majd háttér-feldolgozás. A szerver helyben (PDF-szöveg / helyi OCR, AI nélkül) kiolvassa, és a hiányos menetlevelek hiányzó helyeihez (ügyfél / alvállalkozó megrendelő + számla) párosítja (`lib/docInbox.js` `pickSlot`: pontszám ≥ 70 és ≥ 15 pont előny a következő fuvarhoz képest). Találat → `order_documents` sor a fuvarhoz + a menetlevélhez kötve, visszaigazolt döntés (tanulás), újraellenőrzés.
+- Nincs találat → újrapróbálás az ütemezőben (10 percenként, irataként 3 próbálkozás); 3 után „nem párosítható". Az oldal megnyitásakor ilyenkor magától felugrik a lista, és rákérdez: kézi párosítás a hiányzó helyek legördülőjéből, vagy végleges törlés (soronként / mind). Új tábla `waybill_doc_inbox` (`db/waybill-doc-inbox.sql`; párosítás / törlés után a fájl kikerül a tárolóból). RPC-k: `docInboxUpload/Process/List/Assign/Delete/Retry` (`handlers/docInbox.js`). Cache-bust `?v=20261122inbox`. Teszt: `tests/unit/docInbox.test.js` (14); valódi DB-n: számla + megrendelő automatikusan a helyére, idegen irat 3 kör után „nem párosítható", cross-tenant törlés elutasítva; kontraszt-audit 0 hiba.
+
 ## 2026-11-22 — 📑 „Megbízás" és „Megrendelő" egy dokumentum-típus
 - A két típus egybe: „Megbízás / megrendelő" (RO „Comandă", `doc_type='order'`). A feltöltők (menetlevél + fuvar-dokumentum) már csak ezt kínálják; a szerver a régi `assignment` értéket is `order`-re írja (`_type`), migráció `db/zzz-doc-type-merge-order.sql` a meglévő sorokat átírja. Cache-bust `?v=20261122dtype`.
 
