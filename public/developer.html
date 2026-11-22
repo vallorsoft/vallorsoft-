@@ -168,7 +168,7 @@
     <div class="dev-tab" onclick="showPane('bank');loadBankDetails()">🏦 Banki adatok</div>
     <div class="dev-tab" onclick="showPane('payments');loadPaymentRequests();loadArchiveOrders()">💸 Fizetési kérelmek</div>
     <div class="dev-tab" onclick="showPane('orphanwb');loadOrphanWaybills()">🧾 Árva menetlevelek</div>
-    <div class="dev-tab" onclick="showPane('backup');loadBackupPane()">🛡️ Biztonsági mentés</div>
+    <div class="dev-tab" onclick="showPane('backup');loadBackupPane();loadSysBackup()">🛡️ Biztonsági mentés</div>
     <div class="dev-tab" onclick="showPane('usage');loadAuditUsage()">📈 Használat (audit)</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
@@ -500,6 +500,9 @@
       <div class="section-title">🛡️ Cégenkénti biztonsági mentés — Cloudflare R2</div>
       <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Minden aktív cég éjszakai, cégenkénti kulccsal titkosított mentése a VallorSoft Cloudflare R2 tárhelyére (<code>backups/c&lt;cég&gt;/</code>). 30 napig minden napi mentés megmarad, utána havonta egy, a cég által választott ideig (30/90/180/365 nap).</p>
       <div class="glass" style="padding:16px;margin-bottom:16px;" id="bkVsBox">Betöltés...</div>
+      <div class="section-title" style="margin-top:8px;">🗄️ Teljes rendszer-mentés (újraélesztéshez)</div>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Az EGÉSZ adatbázis (minden cég, minden adat, dokumentum és fájl): havonta egy teljes mentés (pg_dump), minden éjjel csak a változások. Titkosítva az R2-re (<code>system/…</code>). Visszaállítás: <code>node scripts/system-restore.js --list</code> → <code>--target … --yes</code> (lásd FLY-DEPLOY.md). <b>Az INTEGRATION_ENC_KEY-t a szerveren kívül is őrizd meg — nélküle a mentés nem nyitható ki.</b></p>
+      <div class="glass" style="padding:16px;margin-bottom:16px;" id="sysBkBox">Betöltés...</div>
       <div class="glass" style="padding:0;overflow:hidden;">
         <table class="table">
           <thead><tr><th>Időpont</th><th>Cég</th><th>Indítás</th><th>Méret</th><th>Sorok</th><th>R2</th><th>Állapot</th></tr></thead>
@@ -1995,6 +1998,31 @@ async function loadBackupPane() {
   tbody.innerHTML = d.runs.map((r) => '<tr' + (r.error ? ' title="' + escDev(r.error) + '"' : '') + '><td>' + escDev(new Date(r.started_at).toLocaleString('hu-HU')) + '</td><td>' + escDev(r.company_name) + ' (#' + r.company_id + ')</td>'
     + '<td>' + escDev(r.trigger) + '</td><td>' + sz(r.size_bytes) + '</td><td>' + (r.row_count != null ? r.row_count : '—') + '</td>'
     + '<td>' + (r.has_copy ? '☁️' : (stl[r.r2_status] || '—')) + '</td><td>' + (stl[r.status] || '') + ' ' + escDev(r.status) + '</td></tr>').join('');
+}
+async function loadSysBackup() {
+  const d = await gas('devSystemBackupStatus');
+  const box = document.getElementById('sysBkBox');
+  if (!box) return;
+  if (!d || !d.ok) { box.innerHTML = '<span style="color:#ef4444;">Hiba: ' + escDev(d && d.err || 'ismeretlen') + '</span>'; return; }
+  const sz = (b) => b == null ? '—' : (b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : b < 1073741824 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1073741824).toFixed(2) + ' GB');
+  const ic = { ok: '✅', error: '❌', running: '⏳', deleted: '🗑' };
+  let h = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+    + '<span>' + (d.configured ? '☁️ R2 kész' : '⚠️ R2 nincs beállítva') + ' · pg_dump: <b>' + escDev(d.pg_dump || 'NINCS') + '</b> · mentésre váró változás: <b>' + (d.pending_changes != null ? d.pending_changes : '—') + '</b> · éjjel ' + d.hour + ':00 (Bukarest)</span>'
+    + '<button onclick="sysBkRun(false)" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;"' + (d.running ? ' disabled' : '') + '>▶️ Mentés most</button>'
+    + '<button onclick="sysBkRun(true)" style="background:transparent;color:#3b82f6;border:1px solid #3b82f6;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;"' + (d.running ? ' disabled' : '') + '>🗄️ Teljes mentés most</button>'
+    + (d.running ? '<span>⏳ fut…</span>' : '') + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Megőrzés: változás-mentések ' + d.delta_keep_days + ' nap, teljes mentések ' + d.full_keep_days + ' nap; új teljes mentés ' + d.full_every_days + ' naponta.</div>';
+  h += d.runs.length ? '<table class="table" style="font-size:12px;"><thead><tr><th>Időpont</th><th>Fajta</th><th>Indítás</th><th>Méret</th><th>Sorok</th><th>Állapot</th></tr></thead><tbody>'
+    + d.runs.map((r) => '<tr' + (r.error ? ' title="' + escDev(r.error) + '"' : '') + '><td>' + escDev(new Date(r.started_at).toLocaleString('hu-HU')) + '</td><td>' + (r.kind === 'full' ? '🗄️ teljes' : '➕ változás') + '</td><td>' + escDev(r.trigger || '') + '</td><td>' + sz(r.bytes) + '</td><td>' + (r.row_count != null ? r.row_count : '—') + '</td><td>' + (ic[r.status] || '') + ' ' + escDev(r.status) + (r.error ? ' — ' + escDev(r.error.slice(0, 120)) : '') + '</td></tr>').join('') + '</tbody></table>'
+    : '<div style="color:var(--muted);font-size:13px;">Még nem készült rendszer-mentés.</div>';
+  box.innerHTML = h;
+  if (d.running) setTimeout(loadSysBackup, 15000);
+}
+async function sysBkRun(full) {
+  if (full && !confirm('Teljes adatbázis-mentést indítasz most (pg_dump). Pár percig is tarthat. Mehet?')) return;
+  const d = await gas('devSystemBackupRun', [{ full: full }]);
+  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
+  setTimeout(loadSysBackup, 1500);
 }
 async function bkR2Test() {
   const el = document.getElementById('bkR2TestRes');

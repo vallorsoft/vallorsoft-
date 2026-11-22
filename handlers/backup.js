@@ -191,4 +191,39 @@ handlers.devBackupStatus = async function (req, res) {
   }
 };
 
+// ---- Developer: teljes rendszer-mentés ----
+handlers.devSystemBackupStatus = async function (req, res) {
+  try {
+    if (!req.session.user || !req.session.user.is_dev) return deny(res);
+    const sys = require('../services/systemBackup');
+    const runs = await pool.query(`SELECT id, kind, status, trigger, r2_key IS NOT NULL AS stored, bytes, row_count, table_count,
+                                          pg_version, error, started_at, finished_at FROM system_backup_runs ORDER BY started_at DESC LIMIT 40`)
+      .catch(() => ({ rows: [] }));
+    const pending = await pool.query('SELECT COUNT(*)::int AS n FROM sys_change_log').catch(() => ({ rows: [{ n: null }] }));
+    return res.json({ result: { ok: true, configured: r2.configured(), running: sys.isBusy(), pg_dump: await sys.pgDumpVersion(),
+      pending_changes: pending.rows[0].n, full_every_days: sys.FULL_EVERY_DAYS, delta_keep_days: sys.DELTA_KEEP_DAYS,
+      full_keep_days: sys.FULL_KEEP_DAYS, hour: parseInt(process.env.SYSTEM_BACKUP_HOUR, 10) || 3,
+      runs: runs.rows.map((r) => Object.assign({}, r, { bytes: r.bytes != null ? Number(r.bytes) : null, error: r.error ? String(r.error).slice(0, 400) : null })) } });
+  } catch (e) {
+    console.error('devSystemBackupStatus hiba:', e);
+    return deny(res, 'Eroare de server');
+  }
+};
+// devSystemBackupRun({ full?: bool }) — háttérben indul.
+handlers.devSystemBackupRun = async function (req, res, args) {
+  try {
+    if (!req.session.user || !req.session.user.is_dev) return deny(res);
+    const sys = require('../services/systemBackup');
+    if (!r2.configured()) return deny(res, 'A Cloudflare R2 nincs beállítva');
+    if (sys.isBusy()) return deny(res, 'Mentés már fut');
+    const full = !!(args && args[0] && args[0].full);
+    audit.fromReq(req, 'system_backup.run_manual', 'system', 'backup', { full });
+    sys.run({ trigger: 'manual', forceFull: full }).catch(() => {});
+    return res.json({ result: { ok: true, started: true } });
+  } catch (e) {
+    console.error('devSystemBackupRun hiba:', e);
+    return deny(res, 'Eroare de server');
+  }
+};
+
 module.exports = handlers;
