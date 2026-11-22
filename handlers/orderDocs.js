@@ -152,6 +152,7 @@ handlers.orderDocAdd = async function (req, res, args) {
       [orderId, fileName, data, u.nume || u.email, u.company_id,
         type, _date(a.doc_date), _clip(a.ref_no, 100), _clip(a.note, 500), size]);
     audit.fromReq(req, 'order_doc.upload', 'order', orderId, { doc_id: r.rows[0].id, doc_type: type, file_name: fileName });
+    require('../lib/waybillDocCheck').touch(u.company_id, {orderId});
     return res.json({ result: { ok: true, docId: r.rows[0].id } });
   } catch (err) {
     console.error('orderDocAdd hiba:', err);
@@ -185,6 +186,7 @@ handlers.orderDocUpdateMeta = async function (req, res, args) {
         WHERE id = $1`,
       [id, orderId, _type(a.doc_type), _date(a.doc_date), _clip(a.ref_no, 100), _clip(a.note, 500), u.company_id]);
     audit.fromReq(req, 'order_doc.update', 'order', orderId, { doc_id: id });
+    require('../lib/waybillDocCheck').touch(u.company_id, {orderId});
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('orderDocUpdateMeta hiba:', err);
@@ -205,6 +207,7 @@ handlers.orderDocDelete = async function (req, res, args) {
         RETURNING od.order_id, od.file_name`, [id, u.company_id]);
     if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost găsit' } });
     audit.fromReq(req, 'order_doc.delete', 'order', r.rows[0].order_id, { doc_id: id, file_name: r.rows[0].file_name });
+    require('../lib/waybillDocCheck').touch(u.company_id, {orderId: r.rows[0].order_id});
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('orderDocDelete hiba:', err);

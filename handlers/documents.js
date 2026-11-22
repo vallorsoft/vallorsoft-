@@ -181,6 +181,7 @@ handlers.orderDocUpload = async function (req, res, args) {
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,
         [orderId, fileName, b64, req.session.user.nume || req.session.user.email, req.session.user.company_id]
       );
+      require('../lib/waybillDocCheck').touch(req.session.user.company_id, { orderId });
       return res.json({ result: { ok: true, docId: r.rows[0].id } });
     } catch (err) {
       console.error('orderDocUpload hiba:', err);
@@ -324,6 +325,22 @@ handlers.getFuvarlevelek = async function (req, res, args) {
           });
         } catch (dcErr) {
           console.error('menetlevél-dokumentum számláló hiba (a lista folytatódik):', dcErr.message);
+        }
+        // Dokumentum-csomag állapota (lib/waybillDocCheck, háttérben számolva) — best-effort.
+        try {
+          const ck = await pool.query(
+            `SELECT waybill_id, status, required_cnt, missing_cnt, wrong_cnt, review_cnt
+               FROM waybill_doc_checks WHERE company_id = $1 AND waybill_id = ANY($2::varchar[])`,
+            [cid, rows.map(f => f.id)]);
+          const byW = {};
+          ck.rows.forEach(c => { byW[c.waybill_id] = c; });
+          rows.forEach(f => {
+            const c = byW[f.id];
+            f.doc_check = c ? { status: c.status, required: c.required_cnt, missing: c.missing_cnt,
+              wrong: c.wrong_cnt, review: c.review_cnt } : null;
+          });
+        } catch (ckErr) {
+          if (!(ckErr && (ckErr.code === '42P01' || ckErr.code === '42703'))) console.error('dokumentum-csomag állapot hiba (a lista folytatódik):', ckErr.message);
         }
       }
       return res.json({ result: rows });
@@ -683,6 +700,7 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           newEmailSofer   // $26 — új sofőr-horgony (validált cég-user) vagy NULL (marad a régi)
         ]
       );
+      require('../lib/waybillDocCheck').touch(me.company_id, { waybillId: id });
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
     } catch (err) {
       console.error('fuvarlevelUpdate hiba:', err);
@@ -921,6 +939,7 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
           JSON.stringify(hataratok)   // a GPS-ből származó átlépés-napló (lehet üres)
         ]
       );
+      require('../lib/waybillDocCheck').touch(cid, { waybillId: id });
       return res.json({ result: { ok: true, id, docNumber: autoDocNumber, total_km: totalKm, consum_100: consum100 } });
     } catch (err) {
       console.error('fuvarlevelCreate hiba:', err);

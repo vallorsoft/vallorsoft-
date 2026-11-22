@@ -251,7 +251,7 @@ app.use((err, req, res, next) => {
 // e-mailek/push-ok/IMAP-feldolgozás), és csak a DB-migrációk UTÁN indulnak
 // (friss deploynál az első tick ne fusson hiányzó táblába). lib/schedulerLeader.js
 const schedulerLeader = require('./lib/schedulerLeader');
-const { startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler } = require('./services/scheduler');
+const { startWaybillDocCheckScheduler, startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler } = require('./services/scheduler');
 function startAllSchedulers() {
   startIntakeScheduler();
   startExpiryScheduler();
@@ -271,6 +271,7 @@ function startAllSchedulers() {
   startGpsTrackHistoryScheduler();   // GPS útvonal-előzmény: teljes pont-sor naponként mentve + úthálózatra illesztve
   startFuelLossScheduler();          // üzemanyag-hiány riasztás (GPS tartály-szint, 100 / 250 L)
   startBorderAutoScheduler();        // határátlépés automatikusan a GPS-ből (Románia-geozóna)
+  startWaybillDocCheckScheduler();   // menetlevél dokumentum-csomag ellenőrzése (helyben)
   startStopMatchScheduler();         // tényleges fel-/lerakási címek a GPS-ből (csak Admin/Manager látja)
   startOrderRouteKmScheduler();      // fuvar teljes km (minden állomás, üres km is) + menetlevél Plecare→Sosire
   require('./services/companyBackup').startCompanyBackupScheduler(); // cégenkénti éjszakai mentés Google Drive-ba

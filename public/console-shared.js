@@ -3003,15 +3003,51 @@ function fuvAnomalyBadge(f){
   return ' <span title="'+esc(title)+'" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:'+col+';background:'+bg+';white-space:nowrap;">⚠️ '+arrow+' '+esc(pct)+'</span>';
 }
 
+// Dokumentum-csomag jelvény (lib/waybillDocCheck — háttérben, helyben számolva).
+// ✅ teljes · ⚠️ N hiányzik · ❌ N nem ide tartozik · 🟡 N megerősítésre vár.
+function wbDocCheckBadge(f){
+  var c=f&&f.doc_check;
+  if(!c||c.status==='none') return '';
+  var pill=function(txt,col,bg,tip){ return ' <span title="'+esc(tip)+'" onclick="WaybillDocs.openManage(\''+f.id+'\')" style="cursor:pointer;display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:'+col+';background:'+bg+';white-space:nowrap;">'+txt+'</span>'; };
+  if(c.status==='complete') return pill('✅ '+t('wdc.badgeOk'),'#15803d','rgba(34,197,94,0.14)',t('wdc.badgeOkTip'));
+  var out='';
+  if(c.missing) out+=pill('⚠️ '+t('wdc.badgeMissing',{n:c.missing}),'#b45309','rgba(245,158,11,0.16)',t('wdc.badgeTip'));
+  if(c.wrong) out+=pill('❌ '+t('wdc.badgeWrong',{n:c.wrong}),'#b91c1c','rgba(239,68,68,0.14)',t('wdc.badgeTip'));
+  if(c.review) out+=pill('🟡 '+t('wdc.badgeReview',{n:c.review}),'#92400e','rgba(250,204,21,0.20)',t('wdc.badgeTip'));
+  return out;
+}
+// Teendő-sáv: hány menetlevél dokumentum-csomagja hiányos.
+function loadWbDocCheckBand(){
+  var band=document.getElementById('wbDocCheckBand');
+  if(!band){
+    var anchor=document.getElementById('missingWaybillBand');
+    if(!anchor||!anchor.parentNode) return;
+    band=document.createElement('div'); band.id='wbDocCheckBand'; band.style.cssText='display:none;margin-top:14px;';
+    anchor.parentNode.insertBefore(band, anchor);
+  }
+  gas('waybillDocCheckSummary').then(function(r){
+    if(!r||!r.ok||!r.incomplete){ band.style.display='none'; band.innerHTML=''; return; }
+    var parts=[];
+    if(r.missing) parts.push(t('wdc.bandMissing',{n:r.missing}));
+    if(r.wrong) parts.push(t('wdc.bandWrong',{n:r.wrong}));
+    if(r.review) parts.push(t('wdc.bandReview',{n:r.review}));
+    band.innerHTML='<div style="border:1px solid rgba(99,102,241,0.40);background:linear-gradient(180deg,rgba(99,102,241,0.10),rgba(99,102,241,0.03));border-radius:14px;padding:12px 16px;">'
+      +'<div style="font-weight:700;color:#4f46e5;">📑 '+t('wdc.bandTitle',{n:r.incomplete})+'</div>'
+      +'<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">'+esc(parts.join(' · '))+' — '+t('wdc.bandHint')+'</div></div>';
+    band.style.display='';
+  }).catch(function(){ band.style.display='none'; });
+}
+
 function loadReceivedFuvarlevelek(){
   loadMissingWaybills();
+  loadWbDocCheckBand();
   loadWaybillKmGaps();
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
       +`<td><b style="color:#6366f1;">${esc(f.numar_fisa||'—')}</b></td>`
-      +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b>${fuvAnomalyBadge(f)}</td>`
+      +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b>${fuvAnomalyBadge(f)}${wbDocCheckBadge(f)}</td>`
       +`<td>${esc(f.nume_sofer||f.email_sofer||'—')}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`

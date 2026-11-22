@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-22 — 📑 Menetlevél dokumentum-csomag ellenőrzés (helyben, AI nélkül, gomb nélkül)
+- **Szabály:** a menetlevélhez azoknak a fuvaroknak az iratai kellenek, amelyeknek a LERAKÁSA a menetlevélen szerepel (`puncte` Descarcare / `role='unloading'`; régi, jelöletlen pontú menetlevélnél a `descarcat_at`-tal lerakott fuvarok). Fuvaronként: ügyfél-megrendelő + az ügyfélnek kiállított számla; alvállalkozós fuvarnál (`orders.carrier_id`) még a neki küldött megrendelő + az alvállalkozó számlája. Az itt nem lerakott fuvar „⏳ folyamatban (Alocat)", nem kell irat és nem számít elvégzettnek.
+- **`lib/waybillDocCheck.js`** — a fuvar ismert adatait keresi a PDF szövegrétegében (fuvar-szám, ügyfél-referencia, CUI, cégnév, összeg nettó/bruttó, rendszám, fel-/lerakó város, dátum) → biztonság %; ✅ ≥ 85 · 🟡 50–84 megerősítés · ❗ gyenge; más cég CUI-ja levon. Mohó párosítás a 4 helyre; a be nem sorolt irat: „nem ide tartozik" / „többlet" / „másik menetlevélé" / „nem olvasható". A PDF szövege a saját DB-ben cache-elve (`order_documents.text_cache/text_status`). Szkennelt PDF / fotó: „nem olvasható", kézi döntés.
+- **Háttérben fut:** `startWaybillDocCheckScheduler` (10 percenként, a hiányos és még nem ellenőrzött menetlevelek, 365 nap) + 3 mp-es gyűjtéssel azonnal minden irat-feltöltés / -törlés / -átsorolás és menetlevél-mentés után (`touch`). Eredmény: `waybill_doc_checks`.
+- **Visszaigazolás = tanulás:** `waybillDocDecide` ✓ (rögzít, 100%) / ✗ (a párt többé nem ajánlja) / ↩ — `waybill_doc_decisions`. Felület: a 🗂️ Kezelés ablak tetején fuvaronkénti csomag-lista, a FUVARLEVELEK sorában jelvény (✅ / ⚠️ N hiányzik / ❌ N nem ide tartozik / 🟡 N megerősítés), felül teendő-sáv (`waybillDocCheckSummary`). Migráció `db/waybill-doc-check.sql`; i18n `wdc.*` (RO+HU); cache-bust `?v=20261122wdc`. Teszt: `tests/unit/waybillDocCheck.test.js` (14 eset, a 3 fuvaros példával).
+
 ## 2026-11-22 — 📷 Bon-szkennelés visszakapcsolva a sofőrnél (kivétel a dokumentum-tiltás alól)
 - A tulajdonos döntése: a sofőr bon-szkennelése (tankolás/vásárlás nyugta) marad AI-val. `lib/docPrivacy.js` új `ALLOWED_FILE_KINDS = ['receipt']` + `fileAllowed()`; a `lib/geminiJson.js` fájl-blokkja csak a `fileKind: 'receipt'` jelölésű hívást engedi át, ezt kizárólag a `handlers/receiptScan.js` adja. A `scanReceipt` / `getMyBonScanEnabled` és a bon-tesztek a #665 előtti állapotra visszaállítva. Megrendelő, számla, UIT- és fuvar-fotó továbbra sem megy ki. Teszt: `docPrivacy.test.js` (más címke nem nyit kaput).
 
