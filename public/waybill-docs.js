@@ -9,13 +9,13 @@
 // ============================================================
 window.WaybillDocs = (function () {
   // A feltöltő típusai; a fuvar-oldalról jövő további típusok (CMR, POD…) is megjelennek.
-  var TYPES = ['order_doc', 'invoice', 'gps_route', 'assignment', 'other'];
-  var ALL_TYPES = TYPES.concat(['cmr', 'pod', 'order', 'contract', 'customs', 'receipt']);
-  var ICO = { order_doc: '🚚', invoice: '🧾', gps_route: '🗺️', assignment: '📑', other: '📎',
+  var TYPES = ['order_doc', 'order', 'invoice', 'gps_route', 'other'];
+  var ALL_TYPES = TYPES.concat(['cmr', 'pod', 'contract', 'customs', 'receipt']);
+  var ICO = { order_doc: '🚚', invoice: '🧾', gps_route: '🗺️', order: '📑', other: '📎',
     cmr: '📄', pod: '📷', order: '📑', contract: '📝', customs: '🛃', receipt: '🧾' };
   var FB = {
     order_doc: 'Documente cursă', invoice: 'Factură', gps_route: 'Traseu GPS',
-    assignment: 'Comandă de transport', other: 'Altele'
+    order: 'Comandă', other: 'Altele'
   };
   var MAX_FILE = 15 * 1024 * 1024;
   var st = { wid: null, info: null, staged: [] };
@@ -44,7 +44,7 @@ window.WaybillDocs = (function () {
     var n = String(name || '').toLowerCase();
     if (/factur|invoice|sz[aá]ml/.test(n)) return 'invoice';
     if (/gps|traseu|route|[uú]tvonal|track/.test(n)) return 'gps_route';
-    if (/comand|megb[ií]z|order|contract/.test(n)) return 'assignment';
+    if (/comand|megb[ií]z|megrendel|order|contract/.test(n)) return 'order';
     return hasOrders ? 'order_doc' : 'other';
   }
 

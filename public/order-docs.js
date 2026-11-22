@@ -7,7 +7,7 @@
 //  a fuvar ⋯ menüből: OrderDocs.openUpload(orderId) / OrderDocs.showForOrder(orderId).
 // ============================================================
 window.OrderDocs = (function () {
-  var TYPES = ['invoice', 'cmr', 'pod', 'order', 'contract', 'customs', 'receipt', 'order_doc', 'gps_route', 'assignment', 'other'];
+  var TYPES = ['invoice', 'cmr', 'pod', 'order', 'contract', 'customs', 'receipt', 'order_doc', 'gps_route', 'other'];
   var ICO = { invoice: '🧾', cmr: '📄', pod: '📷', order: '📑', contract: '📝', customs: '🛃', receipt: '🧾', order_doc: '🚚', gps_route: '🗺️', assignment: '📑', other: '📎' };
   var st = { q: '', type: '', from: '', to: '', order_id: '', order_label: '', rows: [], boxId: null };
   var _qTimer = null;

@@ -194,7 +194,7 @@ describe('chat: bármilyen kérdés egy fuvarról (fizetve / postázva / hiányz
     const r = await co.answer(req, 'Milyen dokumentum hiányzik?', ['🚚 #CMD-2026-0047 — Fuvar'], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
     expect(r.kind).toBe('order_view');
     expect(r.focus).toBe(true);
-    expect(r.reply).toMatch(/CMD-2026-0047 — Ami még hiányzik: Megbízás, CMR/);
+    expect(r.reply).toMatch(/CMD-2026-0047 — Ami még hiányzik: Megbízás \/ megrendelő, CMR/);
   });
 
   test('„Postázva van?" → postázás dátummal', async () => {

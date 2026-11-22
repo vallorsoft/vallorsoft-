@@ -14,7 +14,10 @@
 
 ---
 
-## 2026-11-22 — 🔎 Menetlevél-iratok: helyi szövegfelismerés (OCR) szkennelt PDF-hez és fotóhoz
+## 2026-11-22 — 📑 „Megbízás" és „Megrendelő" egy dokumentum-típus
+- A két típus egybe: „Megbízás / megrendelő" (RO „Comandă", `doc_type='order'`). A feltöltők (menetlevél + fuvar-dokumentum) már csak ezt kínálják; a szerver a régi `assignment` értéket is `order`-re írja (`_type`), migráció `db/zzz-doc-type-merge-order.sql` a meglévő sorokat átírja. Cache-bust `?v=20261122dtype`.
+
+## 2026-11-22 — 🔎 Menetlevél-iratok: helyi szövegfelismerés (OCR) szkennelt PDF-hez és fotóhoz (PR #669)
 - Új `lib/localOcr.js` — tesseract.js (WebAssembly) a SAJÁT szerveren; a nyelvi modellek npm-csomagban (`@tesseract.js-data/ron|hun|eng|deu`), futás közben nincs letöltés, irat nem megy ki. Alapnyelvek: román + magyar + angol (`WAYBILL_DOC_OCR_LANGS`, pl. `ron+hun+eng+deu`; más nyelvhez a megfelelő csomag kell). Szkennelt PDF: a beágyazott JPEG-oldalakat olvassa (DCTDecode, max. 4 oldal); más tömörítésű kép-PDF „nem olvasható" marad.
 - `lib/waybillDocCheck.js` `ocrRound` az ütemező körében (kör / 3 irat, `WAYBILL_DOC_OCR_PER_ROUND`; kikapcsolás `WAYBILL_DOC_OCR=0`): irataként egyszer (`order_documents.ocr_at`), siker → `text_status='ocr'`, majd az érintett menetlevél újraellenőrzése. OCR-rel olvasott irat ×0,9 pontszám + „OCR" jelzés. Migráció `db/waybill-doc-ocr.sql`; cache-bust `?v=20261122ocr`. Teszt: `tests/unit/localOcr.test.js` + 1 eset; valódi DB-n: fotózott számla → OCR → 99% ✅.
 

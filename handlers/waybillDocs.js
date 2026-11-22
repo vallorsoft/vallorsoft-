@@ -24,7 +24,8 @@ const MIME_RE = /^data:(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|text\
 const EXT_MIME = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic' };
 
 function _clip(v, max) { if (v == null) return null; const s = String(v).trim(); return s ? s.slice(0, max) : null; }
-function _type(v) { const s = String(v || '').trim(); return DOC_TYPES.includes(s) ? s : 'other'; }
+// A „megbízás" és a „megrendelő" egy típus (doc_type='order'); a régi 'assignment' is ide kerül.
+function _type(v) { let s = String(v || '').trim(); if (s === 'assignment') s = 'order'; return DOC_TYPES.includes(s) ? s : 'other'; }
 function _orderIds(v) {
   let a = v;
   if (typeof a === 'string') { try { a = JSON.parse(a); } catch (_) { a = []; } }
