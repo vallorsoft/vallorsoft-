@@ -1050,11 +1050,14 @@ handlers.devGetArchiveOrders = async function (req, res) {
     const r = await pool.query(
       `SELECT o.id, o.company_id, c.nev AS company_nev, o.reference, o.years, o.gb, o.size_bytes, o.amount_eur, o.total_ron,
               o.status, o.requested_by, o.created_at, o.pay_until, o.activated_at, o.covered_until,
-              d.status AS cloud_status, d.bytes AS cloud_bytes, d.updated_at AS cloud_at, d.error AS cloud_error
+              o.size_source, o.actual_bytes, o.actual_checked_at, o.size_flag,
+              d.status AS cloud_status, d.bytes AS cloud_bytes, d.updated_at AS cloud_at, d.verified_at AS cloud_verified_at, d.error AS cloud_error
          FROM doc_archive_orders o LEFT JOIN companies c ON c.id = o.company_id
          LEFT JOIN doc_archive_cloud d ON d.company_id = o.company_id
         ORDER BY o.created_at DESC LIMIT 200`);
-    return res.json({ result: { ok: true, orders: r.rows, r2_configured: require('../lib/r2').configured() } });
+    const rep = require('../lib/r2').configReport();
+    delete rep.expected;
+    return res.json({ result: { ok: true, orders: r.rows, r2_configured: rep.ok, r2_env: rep } });
   } catch (e) {
     if (e && e.code === '42P01') return res.json({ result: { ok: true, orders: [], r2_configured: false } });
     console.error('devGetArchiveOrders hiba:', e);
@@ -1079,6 +1082,29 @@ handlers.devCancelArchiveOrder = async function (req, res, args) {
   const r = await require('../lib/docArchive').cancelOrder(parseInt(id, 10) || 0);
   if (r.ok) require('../lib/audit').fromReq(req, 'doc_archive.order_cancel', 'doc_archive_order', String(id), {});
   return res.json({ result: r });
+};
+
+// R2 kapcsolat-teszt (kis fájl fel / visszaolvas / töröl) + a talált env-nevek.
+handlers.devR2Test = async function (req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const r2 = require('../lib/r2');
+  const rep = r2.configReport();
+  if (!rep.ok) return res.json({ result: { ok: false, env: rep, err: 'Hiányzó R2 beállítás. Elfogadott nevek: ' + JSON.stringify(rep.expected) } });
+  delete rep.expected;
+  try { const t = await r2.testConnection(); return res.json({ result: Object.assign({ env: rep }, t) }); }
+  catch (e) { return res.json({ result: { ok: false, env: rep, err: String(e.message).slice(0, 400) } }); }
+};
+// Egy archiválási kérés cégének tényleges R2-mérete (HEAD) + sáv-összevetés.
+handlers.devArchiveVerify = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const [id] = args || [];
+  try {
+    const o = await pool.query('SELECT company_id FROM doc_archive_orders WHERE id=$1', [parseInt(id, 10) || 0]);
+    if (!o.rows.length) return res.json({ result: { ok: false, err: 'Nem található' } });
+    const v = await require('../lib/docArchiveCloud').verify(o.rows[0].company_id);
+    if (!v) return res.json({ result: { ok: false, err: 'Ennek a cégnek még nincs archívuma a Cloudflare-en.' } });
+    return res.json({ result: Object.assign({ ok: true }, v) });
+  } catch (e) { return res.json({ result: { ok: false, err: String(e.message).slice(0, 300) } }); }
 };
 
 module.exports = handlers;

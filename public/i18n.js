@@ -4561,6 +4561,7 @@
     'dar.year': { hu: 'év', ro: 'an' },
     'dar.years': { hu: 'év', ro: 'ani' },
     'dar.cloudHint': { hu: 'A céged dokumentum-archívumát mi őrizzük meg, titkosítva. Éves díj: 1 GB-ig 10 EUR, 1–5 GB 20 EUR, 5–15 GB 32 EUR, 15–50 GB 68 EUR; 50 GB felett egyedi ajánlat. Válaszd ki az időszakot — megmutatjuk, mennyibe kerül.', ro: 'Păstrăm noi arhiva documentelor firmei, criptat. Tarif anual: până la 1 GB 10 EUR, 1–5 GB 20 EUR, 5–15 GB 32 EUR, 15–50 GB 68 EUR; peste 50 GB ofertă individuală. Alege perioada — îți arătăm cât costă.' },
+    'dar.qSrcCloud': { hu: 'a felhőben tárolt archívumod alapján mérve', ro: 'măsurat în arhiva ta din cloud' },
     'dar.qTier': { hu: 'Csomag', ro: 'Pachet' },
     'dar.qConsult': { hu: 'A céged dokumentumai {s} helyet foglalnak — {max} GB felett az archiválást egyedileg egyeztetjük. Írj nekünk: vallorsoft@gmail.com.', ro: 'Documentele firmei ocupă {s} — peste {max} GB arhivarea se stabilește individual. Contactați-ne: vallorsoft@gmail.com.' },
     'dar.cloudQuote': { hu: 'Ár kiszámítása', ro: 'Calculează prețul' },

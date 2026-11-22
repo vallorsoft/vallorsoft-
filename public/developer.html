@@ -1915,14 +1915,25 @@ async function loadArchiveOrders() {
   const tb = document.getElementById('archOrdersTbody');
   const warn = document.getElementById('archOrdersWarn');
   if (!tb) return;
-  if (warn) warn.innerHTML = (d && d.ok && !d.r2_configured)
-    ? '<div class="glass" style="padding:10px 14px;margin-bottom:10px;border:1px solid #f59e0b;color:#f59e0b;font-weight:600;">⚠️ A Cloudflare R2 nincs beállítva (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET) — aktiválás után a felhő-feltöltés addig vár.</div>' : '';
+  if (warn) {
+    const env = (d && d.r2_env) || {};
+    const found = ['account', 'key', 'secret', 'bucket', 'endpoint'].map(function (k) { return k + ': ' + (env[k] ? '✓ ' + env[k] : '—'); }).join(' · ');
+    warn.innerHTML = '<div class="glass" style="padding:10px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid ' + (d && d.r2_configured ? '#22c55e' : '#f59e0b') + ';">'
+      + '<span style="font-weight:700;color:' + (d && d.r2_configured ? '#22c55e' : '#f59e0b') + ';">' + (d && d.r2_configured ? '☁️ Cloudflare R2 beállítva' : '⚠️ Cloudflare R2 nincs (teljesen) beállítva — aktiválás után a feltöltés vár') + '</span>'
+      + '<span style="font-size:12px;color:var(--muted);flex:1 1 300px;">' + escDev(found) + '</span>'
+      + '<button onclick="archR2Test()" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">🔌 R2 kapcsolat tesztje</button>'
+      + '<span id="archR2TestRes" style="font-size:12px;font-weight:700;"></span></div>';
+  }
   if (!d || !d.ok || !d.orders.length) { tb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:20px;">Nincs archiválási kérés</td></tr>'; return; }
   const col = { pending: '#f59e0b', paid: '#22c55e', expired: '#94a3b8', cancelled: '#94a3b8' };
   tb.innerHTML = d.orders.map(function (o) {
     const dt = o.created_at ? new Date(o.created_at).toLocaleString('ro-RO') : '—';
     const pu = o.pay_until ? new Date(o.pay_until).toLocaleString('ro-RO') : '—';
-    const cloud = o.status === 'paid' ? (escDev(o.cloud_status || '—') + (o.cloud_bytes ? ' · ' + (o.cloud_bytes / 1048576).toFixed(1) + ' MB' : '') + (o.cloud_error ? ' · ' + escDev(o.cloud_error) : '')) : '';
+    const mb = function (b) { return (Number(b) / 1048576).toFixed(1) + ' MB'; };
+    const est = 'kérés: ' + mb(o.size_bytes) + (o.size_source === 'cloudflare' ? ' (Cloudflare)' : ' (becslés)');
+    const act = o.actual_bytes != null ? '<br>R2 tényleges: <b>' + mb(o.actual_bytes) + '</b>' + (o.size_flag === 'over_tier' ? ' <span style="color:#ef4444;font-weight:700;">⚠️ túllépi a sávot</span>' : ' ✓') : '';
+    const cloud = est + act + (o.status === 'paid' ? '<br>' + escDev(o.cloud_status || '—') + (o.cloud_error ? ' · ' + escDev(o.cloud_error) : '')
+      + ' <button onclick="archOrderVerify(' + o.id + ')" style="background:transparent;color:#3b82f6;border:1px solid #3b82f6;border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer;">📏 Méret a Cloudflare-en</button>' : '');
     const btns = (o.status === 'pending' || o.status === 'expired')
       ? '<button onclick="archOrderActivate(' + o.id + ')" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">✅ Pénz megérkezett — aktiválás</button> '
         + '<button onclick="archOrderCancel(' + o.id + ')" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;">Visszavonás</button>'
@@ -1940,6 +1951,18 @@ async function archOrderActivate(id) {
   const d = await gas('devActivateArchiveOrder', [id]);
   if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
   alert('✅ Aktiválva, eddig: ' + (d.covered_until || '').slice(0, 10));
+  loadArchiveOrders();
+}
+async function archR2Test() {
+  const el = document.getElementById('archR2TestRes');
+  if (el) { el.style.color = 'var(--muted)'; el.textContent = '⏳'; }
+  const d = await gas('devR2Test');
+  if (el) { el.style.color = d && d.ok ? '#22c55e' : '#ef4444'; el.textContent = d && d.ok ? '✅ OK (' + d.ms + ' ms)' : '✗ ' + ((d && d.err) || 'hiba'); }
+}
+async function archOrderVerify(id) {
+  const d = await gas('devArchiveVerify', [id]);
+  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
+  alert('Cloudflare R2 tényleges méret: ' + (d.size / 1048576).toFixed(1) + ' MB' + (d.over ? '\n⚠️ Nagyobb sávba esik, mint amit kifizettek.' : '\n✓ Belefér a kifizetett sávba.'));
   loadArchiveOrders();
 }
 async function archOrderCancel(id) {

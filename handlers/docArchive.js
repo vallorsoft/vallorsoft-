@@ -89,7 +89,7 @@ async function _sendOrderEmails(cid, order, requester) {
     '<div style="background:#fff;padding:22px 26px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">' +
     '<p style="margin:0 0 14px;font-size:15px;">S-a solicitat arhivarea documentelor firmei <b>' + _escH(company) + '</b> pentru <b>' + order.years + ' ' + (order.years === 1 ? 'an' : 'ani') + '</b>.</p>' +
     '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:14px;"><table style="width:100%;border-collapse:collapse;">' +
-      row('Volum documente', _gbTxt(order.size_bytes)) +
+      row('Volum documente', _gbTxt(order.size_bytes) + (order.size_source === 'cloudflare' ? ' (măsurat în arhiva din cloud)' : '')) +
       row('Tarif anual', Number(order.annual_eur).toFixed(2) + ' EUR / an') +
       row('Perioadă', order.years + ' ' + (order.years === 1 ? 'an' : 'ani')) +
       row('Total net EUR', '€' + Number(order.amount_eur).toFixed(2)) +
