@@ -162,3 +162,58 @@ néven. Ezt csak akkor cseréld be, ha már sikeres volt a kézi `fly deploy`.
   használnád, kell egy Fly Volume (`fly volumes create`) és `BACKUP_DIR` arra
   mutasson; egyébként hagyd kikapcsolva (alap), és a Postgres szolgáltató saját
   mentését használd.
+
+---
+
+## 🗄️ Teljes rendszer-mentés és újraélesztés (Cloudflare R2)
+
+**Mit ment:** a TELJES adatbázist (minden cég, minden adat — a dokumentumok, fotók,
+PDF-ek is az adatbázisban vannak). A kód a GitHubon van, a beállítások a Fly-secretekben.
+
+- **Havonta egy teljes mentés** (`pg_dump`), utána **minden éjjel csak a változások**
+  (alap 03:00 Bukarest, `SYSTEM_BACKUP_HOUR`). Az első futáskor teljes mentés készül.
+- Titkosítva (AES-256-GCM) a `vallorsoft` R2-tárolóba: `system/ÉÉÉÉ/HH/full-….vsdb`
+  és `delta-….vsbk`, mindegyik mellett egy `.json` leíró.
+- Megőrzés: változás-mentések 35 nap, teljes mentések 1 év.
+- Hiba esetén e-mail megy a developernek; állapot: Developer → 🛡️ Biztonsági mentés →
+  „🗄️ Teljes rendszer-mentés" (ott van a „Mentés most" / „Teljes mentés most" gomb is).
+
+### ⚠️ Ezeket a szerveren KÍVÜL is őrizd meg (jelszókezelőben)
+
+| Secret | Miért |
+|---|---|
+| `INTEGRATION_ENC_KEY` | **nélküle a mentés nem nyitható ki** (és a tárolt integrációs kulcsok sem) |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT` (vagy `R2_ACCOUNT_ID`), `R2_BUCKET` | a mentések letöltéséhez |
+| `SESSION_SECRET`, `VAPID_*`, `BREVO_*`, `FIREBASE_*`, `GEMINI_API_KEY` … | az új szerver beállításához |
+
+A secretek listája: `fly secrets list -a vallorsoft` (az értékeket ez nem mutatja — azokat a
+beállításkor kell elmenteni).
+
+### Újraélesztés lépésről lépésre
+
+1. **Új, üres adatbázis** (pl. új Neon-projekt vagy -branch). Jegyezd fel a kapcsolati címét
+   (a NEM `-pooler` változatot).
+2. Egy gépen, ahol van **Node 22** és legalább akkora főverziójú **`pg_restore`**, mint a
+   mentést készítő `pg_dump` (a Developer felület kiírja), a repó mappájában:
+   ```bash
+   npm ci
+   ```
+   ```bash
+   export INTEGRATION_ENC_KEY=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_ENDPOINT=https://<fiók>.r2.cloudflarestorage.com R2_BUCKET=vallorsoft
+   ```
+3. Mi van a tárhelyen:
+   ```bash
+   node scripts/system-restore.js --list
+   ```
+4. Visszaállítás a legfrissebb állapotra (vagy `--at 2026-12-01T03:30:00Z` egy korábbira):
+   ```bash
+   node scripts/system-restore.js --target "postgres://user:pass@host/db?sslmode=require" --yes
+   ```
+   Ez letölti a teljes mentést (`pg_restore`), majd sorban rárakja a változás-mentéseket,
+   és beállítja a sorszámlálókat.
+5. A Fly-on állítsd át a `DATABASE_URL`-t az új adatbázisra, és indítsd újra:
+   ```bash
+   fly secrets set -a vallorsoft DATABASE_URL="postgres://…"
+   ```
+6. Ellenőrzés: `/readyz`, belépés, néhány cég adatai. Ha az egész Fly-app is elveszett,
+   előbb az 1–5. szakasz szerint hozd létre újra (ugyanazokkal a secretekkel).

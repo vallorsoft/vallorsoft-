@@ -276,7 +276,8 @@ function startAllSchedulers() {
   startWaybillDocCheckScheduler();   // menetlevél dokumentum-csomag ellenőrzése (helyben)
   startStopMatchScheduler();         // tényleges fel-/lerakási címek a GPS-ből (csak Admin/Manager látja)
   startOrderRouteKmScheduler();      // fuvar teljes km (minden állomás, üres km is) + menetlevél Plecare→Sosire
-  require('./services/companyBackup').startCompanyBackupScheduler(); // cégenkénti éjszakai mentés Google Drive-ba
+  require('./services/companyBackup').startCompanyBackupScheduler(); // cégenkénti éjszakai mentés (Cloudflare R2)
+  require('./services/systemBackup').startSystemBackupScheduler();   // TELJES rendszer-mentés (havi teljes + éjszakai változások, R2)
   startBnrRatesScheduler();          // BNR árfolyamok (minden valuta) napi mentése
   startChatHistoryCleanup();         // AI-chat beszélgetések: megőrzési idő (alap 365 nap) utáni törlés
 
