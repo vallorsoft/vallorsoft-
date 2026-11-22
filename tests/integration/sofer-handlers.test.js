@@ -389,16 +389,16 @@ describe('bon-scan handlerek', () => {
     await receiptScan.getMyBonScanEnabled(reqAs({ pozicio: 'Konyvelo', company_id: 1 }), res);
     expect(res.body.result.ok).toBe(false);
   });
-  test('getMyBonScanEnabled: Sofer + GEMINI_API_KEY → usable:true', async () => {
+  test('getMyBonScanEnabled: Sofer + GEMINI_API_KEY → usable:false (docPrivacy: a fotó nem megy ki)', async () => {
     const prev = process.env.GEMINI_API_KEY;
     process.env.GEMINI_API_KEY = 'AI...';
     try {
       const res = makeRes();
       await receiptScan.getMyBonScanEnabled(reqAs(DRIVER), res);
       expect(res.body.result.ok).toBe(true);
-      expect(res.body.result.hasKey).toBe(true);
+      expect(res.body.result.hasKey).toBe(false);
       expect(res.body.result.enabled).toBe(true);
-      expect(res.body.result.usable).toBe(true);
+      expect(res.body.result.usable).toBe(false);
     } finally { if (prev == null) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = prev; }
   });
   test('getMyBonScanEnabled: nincs kulcs → usable:false + hasKey:false (nem szivárog belső hibaüzenet)', async () => {

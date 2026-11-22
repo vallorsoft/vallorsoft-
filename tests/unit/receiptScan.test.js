@@ -72,11 +72,18 @@ describe('handlers/receiptScan', () => {
     expect(r.result.ok).toBe(false);
   });
 
-  test('hiányzó API-kulcs → nem-configured hiba', async () => {
-    delete process.env.GEMINI_API_KEY;
+  test('DOCS_LOCAL_ONLY: a bon fotója nem megy ki — nincs hálózati hívás', async () => {
+    global.fetch = jest.fn();
     const r = await callScan(SOFER, PAYLOAD_IMG);
     expect(r.result.ok).toBe(false);
-    expect(r.result.err).toMatch(/nu este configurat/i);
+    expect(r.result.local_only).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('getMyBonScanEnabled: kulccsal is usable:false (a fotós AI tiltva)', async () => {
+    const r = await new Promise((resolve) => handler.getMyBonScanEnabled({ session: { user: SOFER } }, { json: resolve }));
+    expect(r.result.ok).toBe(true);
+    expect(r.result.usable).toBe(false);
   });
 
   test('nem támogatott mimetype → hiba', async () => {
@@ -98,33 +105,6 @@ describe('handlers/receiptScan', () => {
     expect(r.result.err).toMatch(/prea mare/i);
   });
 
-  test('fuel bon: Gemini válaszát fehérlistázva visszaadja', async () => {
-    mockGeminiJson({
-      kind: 'fuel', loc: 'MOL Arad', data: '2026-07-22', tip: 'Motorină',
-      litru: 234.56, km: 456123, plata: 'Card', suma: 1450.00, valuta: 'RON',
-      produs: null, confidence: 0.91,
-    });
-    const r = await callScan(SOFER, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(true);
-    expect(r.result.fields).toEqual(expect.objectContaining({
-      kind: 'fuel', loc: 'MOL Arad', data: '2026-07-22', tip: 'Motorină',
-      litru: 234.56, km: 456123, plata: 'Card', suma: 1450, valuta: 'RON',
-    }));
-  });
-
-  test('purchase bon: kliens purchase-jel is visszatér', async () => {
-    mockGeminiJson({
-      kind: 'purchase', loc: 'Kaufland', data: '2026-07-22', tip: null,
-      litru: null, km: null, plata: 'Cash', suma: 89.5, valuta: 'RON',
-      produs: 'Apă minerală', confidence: 0.8,
-    });
-    const r = await callScan(ADMIN, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(true);
-    expect(r.result.fields.kind).toBe('purchase');
-    expect(r.result.fields.produs).toBe('Apă minerală');
-    expect(r.result.fields.suma).toBe(89.5);
-  });
-
   test('sanitize kiszűri az ismeretlen "plata"/"tip"-et, invalid dátumot', () => {
     const out = handler._sanitize({
       kind: 'fuel',
@@ -143,23 +123,6 @@ describe('handlers/receiptScan', () => {
     expect(out.suma).toBe(89.5);
     expect(out.loc).toBe('Kaufland');
     expect(out.confidence).toBeNull();
-  });
-
-  test('minden modell 429/503 → érthető hiba', async () => {
-    mockGeminiStatus(429, { error: { message: 'quota' } });
-    const r = await callScan(SOFER, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(false);
-    // A lib összefoglaló szövege: "Toate modelele … supraîncărcate sau cota gratuită a fost epuizată"
-    expect(r.result.err).toMatch(/supraînc|supraincarcate|epuizat/i);
-    // A modell-lánc mind a 6 modellen végigment (429 → next)
-    expect(global.fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
-  });
-
-  test('400 → azonnal áll, nem próbál más modellt', async () => {
-    mockGeminiStatus(400, { error: { message: 'bad request' } });
-    const r = await callScan(SOFER, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(false);
-    expect(global.fetch.mock.calls.length).toBe(1);
   });
 
   test('feature kikapcsolva → tiltva', async () => {
@@ -187,29 +150,6 @@ describe('handlers/receiptScan', () => {
     expect(handler._normalizeMerchant('1300')).toBe('');           // csak számok
   });
 
-  test('few-shot: a cég korábbi mintái bekerülnek a system-promptba', async () => {
-    // A samples-lekérdezésre 2 mintát adunk vissza
-    pool.query.mockResolvedValueOnce({
-      rows: [
-        { merchant_label: 'MOL Arad', fields: { kind: 'fuel', loc: 'MOL Arad', tip: 'Motorină', plata: 'Card', valuta: 'RON' }, updated_at: new Date('2026-07-20') },
-        { merchant_label: 'Kaufland', fields: { kind: 'purchase', loc: 'Kaufland', plata: 'Cash', valuta: 'RON', produs: 'Apă' }, updated_at: new Date('2026-07-22') },
-      ], rowCount: 2,
-    });
-    mockGeminiJson({
-      kind: 'fuel', loc: 'MOL Timișoara', data: '2026-07-23', tip: 'Motorină',
-      litru: 150, plata: 'Card', suma: 900, valuta: 'RON', confidence: 0.9,
-    });
-    const r = await callScan(SOFER, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(true);
-    expect(r.result.learned_from).toBe(2);
-    // A Gemini-fetch payloadjában szerepelnek a példák (system-prompt)
-    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-    const sysText = body.systemInstruction.parts[0].text;
-    expect(sysText).toMatch(/EXEMPLE CONFIRMATE/);
-    expect(sysText).toMatch(/MOL Arad/);
-    expect(sysText).toMatch(/Kaufland/);
-  });
-
   test('_buildSystemPrompt: minta nélkül változatlan alap-promt', () => {
     const empty = handler._buildSystemPrompt([]);
     const withNull = handler._buildSystemPrompt(null);
@@ -230,16 +170,6 @@ describe('handlers/receiptScan', () => {
     expect(p).not.toMatch(/2026-07-22|"data":/);
     expect(p).not.toMatch(/"litru":/);
     expect(p).not.toMatch(/"km":/);
-  });
-
-  test('samples-lekérdezés hibája nem törik el a scan-t (csendes fallback)', async () => {
-    pool.query.mockRejectedValueOnce(new Error('table missing'));
-    mockGeminiJson({
-      kind: 'purchase', loc: 'X', data: '2026-07-23', suma: 10, valuta: 'RON', plata: 'Cash', confidence: 0.5,
-    });
-    const r = await callScan(SOFER, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(true);
-    expect(r.result.learned_from).toBe(0);
   });
 
   // ── confirmReceiptExtraction ────────────────────────────────────
@@ -357,14 +287,6 @@ describe('handlers/receiptScan', () => {
     expect(r.result.ok).toBe(false);
   });
 
-  test('getMyBonScanEnabled: sofer → { enabled, hasKey, usable }', async () => {
-    const r = await callHandler('getMyBonScanEnabled', SOFER, []);
-    expect(r.result.ok).toBe(true);
-    expect(r.result.enabled).toBe(true);      // featureEnabled default true
-    expect(r.result.hasKey).toBe(true);       // beforeEach beállítja GEMINI_API_KEY-t
-    expect(r.result.usable).toBe(true);
-  });
-
   test('getMyBonScanEnabled: nincs kulcs → usable:false (de a flag lehet true)', async () => {
     delete process.env.GEMINI_API_KEY;
     const r = await callHandler('getMyBonScanEnabled', SOFER, []);
@@ -378,13 +300,6 @@ describe('handlers/receiptScan', () => {
   });
 
   // ── Nem-szivárgás védőháló ──────────────────────────────────────
-  test('hibaüzenet 300 karakteren csonkolva (echo-back védelem)', async () => {
-    const long = 'x'.repeat(1000);
-    mockGeminiStatus(400, { error: { message: long } });
-    const r = await callScan(SOFER, PAYLOAD_IMG);
-    expect(r.result.ok).toBe(false);
-    expect(r.result.err.length).toBeLessThanOrEqual(300);
-  });
 });
 
 // ════════════════════════════════════════════════════════════

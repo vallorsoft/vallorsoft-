@@ -16,6 +16,8 @@ const { extractJson } = require('../lib/geminiJson');
 const { featureEnabled } = require('../lib/featureEnabled');
 const { normalizeUit, isValidUit, isUitDocMime } = require('../lib/uitFormat');
 const audit = require('../lib/audit');
+const docPrivacy = require('../lib/docPrivacy');
+const pdfx = require('../services/pdf-extract');
 
 const handlers = {};
 
@@ -51,6 +53,19 @@ function sanitize(json) {
   return { codes: codes, confidence: conf };
 }
 
+// Helyi UIT-kiolvasás egy PDF szövegrétegéből (AI nélkül). Az UIT-kódot a
+// „UIT” / „cod UIT” címke utáni tokenként keressük (A-Z/0-9, kötőjellel is),
+// mert egy szabad 16 karakteres minta számlaszámokra is ráillene.
+function extractUitCodesFromText(text) {
+  var out = [], seen = {};
+  var re = /\bUIT\b[^A-Z0-9]{0,20}([A-Z0-9][A-Z0-9\-]{2,22})/gi, m;
+  while ((m = re.exec(String(text || ''))) && out.length < MAX_CODES_PER_PHOTO) {
+    var c = normalizeUit(m[1]);
+    if (/\d/.test(c) && isValidUit(c) && !seen[c]) { out.push(c); seen[c] = true; }
+  }
+  return out;
+}
+
 // ─── args[0]: { mimeType, data (base64) } ─────────────────────
 handlers.scanUitFromImage = async function (req, res, args) {
   try {
@@ -66,10 +81,6 @@ handlers.scanUitFromImage = async function (req, res, args) {
     if (!(await featureEnabled(cid, 'ai-kiolvasas'))) {
       return res.json({ result: { ok: false, err: 'Functie AI nedisponibila in pachetul curent.' } });
     }
-    if (!process.env.GEMINI_API_KEY) {
-      return res.json({ result: { ok: false, err: 'Serviciul AI nu este configurat.' } });
-    }
-
     const a = (args && args[0]) ? args[0] : {};
     const mimeType = String(a.mimeType || '').toLowerCase();
     const base64 = String(a.data || '');
@@ -81,6 +92,27 @@ handlers.scanUitFromImage = async function (req, res, args) {
     const approxBytes = Math.floor(base64.length * 0.75);
     if (approxBytes > MAX_BYTES) {
       return res.json({ result: { ok: false, err: 'Fisierul este prea mare (max 8 MB).' } });
+    }
+
+    // ÁLLANDÓ SZABÁLY (lib/docPrivacy.js): a UIT-dokumentum / fotó SOHA nem megy
+    // külső AI-hoz. PDF-nél a szövegréteget HELYBEN olvassuk ki; fotónál nincs
+    // helyi kiolvasás → a kódot kézzel kell beírni.
+    if (docPrivacy.DOCS_LOCAL_ONLY) {
+      if (mimeType !== 'application/pdf') {
+        return res.json({ result: { ok: false, err: docPrivacy.BLOCKED_MSG, status: 403, local_only: true } });
+      }
+      let text = '';
+      try { const ex = await pdfx.extractText(Buffer.from(base64, 'base64')); text = (ex && ex.text) || ''; }
+      catch (_) { text = ''; }
+      const codes = extractUitCodesFromText(text);
+      try { await audit.fromReq(req, 'uit.scan', 'uit', null, { model: 'local-pdf', codes: codes.length }); } catch (_) {}
+      if (!codes.length) {
+        return res.json({ result: { ok: false, err: 'Nu am găsit cod UIT în textul PDF-ului. Introdu codul manual.', local_only: true } });
+      }
+      return res.json({ result: { ok: true, codes: codes, model: 'local-pdf', confidence: null } });
+    }
+    if (!process.env.GEMINI_API_KEY) {
+      return res.json({ result: { ok: false, err: 'Serviciul AI nu este configurat.' } });
     }
 
     const parts = [
@@ -112,5 +144,6 @@ handlers.scanUitFromImage = async function (req, res, args) {
 
 // Belső segéd — a teszt eléri, de RPC-n nem hívható.
 Object.defineProperty(handlers, '_sanitize', { value: sanitize, enumerable: false });
+Object.defineProperty(handlers, '_extractUitCodesFromText', { value: extractUitCodesFromText, enumerable: false });
 
 module.exports = handlers;
