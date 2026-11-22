@@ -120,7 +120,21 @@ async function learnedDataList(req, res) {
         summary: _clip(x.text, 300) + (x.source === 'explicit' ? ' 📌' : ''), hits: x.hits || 0, updated_at: x.updated_at }));
     } catch (_) { /* migráció előtt */ }
 
-    return res.json({ result: { ok: true, orderScan, memory, kinds: MEM_KINDS, chatMiss, chatIntent, chatMemory } });
+    // 📑 Menetlevél dokumentum-ellenőrzés: ügyfelenként tanult referencia-feliratok.
+    let wbDocPattern = [];
+    try {
+      const r = await pool.query(
+        `SELECT p.id, p.party_key, p.kind, p.ref_label, p.sample_count, p.updated_at, cl.denumire, ca.nev AS carrier_nev
+           FROM waybill_doc_patterns p
+           LEFT JOIN clients cl ON p.party_key = 'client:' || cl.id::text AND cl.company_id = p.company_id
+           LEFT JOIN carriers ca ON p.party_key = 'carrier:' || ca.id::text AND ca.company_id = p.company_id
+          WHERE p.company_id=$1 ORDER BY p.updated_at DESC LIMIT $2`, [cid, MAX_ROWS]);
+      wbDocPattern = r.rows.map(x => ({ id: Number(x.id),
+        key: (x.carrier_nev ? '🚚 ' + x.carrier_nev : (x.denumire || String(x.party_key).replace(/^client:/, ''))) + (x.kind === 'invoice' ? ' · 🧾' : ' · 📄'),
+        summary: '„' + (x.ref_label || '') + '"', hits: x.sample_count || 0, updated_at: x.updated_at }));
+    } catch (_) { /* migráció előtt */ }
+
+    return res.json({ result: { ok: true, orderScan, memory, kinds: MEM_KINDS, chatMiss, chatIntent, chatMemory, wbDocPattern } });
   } catch (e) {
     console.error('learnedDataList hiba:', e);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -156,6 +170,11 @@ async function learnedDataDelete(req, res, args) {
       const r = id > 0
         ? await pool.query(`DELETE FROM chat_memories WHERE id=$4 AND ${scope}`, [cid, isAdmin, u.id, id])
         : await pool.query(`DELETE FROM chat_memories WHERE ${scope}`, [cid, isAdmin, u.id]);
+      n = r.rowCount;
+    } else if (source === 'wb_doc_pattern') {
+      const r = id > 0
+        ? await pool.query('DELETE FROM waybill_doc_patterns WHERE id=$1 AND company_id=$2', [id, cid])
+        : await pool.query('DELETE FROM waybill_doc_patterns WHERE company_id=$1', [cid]);
       n = r.rowCount;
     } else if (source === 'chat_miss' || source === 'chat_intent') {
       const tbl = source === 'chat_miss' ? 'chat_miss_log' : 'chat_learned_intents';

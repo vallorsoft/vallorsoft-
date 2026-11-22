@@ -232,12 +232,13 @@ window.WaybillDocs = (function () {
     carrier_order: '📤 Comanda către subcontractor', carrier_invoice: '🧾 Factura subcontractorului' };
   var WHY_FB = { linked: 'legat de cursă', fuvar_no: 'nr. cursă', ref: 'referință', cui: 'CUI', name: 'denumire',
     amount: 'sumă', plate: 'nr. auto', load_city: 'loc încărcare', unload_city: 'loc descărcare', date: 'dată',
-    other_cui: 'alt CUI', kind_unknown: 'tip nesigur', confirmed: 'confirmat', unreadable: 'nu se poate citi' };
+    other_cui: 'alt CUI', kind_unknown: 'tip nesigur', confirmed: 'confirmat', unreadable: 'nu se poate citi',
+    learned_ref: 'referință învățată', learned_mismatch: 'altă referință' };
   function whyText(list) {
     return (list || []).map(function (r) {
       var k = String(r).split(':')[0], v = String(r).slice(k.length + 1);
       var lbl = tt('wdc.why.' + k, WHY_FB[k] || k);
-      return k === 'other_cui' ? '⚠️ ' + lbl + ' ' + v : lbl;
+      return (k === 'other_cui' || k === 'learned_mismatch') ? '⚠️ ' + lbl + ' ' + v : lbl;
     }).join(' · ');
   }
   function pct(s) {
@@ -291,7 +292,8 @@ window.WaybillDocs = (function () {
       c.foreign.forEach(function (f) {
         h += '<div class="wdc-s"><span>❌</span><div><b>' + esc(f.file_name || '') + '</b>' +
           '<div class="wdc-r">' + esc(tt('wdc.foreignWhy', 'Nu se potrivește cu nicio cursă de pe această foaie')) +
-          (f.other_cui ? ' · ' + esc(tt('wdc.why.other_cui', 'alt CUI')) + ' ' + esc(f.other_cui) : '') + '</div></div>' +
+          (f.other_cui ? ' · ' + esc(tt('wdc.why.other_cui', 'alt CUI')) + ' ' + esc(f.other_cui) : '') +
+          (f.other_ref ? ' · ' + esc(tt('wdc.why.learned_mismatch', 'altă referință')) + ' ' + esc(f.other_ref) : '') + '</div></div>' +
           '<div><button title="🗑" onclick="WaybillDocs._del(' + f.doc_id + ')">🗑</button></div></div>';
       });
       h += '</div>';

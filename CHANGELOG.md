@@ -14,7 +14,12 @@
 
 ---
 
-## 2026-11-22 — 📑 Menetlevél dokumentum-csomag ellenőrzés (helyben, AI nélkül, gomb nélkül)
+## 2026-11-22 — 🧠 Menetlevél-iratok: tanulás ügyfelenként + jel-súlyok
+- A ✓ visszaigazolásból `lib/waybillDocCheck.js` `learnFromDecision` megjegyzi, milyen felirat után áll az ügyfél (vagy alvállalkozó) referenciája / a fuvar-szám (pl. „nr comanda") — `waybill_doc_patterns` (ügyfél/alvállalkozó + megrendelő/számla). A következő iratnál a felirat utáni értéket a fuvarral veti össze: egyezés +45 (`learned_ref`), eltérés → az irat NEM párosítható ehhez a fuvarhoz (`learned_mismatch`) — így ugyanazon ügyfél MÁSIK fuvarjának megrendelője is kiszűrődik.
+- Jel-súlyok cégenként (`waybill_doc_feedback`): ✓/✗ döntésenként a jelek jó/rossz számlálója; legalább 5 döntés után a jel 0,5…1,2-szeres súlyt kap (`weightOf`).
+- A tanult feliratok a 🧠 Tanult adatok fülön (`learnedDataList` `wbDocPattern`, törölhető). Migráció `db/waybill-doc-learn.sql`; cache-bust `?v=20261122wdc3`. Teszt +4 eset.
+
+## 2026-11-22 — 📑 Menetlevél dokumentum-csomag ellenőrzés (helyben, AI nélkül, gomb nélkül, PR #667)
 - **Szabály:** a menetlevélhez azoknak a fuvaroknak az iratai kellenek, amelyeknek a LERAKÁSA a menetlevélen szerepel (`puncte` Descarcare / `role='unloading'`; régi, jelöletlen pontú menetlevélnél a `descarcat_at`-tal lerakott fuvarok). Fuvaronként: ügyfél-megrendelő + az ügyfélnek kiállított számla; alvállalkozós fuvarnál (`orders.carrier_id`) még a neki küldött megrendelő + az alvállalkozó számlája. Az itt nem lerakott fuvar „⏳ folyamatban (Alocat)", nem kell irat és nem számít elvégzettnek.
 - **`lib/waybillDocCheck.js`** — a fuvar ismert adatait keresi a PDF szövegrétegében (fuvar-szám, ügyfél-referencia, CUI, cégnév, összeg nettó/bruttó, rendszám, fel-/lerakó város, dátum) → biztonság %; ✅ ≥ 85 · 🟡 50–84 megerősítés · ❗ gyenge; más cég CUI-ja levon. Mohó párosítás a 4 helyre; a be nem sorolt irat: „nem ide tartozik" / „többlet" / „másik menetlevélé" / „nem olvasható". A PDF szövege a saját DB-ben cache-elve (`order_documents.text_cache/text_status`). Szkennelt PDF / fotó: „nem olvasható", kézi döntés.
 - **Háttérben fut:** `startWaybillDocCheckScheduler` (10 percenként, a hiányos és még nem ellenőrzött menetlevelek, 365 nap) + 3 mp-es gyűjtéssel azonnal minden irat-feltöltés / -törlés / -átsorolás és menetlevél-mentés után (`touch`). Eredmény: `waybill_doc_checks`.

@@ -7608,6 +7608,8 @@ function loadLearnedData() {
     var groups = [{ key: 'order_scan', title: t('ld.orderScan'), rows: (r.orderScan || []).map(function (x) {
       return { id: x.id, key: x.label, val: x.summary, hits: x.count, upd: x.updated_at };
     }) }];
+    // 📑 Menetlevél dokumentum-ellenőrzés: ügyfelenként tanult referencia-feliratok.
+    groups.push({ key: 'wb_doc_pattern', src: 'wb_doc_pattern', clear: true, title: t('ld.wbDocPattern'), rows: (r.wbDocPattern || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
     // AI-chat 2.0: megerősített mondat → képesség párok + nem értett mondatok (30 nap).
     groups.push({ key: 'chat_intent', src: 'chat_intent', clear: true, title: t('ld.chatIntent'), rows: (r.chatIntent || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
     groups.push({ key: 'chat_miss', src: 'chat_miss', clear: true, title: t('ld.chatMiss'), rows: (r.chatMiss || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
@@ -7663,7 +7665,7 @@ function ldDelete(source, id) {
 }
 function ldClearKind(kind) {
   if (!confirm(t('ld.confirmClear'))) return;
-  var arg = (kind === 'chat_miss' || kind === 'chat_intent' || kind === 'chat_memory') ? { source: kind } : { source: 'memory', kind: kind };
+  var arg = (kind === 'chat_miss' || kind === 'chat_intent' || kind === 'chat_memory' || kind === 'wb_doc_pattern') ? { source: kind } : { source: 'memory', kind: kind };
   gas('learnedDataDelete', [arg]).then(function (r) {
     if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
     toast(t('ld.deleted'), 'ok'); loadLearnedData();

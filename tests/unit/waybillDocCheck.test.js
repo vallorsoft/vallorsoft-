@@ -144,3 +144,43 @@ describe('evaluate — a dokumentum-csomag', () => {
     expect(r.foreign).toEqual([]);
   });
 });
+
+describe('tanulás — ügyfelenkénti referencia-felirat + jel-súly', () => {
+  const A = Object.assign({}, ORD_A, { client_id: 12 });
+  // Ugyanaz az ügyfél, ugyanaz az útvonal — DE egy másik fuvar megrendelője.
+  const OTHER = 'COMANDA DE TRANSPORT\nNr. comandă: PO-99001\nBeneficiar: VESNA GC SRL CUI RO25871352\nIncarcare: Arad\nDescarcare: Cluj-Napoca\nPret: 1.500,00 EUR';
+  const RIGHT = 'COMANDA DE TRANSPORT\nNr. comandă: PO-88123\nBeneficiar: VESNA GC SRL CUI RO25871352\nIncarcare: Arad\nDescarcare: Cluj-Napoca';
+
+  test('a felirat megtanulása és az érték kiolvasása', () => {
+    const l = chk.learnLabel(RIGHT, 'PO-88123');
+    expect(l).toBe('nr comanda');
+    expect(chk.valuesAfterLabel(OTHER, l)).toEqual(['po99001']);
+    expect(chk.partyKey(A, 'client')).toBe('client:12');
+    expect(chk.partyKey(ORD_B, 'carrier')).toBe('carrier:7');
+  });
+
+  test('tanulás nélkül az ügyfél MÁSIK fuvarjának megrendelője is átmegy — tanulással kiszűrve', () => {
+    const base = { orders: [A], requiredIds: ['A'], ownCui: OWN, docs: [doc(1, OTHER)] };
+    const r0 = chk.evaluate(base);
+    expect(r0.orders[0].slots[0].doc_id).toBe(1);   // CUI + név + városok + ár → párosítja
+    const learn = { patterns: { 'client:12|order': 'nr comanda' }, weights: {} };
+    const r1 = chk.evaluate(Object.assign({}, base, { learn }));
+    expect(r1.orders[0].slots[0].level).toBe('missing');
+    expect(r1.foreign.map((f) => f.doc_id)).toEqual([1]);
+  });
+
+  test('tanult felirattal a helyes megrendelő magas biztonságot kap', () => {
+    const learn = { patterns: { 'client:12|order': 'nr comanda' }, weights: {} };
+    const r = chk.evaluate({ orders: [A], requiredIds: ['A'], ownCui: OWN, docs: [doc(1, OTHER), doc(2, RIGHT)], learn });
+    const s = r.orders[0].slots[0];
+    expect(s.doc_id).toBe(2);
+    expect(s.level).toBe('ok');
+    expect(s.reasons.some((x) => x.startsWith('learned_ref'))).toBe(true);
+  });
+
+  test('jel-súly: 5 döntés alatt 1, rossz arány → csökken, jó → max 1,2', () => {
+    expect(chk.weightOf(2, 1)).toBe(1);
+    expect(chk.weightOf(1, 9)).toBeLessThan(0.6);
+    expect(chk.weightOf(20, 0)).toBeCloseTo(1.2, 1);
+  });
+});

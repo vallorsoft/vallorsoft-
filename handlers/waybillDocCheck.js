@@ -60,6 +60,16 @@ handlers.waybillDocDecide = async function (req, res, args) {
       [docId, cid, wid]);
     if (!d.rows.length) return res.json({ result: { ok: false, err: 'Documentul nu a fost găsit.' } });
 
+    // A párosítás jelenlegi indokai — ebből tanul a döntés (best-effort).
+    let reasons = [];
+    if (verdict !== 'reset') {
+      try {
+        const cur = await chk.checkWaybill(cid, wid);
+        const o2 = cur && (cur.orders || []).find((x) => x.id === orderId);
+        const sl = o2 && (o2.slots || []).find((x) => x.slot === slot && x.doc_id === docId);
+        reasons = (sl && sl.reasons) || [];
+      } catch (_) {}
+    }
     if (verdict === 'reset') {
       await pool.query('DELETE FROM waybill_doc_decisions WHERE company_id=$1 AND doc_id=$2 AND order_id=$3 AND slot=$4',
         [cid, docId, orderId, slot]);
@@ -75,6 +85,8 @@ handlers.waybillDocDecide = async function (req, res, args) {
            decided_by=EXCLUDED.decided_by, decided_at=NOW()`,
         [cid, docId, orderId, slot, verdict, u.email || u.nume || null]);
     }
+    try { await chk.learnFromDecision(cid, { docId, orderId, slot, verdict, reasons }); }
+    catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.error('waybillDocDecide tanulás (folytatjuk):', e.message); }
     audit.fromReq(req, 'waybill_doc.decide', 'waybill', wid, { doc_id: docId, order_id: orderId, slot, verdict });
     const r = await chk.checkWaybill(cid, wid);
     return res.json({ result: Object.assign({ ok: true }, r || {}) });
