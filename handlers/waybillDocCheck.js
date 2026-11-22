@@ -85,6 +85,17 @@ handlers.waybillDocDecide = async function (req, res, args) {
            decided_by=EXCLUDED.decided_by, decided_at=NOW()`,
         [cid, docId, orderId, slot, verdict, u.email || u.nume || null]);
     }
+    // ✓ → az irat típusa a visszaigazolt hely szerint (számla / megrendelő) — így a
+    // listában sem marad „Egyéb" alatt, és a következő ellenőrzés is ezt tudja.
+    if (verdict === 'ok') {
+      const kind = slot.endsWith('invoice') ? 'invoice' : 'order';
+      try {
+        await pool.query(
+          `UPDATE order_documents SET doc_type=$2
+            WHERE id=$1 AND COALESCE(doc_type,'') IN ('', 'other', 'order_doc', 'invoice', 'order', 'assignment') AND COALESCE(doc_type,'') <> $2`,
+          [docId, kind]);
+      } catch (e) { console.error('waybillDocDecide típus (folytatjuk):', e.message); }
+    }
     try { await chk.learnFromDecision(cid, { docId, orderId, slot, verdict, reasons }); }
     catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.error('waybillDocDecide tanulás (folytatjuk):', e.message); }
     audit.fromReq(req, 'waybill_doc.decide', 'waybill', wid, { doc_id: docId, order_id: orderId, slot, verdict });

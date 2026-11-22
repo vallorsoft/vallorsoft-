@@ -14,7 +14,11 @@
 
 ---
 
-## 2026-11-22 — 📥 Menetlevél-iratok: csoportos feltöltés + automatikus párosítás
+## 2026-11-22 — 🏷️ Számla / megrendelő felismerése pontosabban + az „Egyéb" iratok átsorolása
+- `lib/waybillDocCheck.js` új `textKindInfo`: pontozásos felismerés. A fejléc címsora (sor eleje, első 15 sor) erős jel, a jellemző mezők (TVA / bázis / fizetendő / esedékesség, ill. felrakás / lerakás / rendszám / fuvarozó / fuvardíj) gyengébbek. RO + HU + EN + DE kulcsszavak, ékezet-függetlenül. **Javított hiba:** a megrendelő fizetési feltételében („plata la primirea facturii") álló „factura" szó + egy sorozatszám-szerű szám miatt a megrendelőt számlának vette; a „Számla" / „Invoice" / „Rechnung" címet nem ismerte fel.
+- A biztosan felismert „Egyéb" / általános (`other`, `''`, `order_doc`) irat típusa átíródik számlára / megrendelőre: az ellenőrzéskor, és egyszer a régi iratoknál is (`reclassifyRound` az ütemezőben, jelző `order_documents.kind_checked_at`, migráció `db/order-doc-kind-reclassify.sql`). A ✓ visszaigazolás a hely szerinti típust állítja be. A felhasználó által választott más típushoz (CMR, POD stb.) nem nyúl. Teszt: +4 eset; valódi DB-n ellenőrizve.
+
+## 2026-11-22 — 📥 Menetlevél-iratok: csoportos feltöltés + automatikus párosítás (PR #671)
 - A FUVARLEVELEK oldal tetején „📥 Csoportos feltöltés" kártya (`public/doc-inbox.js`): egyszerre akár 50 PDF / fotó, vegyesen számlák és megrendelők. Feltöltés soronként (haladásjelző), majd háttér-feldolgozás. A szerver helyben (PDF-szöveg / helyi OCR, AI nélkül) kiolvassa, és a hiányos menetlevelek hiányzó helyeihez (ügyfél / alvállalkozó megrendelő + számla) párosítja (`lib/docInbox.js` `pickSlot`: pontszám ≥ 70 és ≥ 15 pont előny a következő fuvarhoz képest). Találat → `order_documents` sor a fuvarhoz + a menetlevélhez kötve, visszaigazolt döntés (tanulás), újraellenőrzés.
 - Nincs találat → újrapróbálás az ütemezőben (10 percenként, irataként 3 próbálkozás); 3 után „nem párosítható". Az oldal megnyitásakor ilyenkor magától felugrik a lista, és rákérdez: kézi párosítás a hiányzó helyek legördülőjéből, vagy végleges törlés (soronként / mind). Új tábla `waybill_doc_inbox` (`db/waybill-doc-inbox.sql`; párosítás / törlés után a fájl kikerül a tárolóból). RPC-k: `docInboxUpload/Process/List/Assign/Delete/Retry` (`handlers/docInbox.js`). Cache-bust `?v=20261122inbox`. Teszt: `tests/unit/docInbox.test.js` (14); valódi DB-n: számla + megrendelő automatikusan a helyére, idegen irat 3 kör után „nem párosítható", cross-tenant törlés elutasítva; kontraszt-audit 0 hiba.
 
