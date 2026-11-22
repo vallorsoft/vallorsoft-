@@ -24,6 +24,10 @@
   "type": "commonjs",
   "dependencies": {
     "@here/flexpolyline": "^0.1.0",
+    "@tesseract.js-data/deu": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/hun": "^1.0.0",
+    "@tesseract.js-data/ron": "^1.0.0",
     "bcrypt": "^6.0.0",
     "connect-pg-simple": "^10.0.0",
     "cookie-parser": "^1.4.7",
