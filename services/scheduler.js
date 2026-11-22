@@ -1973,6 +1973,11 @@ function startWaybillDocCheckScheduler() {
         if (k) console.log('[WaybillDocCheck] OCR', k, 'irat');
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillDocCheck] OCR hiba', e.message); }
       const n = await chk.runRound(PER);
+      // csoportos feltöltés: a függő iratok újabb párosítási köre (max. 3 próbálkozás / irat)
+      try {
+        const m = await require('../lib/docInbox').runRound();
+        if (m) console.log('[DocInbox] automatikusan párosítva', m, 'irat');
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[DocInbox] kör hiba', e.message); }
       if (n) console.log('[WaybillDocCheck] ellenőrizve', n, 'menetlevél');
     } catch (e) {
       if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillDocCheck] kör hiba', e.message);
