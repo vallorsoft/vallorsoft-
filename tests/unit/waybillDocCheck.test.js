@@ -192,3 +192,25 @@ test('OCR-rel olvasott irat: jelölve, kicsit óvatosabb pontszám', () => {
   expect(viaOcr.reasons).toContain('ocr');
   expect(viaOcr.score).toBeLessThan(plain.score);
 });
+
+describe('irat-fajta felismerés (pontozás)', () => {
+  const k = (t) => chk.textKindInfo(t, parseInvoiceText(t));
+  test('megrendelő, aminek a fizetési feltételében „factura" + sorozatszám-szerű szám áll → megrendelő', () => {
+    const t = 'DACIA LOG SRL\nStr. Fabricii 3, Cluj\nCUI RO11223344\nComandă de transport nr. 4471\nLoc încărcare: Oradea\n' +
+      'Loc descărcare: Sibiu\nPreț transport: 2000 EUR\nPlata la 60 zile de la primirea facturii originale si CMR\nSeria AB nr 12345';
+    expect(k(t)).toMatchObject({ kind: 'order', strong: true });
+  });
+  test('magyar / angol / német iratok', () => {
+    expect(k('Trans Kft\nSzámla\nSzámla sorszáma: TR-2026/55\nTeljesítés dátuma: 2026.10.05\nFizetési határidő: 2026.11.05\nÁFA 27%').kind).toBe('invoice');
+    expect(k('Fuvarmegbízás\nFelrakás: Győr\nLerakás: Arad\nRendszám: ABC-123\nFuvardíj: 900 EUR').kind).toBe('order');
+    expect(k('ACME Ltd\nINVOICE\nInvoice No: 2026-77\nDue date: 01.12.2026\nVAT 0%\nTotal 1200 EUR').kind).toBe('invoice');
+    expect(k('Transportauftrag 5512\nBeladestelle: München\nEntladestelle: Arad\nFrachtpreis 1500 EUR').kind).toBe('order');
+  });
+  test('számla fejlécében „Comanda: …" hivatkozás → számla marad', () => {
+    expect(k('Factura seria VLR nr 01080\nComanda: PO-55\nFurnizor VALLOR\nCumparator X\nTotal de plata 100').kind).toBe('invoice');
+  });
+  test('kevés jel → nem dönt (nem erős)', () => {
+    expect(k('valami szöveg').kind).toBeNull();
+    expect(k('Comanda\nArad - Cluj').strong).toBe(false);
+  });
+});

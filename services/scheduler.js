@@ -1972,6 +1972,11 @@ function startWaybillDocCheckScheduler() {
         const k = await chk.ocrRound(Math.max(1, Math.min(10, parseInt(process.env.WAYBILL_DOC_OCR_PER_ROUND, 10) || 3)));
         if (k) console.log('[WaybillDocCheck] OCR', k, 'irat');
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillDocCheck] OCR hiba', e.message); }
+      // „Egyéb" iratok egyszeri típus-felismerése (számla / megrendelő)
+      try {
+        const rc = await chk.reclassifyRound(200);
+        if (rc) console.log('[WaybillDocCheck] típus felismerve', rc, 'iratnál');
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillDocCheck] típus-felismerés hiba', e.message); }
       const n = await chk.runRound(PER);
       // csoportos feltöltés: a függő iratok újabb párosítási köre (max. 3 próbálkozás / irat)
       try {
