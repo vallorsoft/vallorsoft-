@@ -1,26 +1,15 @@
 // services/order-ai/index.js
-// Kiolvasás-vezénylő. AI BE (és van GEMINI_API_KEY) -> Gemini; különben heurisztika.
-// Az AI-szolgáltató cserélhető (mint a többi adapter): ide pattintható be groq/local.
-const gemini = require('./gemini');
+// Kiolvasás-vezénylő — a megrendelő / e-mailes megrendelés kiolvasása.
+// ÁLLANDÓ SZABÁLY (lib/docPrivacy.js): a megrendelő tartalma (fájl ÉS szöveg)
+// SOHA nem hagyja el a szervert → mindig a helyi heurisztika fut, a Gemini-adapter
+// (./gemini.js) erről az útról nem hívható. Az `aiEnabled` opció figyelmen kívül marad.
 const heuristic = require('./heuristic');
+const { DOCS_LOCAL_ONLY } = require('../../lib/docPrivacy');
 
 // opts: { text, pdfBuffer, pdfName, fileBuffer, mimeType, aiEnabled }
-// (a fileBuffer+mimeType az általános — kép VAGY PDF — út; a pdfBuffer a
-//  régi e-mail-intake hívási forma. A gemini-adapter mindkettőt kezeli.)
 async function extractFields(opts) {
-  const wantAi = opts.aiEnabled && process.env.GEMINI_API_KEY;
-  if (wantAi) {
-    try {
-      const r = await gemini.extract(opts);
-      return { fields: r.fields, confidence: r.confidence, ai_used: true };
-    } catch (e) {
-      // ha az AI hibázik, ne vesszen el a megrendelés -> heurisztika + jelzés
-      const r = heuristic.extract(opts);
-      r.fields.observatii = '[AI hiba: ' + e.message + ']';
-      return { fields: r.fields, confidence: r.confidence, ai_used: false };
-    }
-  }
-  const r = heuristic.extract(opts);
+  if (!DOCS_LOCAL_ONLY) throw new Error('DOCS_LOCAL_ONLY kötelező'); // védőkorlát
+  const r = heuristic.extract(opts || {});
   return { fields: r.fields, confidence: r.confidence, ai_used: false };
 }
 

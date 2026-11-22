@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-22 — 🔒 Dokumentumok csak a saját szerveren: megrendelő, számla/bon, fuvar-fotó nem megy külső AI-hoz
+- Új `lib/docPrivacy.js` — kódba égetett (NEM env) `DOCS_LOCAL_ONLY = true`. **`lib/geminiJson.js`** `extractJson`: bármilyen fájl-rész (`inlineData`/`fileData`) a kérésben → hálózati hívás NÉLKÜL elutasítva (403, `DOCS_LOCAL_ONLY`).
+- **`services/order-ai`** mindig a helyi heurisztikát futtatja (a megrendelő fájlja ÉS szövege sem megy ki): fuvar-kiírás „megrendelő feltöltése", e-mailes megrendelés, beérkező újraolvasás. **Bon-scan** (`scanReceipt`) kikapcsolva, a gomb rejtve (`getMyBonScanEnabled` `usable:false`). **UIT-scan**: fotó → kézi bevitel; PDF → a szövegrétegből helyben (`extractUitCodesFromText`, „UIT" címke után).
+- A chat (szöveg) és a sofőr-fordító marad AI-val. Tesztek: új `tests/unit/docPrivacy.test.js` (valódi Gemini-kliens + `fetch`-kém: egy hívás sem megy ki), a régi AI-utas tesztek az új viselkedésre írva.
+
 ## 2026-11-21 — ✏️ „Korábbi tétel" ablak: tételenkénti szerkesztés (PR #664)
 - `public/sofer.js` `pendingAddEdit` / `pendingEditSave` + új `#pendingEditModal` (`sofer.html`): a „📋 Korábbi tétel — hozzáadod?" ablak minden során ✏️ gomb (a 🗑 mellett) → szerkesztő ablak az ÖSSZES adattal: típus (tankolás ↔ vásárlás, váltáskor a beírt közös mezők megmaradnak), helyszín, dátum, összeg a bon saját valutájában, valuta, fizetés; tankolásnál üzemanyag/liter/km, vásárlásnál termék/kategória. Mentett (félretett) tételnél a mentett lista frissül (`_pid` megmarad; valutás tételnél az eredeti a `*_orig`-ba, az árfolyam csak azonos valuta+nap esetén marad), lefotózott bonnál a várólista + a szerveri pending sor is (`updatePendingReceipt`, az árfolyamot a dátumra újraszámolja). A pipa-állapot megmarad. A vissza-gomb előbb a szerkesztőt zárja (`_SOF_MODALS`).
 - `handlers/receiptScan.js` új `updatePendingReceipt` (Sofer: csak saját; Admin/Manager: a cégéé; csak `pending` sor; `sanitize` fehérlista, a kézi litert nem „javítja"; audit `receipt.update`). i18n `sof.pe.*` (RO+HU), cache-bust `?v=20261121paedit`.

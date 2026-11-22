@@ -25,6 +25,7 @@
 const pool = require('../db');
 const { normalizeCategory, categoryListForPrompt } = require('../lib/expenseCategories');
 const { extractJson } = require('../lib/geminiJson');
+const docPrivacy = require('../lib/docPrivacy');
 const { featureEnabled } = require('../lib/featureEnabled');
 const audit = require('../lib/audit');
 
@@ -199,10 +200,6 @@ handlers.scanReceipt = async function (req, res, args) {
     if (!(await featureEnabled(cid, 'ai-bon-scan'))) {
       return res.json({ result: { ok: false, err: 'Functie AI nedisponibila in pachetul curent.' } });
     }
-    if (!process.env.GEMINI_API_KEY) {
-      return res.json({ result: { ok: false, err: 'Serviciul AI nu este configurat.' } });
-    }
-
     const a = (args && args[0]) ? args[0] : {};
     const mimeType = String(a.mimeType || '').toLowerCase();
     const base64 = String(a.data || '');
@@ -211,6 +208,14 @@ handlers.scanReceipt = async function (req, res, args) {
     if (!base64) return res.json({ result: { ok: false, err: 'Fisier lipsa.' } });
     const approxBytes = Math.floor(base64.length * 0.75);
     if (approxBytes > MAX_BYTES) return res.json({ result: { ok: false, err: 'Fisierul este prea mare (max 8 MB).' } });
+
+    // ÁLLANDÓ SZABÁLY (lib/docPrivacy.js): a bon fotója SOHA nem megy külső AI-hoz.
+    if (docPrivacy.DOCS_LOCAL_ONLY) {
+      return res.json({ result: { ok: false, err: docPrivacy.BLOCKED_MSG, status: 403, local_only: true } });
+    }
+    if (!process.env.GEMINI_API_KEY) {
+      return res.json({ result: { ok: false, err: 'Serviciul AI nu este configurat.' } });
+    }
 
     // Tanulás: a cég legutóbbi 5 egyedi merchant-mintáját few-shot példaként
     // hozzáfűzzük a system-prompthoz.
@@ -437,7 +442,8 @@ handlers.getMyBonScanEnabled = async function (req, res /*, args */) {
     if (!allowed) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = u.company_id;
     const flag = await featureEnabled(cid, 'ai-bon-scan');
-    const hasKey = !!process.env.GEMINI_API_KEY;
+    // A fotós AI-kiolvasás a docPrivacy szabály miatt nem használható → a gomb rejtve.
+    const hasKey = !!process.env.GEMINI_API_KEY && !docPrivacy.DOCS_LOCAL_ONLY;
     // A UI a `usable`-t nézi (a két feltétel együtt); a `flag` és `hasKey`
     // csak diagnosztikai (a bug-jelentőnek hasznos).
     return res.json({ result: { ok: true, enabled: !!flag, hasKey, usable: !!(flag && hasKey) } });

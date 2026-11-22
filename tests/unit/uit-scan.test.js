@@ -18,6 +18,10 @@ jest.mock('../../lib/audit', () => ({
   fromReq: jest.fn().mockResolvedValue(undefined),
 }));
 
+// A PDF szövegrétege helyben olvasva (docPrivacy) — tesztenként állítható szöveg.
+let mockPdfText = '';
+jest.mock('../../services/pdf-extract', () => ({ extractText: async () => ({ text: mockPdfText }) }));
+
 const { extractJson } = require('../../lib/geminiJson');
 const handlers = require('../../handlers/uitScan');
 
@@ -55,12 +59,13 @@ describe('handlers.scanUitFromImage — kapuk', () => {
     expect(res._body.result.ok).toBe(false);
     expect(res._body.result.err).toMatch(/Format/i);
   });
-  test('nincs API-kulcs → nem-konfigurált', async () => {
-    delete process.env.GEMINI_API_KEY;
+  test('fotó → nem megy ki (local_only), az AI-t nem hívja', async () => {
+    extractJson.mockReset();
     const res = mkRes();
     await handlers.scanUitFromImage(mkReq('Admin'), res, [{ mimeType: 'image/jpeg', data: 'AAAA' }]);
     expect(res._body.result.ok).toBe(false);
-    expect(res._body.result.err).toMatch(/nu este configurat/i);
+    expect(res._body.result.local_only).toBe(true);
+    expect(extractJson).not.toHaveBeenCalled();
   });
 });
 
@@ -90,34 +95,24 @@ describe('handlers.scanUitFromImage — sanitize', () => {
   });
 });
 
-describe('handlers.scanUitFromImage — teljes út (Gemini mock)', () => {
-  beforeEach(() => { process.env.GEMINI_API_KEY = 'test'; extractJson.mockReset(); });
-  test('sikeres AI-válasz → codes-tömb', async () => {
-    extractJson.mockResolvedValueOnce({ json: { codes: ['ABCD-1234', 'xyz0-9999'], confidence: 0.9 }, model: 'gemini-2.0-flash' });
+describe('UIT PDF — helyi kiolvasás (docPrivacy)', () => {
+  beforeEach(() => { extractJson.mockReset(); mockPdfText = ''; });
+  const PDF = [{ mimeType: 'application/pdf', data: Buffer.from('%PDF-1.4').toString('base64') }];
+  test('PDF szövegrétegéből kódok, AI nélkül', async () => {
+    mockPdfText = 'Confirmare e-Transport\nCod UIT: ABCD-1234-EFGH-5678\nFactura 2026000123';
     const res = mkRes();
-    await handlers.scanUitFromImage(mkReq('Sofer'), res, [{ mimeType: 'image/jpeg', data: Buffer.from('x').toString('base64') }]);
-    expect(res._body.result.ok).toBe(true);
-    expect(res._body.result.codes).toEqual(['ABCD1234', 'XYZ09999']);
-    expect(res._body.result.model).toBe('gemini-2.0-flash');
-  });
-  test('AI-hiba → err a válaszban', async () => {
-    extractJson.mockRejectedValueOnce(Object.assign(new Error('kvota'), { status: 429 }));
-    const res = mkRes();
-    await handlers.scanUitFromImage(mkReq('Sofer'), res, [{ mimeType: 'image/jpeg', data: Buffer.from('x').toString('base64') }]);
-    expect(res._body.result.ok).toBe(false);
-    expect(res._body.result.status).toBe(429);
-  });
-});
-
-describe('UIT PDF-feltöltés', () => {
-  beforeEach(() => { process.env.GEMINI_API_KEY = 'test'; extractJson.mockReset(); });
-  test('PDF (pl. e-Transport visszaigazolás) → a Gemini PDF-ként kapja, kódokat ad', async () => {
-    extractJson.mockResolvedValueOnce({ json: { codes: ['ABCD1234EFGH5678'], confidence: 0.95 }, model: 'm' });
-    const res = mkRes();
-    await handlers.scanUitFromImage(mkReq('Admin'), res, [{ mimeType: 'application/pdf', data: Buffer.from('%PDF-1.4').toString('base64') }]);
+    await handlers.scanUitFromImage(mkReq('Sofer'), res, PDF);
     expect(res._body.result.ok).toBe(true);
     expect(res._body.result.codes).toEqual(['ABCD1234EFGH5678']);
-    expect(extractJson.mock.calls[0][0].parts[0].inlineData.mimeType).toBe('application/pdf');
+    expect(res._body.result.model).toBe('local-pdf');
+    expect(extractJson).not.toHaveBeenCalled();
+  });
+  test('nincs UIT a szövegben → kézi bevitelre kér', async () => {
+    mockPdfText = 'Factura nr 2026000123';
+    const res = mkRes();
+    await handlers.scanUitFromImage(mkReq('Sofer'), res, PDF);
+    expect(res._body.result.ok).toBe(false);
+    expect(extractJson).not.toHaveBeenCalled();
   });
 });
 

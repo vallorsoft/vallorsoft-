@@ -16,6 +16,12 @@ jest.mock('../../services/pdf-extract', () => ({
   extractText: async () => ({ text: '', scanned: true, hasParser: false }),
 }));
 
+// A kiolvasó (services/order-ai) mockolva: a docPrivacy szabály óta MINDIG a helyi
+// heurisztika fut (lásd tests/unit/docPrivacy.test.js) — itt a handler kapuit és a
+// mező-sanitize-t teszteljük a kiolvasó kimenetére.
+const mockExtract = jest.fn();
+jest.mock('../../services/order-ai', () => ({ extractFields: (...a) => mockExtract(...a) }));
+
 const handler = require('../../handlers/orderScan');
 
 function call(user, args) {
@@ -27,18 +33,7 @@ function call(user, args) {
 }
 
 function mockGeminiJson(json) {
-  global.fetch = jest.fn(async () => ({
-    ok: true, status: 200,
-    text: async () => JSON.stringify({
-      candidates: [{ content: { parts: [{ text: JSON.stringify(json) }] } }],
-    }),
-  }));
-}
-function mockGeminiStatus(status) {
-  global.fetch = jest.fn(async () => ({
-    ok: false, status,
-    text: async () => JSON.stringify({ error: { message: 'fail' } }),
-  }));
+  mockExtract.mockResolvedValue({ fields: json, confidence: json.confidence, ai_used: false });
 }
 
 const ADMIN = { id: 1, email: 'a@x', pozicio: 'Admin', company_id: 1, nume: 'A' };
@@ -65,6 +60,8 @@ describe('handlers/orderScan — scanOrderDocument', () => {
   const origFetch = global.fetch;
   beforeEach(() => {
     process.env.GEMINI_API_KEY = 'test-key';
+    mockExtract.mockReset();
+    mockExtract.mockResolvedValue({ fields: {}, confidence: 0.25, ai_used: false });
     mockFeatureOn = true;
     mockDbQuery.mockReset();
     mockDbQuery.mockResolvedValue({ rows: [] });
@@ -122,11 +119,11 @@ describe('handlers/orderScan — scanOrderDocument', () => {
     expect(r.result.err).toMatch(/prea mare/i);
   });
 
-  it('PDF-et is elfogad (a szöveg-kinyerés után az AI-t hívja)', async () => {
+  it('PDF-et is elfogad (helyi kiolvasás, ai_used=false)', async () => {
     mockGeminiJson({ client: 'PDF Client', confidence: 0.8 });
     const r = await call(ADMIN, PDF);
     expect(r.result.ok).toBe(true);
-    expect(r.result.ai_used).toBe(true);
+    expect(r.result.ai_used).toBe(false);
     expect(r.result.fields.client).toBe('PDF Client');
   });
 
@@ -175,13 +172,6 @@ describe('handlers/orderScan — scanOrderDocument', () => {
   // ── Tartalék (AI nélkül) ──
   it('GEMINI_API_KEY nélkül a heurisztikus tartalék fut (ai_used=false)', async () => {
     delete process.env.GEMINI_API_KEY;
-    const r = await call(ADMIN, PDF);
-    expect(r.result.ok).toBe(true);
-    expect(r.result.ai_used).toBe(false);
-  });
-
-  it('AI-hiba (429 minden modellen) esetén sem hasal el — tartalékra esik', async () => {
-    mockGeminiStatus(429);
     const r = await call(ADMIN, PDF);
     expect(r.result.ok).toBe(true);
     expect(r.result.ai_used).toBe(false);
@@ -236,28 +226,19 @@ describe('handlers/orderScan — scanOrderDocument', () => {
   });
 
   // ── Tanulás — few-shot minta betöltés ──
-  it('few-shot: a cég korábbi mintáit lekéri és a prompt-ba fűzi', async () => {
+  it('few-shot: a cég korábbi mintáit lekéri és a kiolvasónak adja', async () => {
     // Első SELECT (loadCompanySamples) → 2 minta
     mockDbQuery.mockResolvedValueOnce({ rows: [
       { template_label: 'Vallor Logistics SRL', fields: { valuta: 'EUR', load_type: 'FTL', typical_deliveries: 3 }, updated_at: new Date('2026-08-01') },
       { template_label: 'DHL Freight', fields: { valuta: 'EUR', load_type: 'LTL' }, updated_at: new Date('2026-07-01') },
     ]});
-    // Elkapjuk a Gemini hívásba küldött system-promptot
-    let capturedBody = null;
-    global.fetch = jest.fn(async (url, opts) => {
-      capturedBody = JSON.parse(opts.body);
-      return { ok: true, status: 200, text: async () => JSON.stringify({
-        candidates: [{ content: { parts: [{ text: JSON.stringify({ client: 'Vallor', confidence: 0.9 }) }] } }],
-      }) };
-    });
+    mockGeminiJson({ client: 'Vallor', confidence: 0.9 });
     const r = await call(ADMIN, IMG);
     expect(r.result.ok).toBe(true);
     expect(r.result.learned_from).toBe(2);
-    // A system-prompt tartalmazza az EXEMPLE CONFIRMATE szekciót
-    const sysPrompt = capturedBody.systemInstruction.parts[0].text;
-    expect(sysPrompt).toMatch(/EXEMPLE CONFIRMATE/);
-    expect(sysPrompt).toMatch(/Vallor Logistics SRL/);
-    expect(sysPrompt).toMatch(/DHL Freight/);
+    // A minták a (helyi) kiolvasónak adódnak át
+    const opts = mockExtract.mock.calls[mockExtract.mock.calls.length - 1][0];
+    expect(opts.samples.map((x) => x.template_label)).toEqual(['Vallor Logistics SRL', 'DHL Freight']);
   });
 
   it('few-shot: DB-hiba (tábla hiányzik) → hint nélkül fut', async () => {
