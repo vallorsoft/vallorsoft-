@@ -21,7 +21,8 @@ const MIME_RE = /^data:(application\/pdf|image\/(png|jpe?g|webp|heic|heif)|text\
 
 function _clip(v, max) { if (v == null) return null; const s = String(v).trim(); return s ? s.slice(0, max) : null; }
 function _date(v) { const s = String(v || '').trim().slice(0, 10); return DATE_RE.test(s) ? s : null; }
-function _type(v) { const s = String(v || '').trim(); return DOC_TYPES.includes(s) ? s : 'other'; }
+// A „megbízás" és a „megrendelő" egy típus (doc_type='order'); a régi 'assignment' is ide kerül.
+function _type(v) { let s = String(v || '').trim(); if (s === 'assignment') s = 'order'; return DOC_TYPES.includes(s) ? s : 'other'; }
 
 // orderDocSearch({ q?, order_id?, doc_type?, from?, to?, limit? })
 // A dátum = a dokumentum saját dátuma, ha nincs → feltöltés napja.
