@@ -1,7 +1,6 @@
 // public/backup-card.js
-// 🛡️ Biztonsági mentés Google Drive-ba — Integrációk fül (csak Admin).
-// Backend: backupGetStatus / backupSaveSettings / backupDisconnect / backupRunNow
-// (handlers/backup.js); összekötés: /api/backup/google/connect?target=company.
+// 🛡️ Éjszakai biztonsági mentés (titkosítva, a VallorSoft Cloudflare-tárhelyén) — Integrációk fül (csak Admin).
+// Backend: backupGetStatus / backupSaveSettings / backupRunNow / backupRestore* (handlers/backup.js).
 window.BackupCard = (function () {
   function tt(k, fb, vars) { try { if (typeof t === 'function') { var v = t(k, vars); if (v && v !== k) return v; } } catch (e) {} return fb || k; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
@@ -27,22 +26,11 @@ window.BackupCard = (function () {
       h += '<div class="badge warn" style="display:inline-block;padding:8px 12px;">' + esc(tt('bk.noConfig')) + '</div></div>';
       box.innerHTML = h; return;
     }
-    // Kapcsolat
-    h += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">';
-    if (d.connected) {
-      h += '<span class="badge ' + (d.status === 'error' ? 'err' : 'ok') + '" style="padding:6px 10px;">'
-        + (d.status === 'error' ? '⚠️ ' : '✅ ') + esc(tt('bk.connectedAs')) + ' ' + esc(d.email || 'Google') + '</span>'
-        + '<button class="btn ghost" style="padding:6px 12px;" onclick="BackupCard.disconnect()">' + esc(tt('bk.disconnect')) + '</button>';
-      if (d.status_message) h += '<div style="width:100%;font-size:12px;color:var(--status-danger);">' + esc(d.status_message) + '</div>';
-      h += '<div style="width:100%;font-size:12px;color:var(--muted);">' + esc(tt('bk.folder')) + ' <b>' + esc(d.folder_name) + '</b></div>';
-    } else {
-      h += '<span class="badge" style="padding:6px 10px;">' + esc(tt('bk.notConnected')) + '</span>'
-        + '<a class="btn primary" style="padding:8px 14px;text-decoration:none;" href="/api/backup/google/connect?target=company">' + esc(tt('bk.connect')) + '</a>';
-    }
-    h += '</div>';
+    h += '<div style="margin-bottom:14px;"><span class="badge ok" style="padding:6px 10px;">🔒 ' + esc(tt('bk.storage', 'Stocare criptată pe serverele VallorSoft (Cloudflare)')) + '</span>'
+      + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">' + esc(tt('bk.keepRule', 'Ultimele {d} zile: copie zilnică; după aceea o copie pe lună, pe perioada aleasă.', { d: d.daily_keep_days || 30 })) + '</div></div>';
     // Beállítások
     var hours = ''; for (var i = 0; i < 24; i++) hours += '<option value="' + i + '"' + (i === d.run_hour ? ' selected' : '') + '>' + (i < 10 ? '0' : '') + i + ':00</option>';
-    var rets = (d.retention_options || ['forever']).map(function (r) {
+    var rets = (d.retention_options || ['365']).map(function (r) {
       return '<option value="' + esc(r) + '"' + (r === d.drive_retention ? ' selected' : '') + '>' + esc(tt('bk.ret.' + r, r)) + '</option>';
     }).join('');
     h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin:0 0 10px;">'
@@ -53,9 +41,8 @@ window.BackupCard = (function () {
       + '</div>'
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 10px;">'
       + '<button class="btn primary" onclick="BackupCard.save()">' + esc(tt('common.save', 'Salvează')) + '</button>'
-      + (d.connected ? '<button class="btn" ' + (d.running ? 'disabled' : '') + ' onclick="BackupCard.runNow(this)">' + esc(d.running ? tt('bk.running') : tt('bk.runNow')) + '</button>' : '')
+      + '<button class="btn" ' + (d.running ? 'disabled' : '') + ' onclick="BackupCard.runNow(this)">' + esc(d.running ? tt('bk.running') : tt('bk.runNow')) + '</button>'
       + '</div>';
-    if (d.vs_copy) h += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">' + esc(tt('bk.vsCopy', '', { n: d.vs_retention_days })) + '</div>';
     // Napló
     h += '<div style="font-weight:700;font-size:13px;margin:6px 0;color:var(--text-primary);">' + esc(tt('bk.history')) + '</div>';
     if (!d.runs || !d.runs.length) {
@@ -63,12 +50,12 @@ window.BackupCard = (function () {
     } else {
       h += '<div style="overflow-x:auto;"><table class="table" style="font-size:12px;"><thead><tr>'
         + '<th>' + esc(tt('bk.c.date')) + '</th><th>' + esc(tt('bk.c.trigger')) + '</th><th>' + esc(tt('bk.c.size')) + '</th>'
-        + '<th>' + esc(tt('bk.c.rows')) + '</th><th>' + esc(tt('bk.c.drive')) + '</th><th>' + esc(tt('bk.c.vs')) + '</th><th>' + esc(tt('bk.c.status')) + '</th><th></th>'
+        + '<th>' + esc(tt('bk.c.rows')) + '</th><th>' + esc(tt('bk.c.status')) + '</th><th></th>'
         + '</tr></thead><tbody>'
         + d.runs.map(function (r) {
           return '<tr' + (r.error ? ' title="' + esc(r.error) + '"' : '') + '><td>' + esc(fmtDate(r.started_at)) + '</td><td>' + esc(tt('bk.tr.' + r.trigger, r.trigger)) + '</td>'
             + '<td>' + esc(fmtSize(r.size_bytes)) + '</td><td>' + esc(r.row_count != null ? r.row_count.toLocaleString('ro-RO') : '—') + '</td>'
-            + '<td>' + esc(st(r.drive_status)) + '</td><td>' + esc(st(r.vs_status)) + '</td><td>' + esc(st(r.status)) + '</td>'
+            + '<td>' + esc(st(r.status)) + (r.r2_status === 'deleted' ? ' · ' + esc(tt('bk.st.deleted', 'șters')) : '') + '</td>'
             + '<td style="white-space:nowrap;">' + restoreBtns(r) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
     }
@@ -85,11 +72,8 @@ window.BackupCard = (function () {
   // ---- Visszaállítás ----
   var _rPoll = null, _confirmWord = 'RESTAURARE';
   function restoreBtns(r) {
-    if (r.status !== 'ok' && r.status !== 'partial') return '';
-    var b = '';
-    if (r.has_drive_copy) b += '<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="BackupCard.restoreStart(' + r.id + ',\'company\')">↩️ ' + esc(tt('bk.r.fromDrive')) + '</button> ';
-    if (r.has_vs_copy) b += '<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="BackupCard.restoreStart(' + r.id + ',\'vs\')">↩️ ' + esc(tt('bk.r.fromVs')) + '</button>';
-    return b;
+    if (r.status !== 'ok' || !r.has_copy) return '';
+    return '<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="BackupCard.restoreStart(' + r.id + ')">↩️ ' + esc(tt('bk.r.restore', 'Restaurează')) + '</button>';
   }
   function renderRestore(j) {
     var el = document.getElementById('bkRestoreBox'); if (!el) return;
@@ -133,9 +117,9 @@ window.BackupCard = (function () {
       renderRestore(d.job);
     }).catch(function () {});
   }
-  function restoreStart(runId, source) {
+  function restoreStart(runId) {
     if (!confirm(tt('bk.r.startConfirm'))) return;
-    gas('backupRestorePreview', [{ run_id: runId, source: source }]).then(function (d) {
+    gas('backupRestorePreview', [{ run_id: runId }]).then(function (d) {
       if (d && d.ok) { renderRestore(d.job); var el = document.getElementById('bkRestoreBox'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
       else toast((d && d.err) || tt('common.error', 'Eroare'), 'err');
     });
@@ -162,10 +146,6 @@ window.BackupCard = (function () {
       if (d && d.ok) { toast(tt('bk.saved'), 'ok'); load(); } else toast((d && d.err) || tt('common.error', 'Eroare'), 'err');
     });
   }
-  function disconnect() {
-    if (!confirm(tt('bk.disconnectConfirm'))) return;
-    gas('backupDisconnect').then(function (d) { if (d && d.ok) load(); else toast((d && d.err) || tt('common.error', 'Eroare'), 'err'); });
-  }
   function runNow(btn) {
     if (btn) btn.disabled = true;
     gas('backupRunNow').then(function (d) {
@@ -174,17 +154,6 @@ window.BackupCard = (function () {
     });
   }
 
-  // Visszatérés a Google összekötésből (/admin?gdrive=…): jelzés + Integrációk fül.
-  document.addEventListener('DOMContentLoaded', function () {
-    var m = /[?&]gdrive=([a-z]+)/.exec(location.search || '');
-    if (!m) return;
-    try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
-    setTimeout(function () {
-      if (typeof toast === 'function') toast(tt('bk.cb.' + m[1], m[1]), m[1] === 'ok' ? 'ok' : 'err');
-      if (typeof activateTab === 'function') activateTab('integrations');
-    }, 800);
-  });
-
-  return { mount: mount, save: save, disconnect: disconnect, runNow: runNow, reload: load,
+  return { mount: mount, save: save, runNow: runNow, reload: load,
     restoreStart: restoreStart, restoreConfirm: restoreConfirm };
 })();

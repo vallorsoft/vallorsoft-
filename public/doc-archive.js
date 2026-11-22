@@ -179,7 +179,8 @@ window.DocArchive = (function () {
       }
       var tierTxt = (q.tier.min_gb ? q.tier.min_gb + '–' : '≤ ') + q.tier.max_gb + ' GB';
       box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0;color:#0f172a;">' +
-        '<tr><td style="color:#475569;">' + esc(tt('dar.qSize', 'Volumul documentelor')) + '</td><td style="text-align:right;"><b>' + esc(fmtSize(q.size_bytes)) + '</b></td></tr>' +
+        '<tr><td style="color:#475569;">' + esc(tt('dar.qSize', 'Volumul documentelor')) + '</td><td style="text-align:right;"><b>' + esc(fmtSize(q.size_bytes)) + '</b>' +
+          (q.size_source === 'cloudflare' ? '<br><span style="font-size:12px;color:#475569;">' + esc(tt('dar.qSrcCloud', 'măsurat în arhiva ta din cloud')) + '</span>' : '') + '</td></tr>' +
         '<tr><td style="color:#475569;">' + esc(tt('dar.qTier', 'Pachet')) + '</td><td style="text-align:right;">' + esc(tierTxt) + ' · ' + money(q.annual_eur) + ' EUR / ' + esc(tt('dar.year', 'an')) + ' × ' + q.years + '</td></tr>' +
         '<tr><td style="color:#475569;">' + esc(tt('dar.qNet', 'Total net')) + '</td><td style="text-align:right;"><b>' + money(q.amount_eur) + ' EUR</b>' + (q.amount_ron ? ' = ' + money(q.amount_ron) + ' RON' : '') + '</td></tr>' +
         (q.total_ron ? '<tr><td style="color:#475569;">' + esc(tt('dar.qGross', 'Total cu TVA 21%')) + '</td><td style="text-align:right;"><b>' + money(q.total_ron) + ' RON</b></td></tr>' : '') +

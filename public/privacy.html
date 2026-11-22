@@ -159,7 +159,7 @@
   <main class="policy-content">
 
     <h1>Politica de Confidențialitate</h1>
-    <p class="last-update">Ultima actualizare: 18.11.2026</p>
+    <p class="last-update">Ultima actualizare: 22.11.2026</p>
 
     <!-- 1 -->
     <h2>1. Operatorul de date</h2>
@@ -297,6 +297,21 @@
       datelor necesare către serviciul de facturare selectat de client.
     </p>
 
+    <h3>4.6 Documente încărcate, descărcări și arhiva documentelor</h3>
+    <p>
+      Documentele încărcate sau generate în platformă (comenzi, facturi, foi de parcurs, CMR, fotografii, documente
+      ale subcontractorilor etc.) sunt stocate pe serverele VallorSoft și sunt citite exclusiv local (fără servicii
+      externe de inteligență artificială). Descărcările pachetelor de documente ale foilor de parcurs sunt înregistrate
+      (utilizator, dată, documente incluse), iar pachetul descărcat este păstrat 12 luni pentru a putea fi descărcat din nou.
+    </p>
+    <p>
+      O dată pe an, firma descarcă arhiva completă a documentelor proprii (fișier ZIP, împărțit pe luni), confirmată
+      printr-un cod. Alternativ, firma poate solicita <strong>arhivarea în cloud</strong> (serviciu cu plată): arhiva este
+      criptată (AES-256-GCM) pe serverele VallorSoft înainte de a fi transmisă către spațiul de stocare Cloudflare R2;
+      cheia de criptare rămâne exclusiv la VallorSoft, iar Cloudflare nu are acces la conținut. Arhiva poate fi descărcată
+      doar de administratorii și managerii firmei respective.
+    </p>
+
     <!-- 5 -->
     <h2>5. Temeiurile juridice ale prelucrării</h2>
 
@@ -334,7 +349,11 @@
       <li>confirmări GDPR: maximum 3 ani;</li>
       <li>date facturare: 10 ani conform legislației fiscale aplicabile;</li>
       <li>date GPS: pe durata contractului și maximum 12 luni după încetare, dacă nu există obligații legale contrare;</li>
-      <li>copii de siguranță: conform politicilor interne de backup.</li>
+      <li>copii de siguranță (Cloudflare R2, criptate): zilnic în ultimele 30 de zile, apoi o copie pe lună pe perioada
+        aleasă de firmă (30 de zile – 12 luni);</li>
+      <li>pachete de documente descărcate (foi de parcurs): 12 luni de la descărcare;</li>
+      <li>arhiva în cloud (Cloudflare R2): pe durata perioadei de arhivare plătite; documentele nu sunt șterse automat
+        de platformă, ci numai la cererea firmei.</li>
     </ul>
 
     <!-- 7 -->
@@ -351,11 +370,12 @@
     <p>Rol: notificări push, funcții de comunicare, infrastructură tehnică.
        Datele pot fi transferate în afara Spațiului Economic European în conformitate cu mecanismele legale aplicabile.</p>
 
-    <h3>Google Drive (copii de siguranță)</h3>
-    <p>Rol: stocarea copiilor de siguranță criptate (AES-256-GCM) ale datelor firmei. Dacă firma își conectează
-       propriul cont Google Drive, copiile ajung în Drive-ul firmei (acces limitat doar la fișierele create de aplicație);
-       în plus, VallorSoft păstrează o copie criptată timp de 30 de zile în propriul cont Google Drive, după care este ștearsă automat.
-       Datele pot fi transferate în afara SEE în baza EU–US Data Privacy Framework și a clauzelor contractuale standard.</p>
+    <h3>Cloudflare R2 (Cloudflare, Inc.)</h3>
+    <p>Rol: spațiul de stocare propriu al VallorSoft pentru (1) copiile de siguranță zilnice ale datelor fiecărei firme și
+       (2) arhiva documentelor pentru firmele care au solicitat serviciul de arhivare în cloud. Fișierele sunt criptate
+       (AES-256-GCM) pe serverele VallorSoft înainte de transmitere, cu o cheie separată pentru fiecare firmă; cheile nu
+       sunt partajate cu Cloudflare, care nu are acces la conținut. Datele pot fi transferate în afara SEE în baza
+       EU–US Data Privacy Framework și a clauzelor contractuale standard.</p>
 
     <h3>CargoTrack / Fomco</h3>
     <p>Rol: furnizare date GPS, integrare telematică. Sediu: România.</p>
@@ -478,7 +498,13 @@
       </p>
       <p>
         <strong>Adatfeldolgozók:</strong> Brevo (e-mail), Stripe (fizetés, Írország), Google Firebase
-        (push értesítések), CargoTrack/Fomco (GPS-adatok, Románia), tárhelyszolgáltató.
+        (push értesítések), Cloudflare R2 (a napi biztonsági mentések és a fizetős dokumentum-archiválás titkosított
+        fájljai — a kulcs nálunk marad), CargoTrack/Fomco (GPS-adatok, Románia), tárhelyszolgáltató.
+      </p>
+      <p>
+        <strong>Dokumentumok:</strong> a feltöltött iratokat helyben, külső AI nélkül dolgozzuk fel. A menetlevél-csomagok
+        letöltését naplózzuk, a letöltött csomagot 12 hónapig megőrizzük. Évente a cég letölti a teljes dokumentum-archívumát,
+        vagy fizetős felhő-archiválást kér (titkosítva, Cloudflare R2).
       </p>
       <p>
         <strong>Az Ön jogai:</strong> hozzáférés, helyesbítés, törlés, adathordozhatóság, korlátozás,

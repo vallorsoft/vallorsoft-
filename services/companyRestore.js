@@ -8,7 +8,7 @@
 //  törlés után). Ezért többször is lefuttatható, és a mentés óta
 //  keletkezett új adatot nem érinti.
 //
-//  Folyamat: 1) a mentés-fájl letöltése a Drive-ról → 2) teljes
+//  Folyamat: 1) a mentés-fájl letöltése a Cloudflare R2-ről → 2) teljes
 //  visszafejtés + hitelesség-ellenőrzés (GCM-tag) ÍRÁS NÉLKÜL, közben
 //  táblánként a hiányzó sorok kigyűjtése helyi átmeneti fájlokba →
 //  3) előnézet → 4) megerősítés után beszúrás a külső kulcsok szerinti
@@ -20,7 +20,9 @@ const path = require('path');
 const readline = require('readline');
 const pool = require('../db');
 const log = require('../lib/logger');
-const drive = require('../lib/googleDrive');
+const { Readable } = require('stream');
+const { finished } = require('stream/promises');
+const r2 = require('../lib/r2');
 const { readFile, companyKey } = require('../lib/backupFile');
 const backup = require('./companyBackup');
 
@@ -106,18 +108,13 @@ async function existingIds(table, ids) {
 
 // ---- Fájl beszerzése ----
 async function fetchRunFile(cid, run, source, destPath) {
-  let conn, fileId;
-  if (source === 'vs') {
-    conn = await backup.getVsDrive();
-    fileId = run.vs_file_id;
-  } else {
-    conn = await backup.getCompanyDrive(cid);
-    fileId = run.drive_file_id;
-  }
-  if (!conn) throw new Error(source === 'vs' ? 'Drive-ul VallorSoft nu este conectat' : 'Google Drive-ul firmei nu este conectat');
-  if (!fileId) throw new Error('Copia de backup nu mai există pe această sursă');
-  const token = await drive.accessToken(conn.refreshToken);
-  await drive.downloadFile(token, fileId, destPath);
+  if (!run || Number(run.company_id) !== Number(cid)) throw new Error('Backup inexistent');
+  if (!run.r2_key) throw new Error('Copia de backup nu mai există în stocare');
+  if (!r2.configured()) throw new Error('Stocarea pentru backup nu este configurată');
+  const res = await r2.getObject(run.r2_key);
+  const out = fs.createWriteStream(destPath);
+  Readable.fromWeb(res.body).pipe(out);
+  await finished(out);
 }
 
 // ---- 1. kör: ellenőrzés + előnézet (írás nélkül) ----

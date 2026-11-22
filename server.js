@@ -222,7 +222,6 @@ app.use(require('./routes/developer-export'));
 app.use(require('./routes/blog'));          // publikus blog cikk API
 app.use(require('./routes/trial-select')); // trial csomag-választás + fizetési email
 app.use(require('./routes/subscription-cancel'));
-app.use(require('./routes/backup'));          // Google Drive összekötés a cégenkénti biztonsági mentéshez // előfizetés-lemondás visszavonása e-mail linkről
 
 // ===== 404 az ismeretlen API-utakra + GLOBÁLIS HIBAKEZELŐ (végső védőháló) =====
 // A handlerek általában maguk kezelik a hibájukat; ez csak a réseket fogja be,
