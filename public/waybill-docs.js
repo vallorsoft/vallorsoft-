@@ -67,6 +67,11 @@ window.WaybillDocs = (function () {
       '.wbd-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px;position:sticky;bottom:-20px;background:#fff;padding:10px 0 0}' +
       '.wbd-foot .btn{padding:9px 16px}.wbd-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}' +
       '.wbd-bar select{padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;color:#0f172a}' +
+      '.wbd-dl{border:1.5px solid #cbd5e1;border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:#0f172a}' +
+      '.wbd-dl-none{background:#f1f5f9;color:#334155}.wbd-dl-ok{background:#f0fdf4;border-color:#86efac}.wbd-dl-ch{background:#fffbeb;border-color:#fcd34d}' +
+      '.wbd-dl ul{margin:6px 0 0 18px;padding:0}.wbd-dl li{margin:2px 0}.wbd-dl li span{color:#475569;font-size:12px}' +
+      '.wbd-dl-sub{margin-top:6px;font-weight:700;color:#92400e}.wbd-dl summary{cursor:pointer;margin-top:6px;color:#1d4ed8;font-weight:600}' +
+      '.wbd-dl a{color:#1d4ed8;font-weight:700}' +
       '.wbd-grp{font-size:12px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px}' +
       '.wbd-empty{padding:22px;text-align:center;color:#475569}' +
       '.wbd-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;margin-left:6px}' +
@@ -314,12 +319,39 @@ window.WaybillDocs = (function () {
       refreshList();
     });
   }
+  // Letöltési napló: legutóbbi letöltés + azóta hozzáadott iratok + a korábbi
+  // csomagok újraletöltése (1 évig).
+  function downloadsHtml() {
+    var dls = (st.info && st.info.downloads) || [];
+    var added = (st.info && st.info.added_since) || [];
+    var fmt = function (d) { return d ? new Date(d).toLocaleString('ro-RO') : ''; };
+    if (!dls.length) {
+      return '<div class="wbd-dl wbd-dl-none">⬇️ ' + esc(tt('wdl.never', 'Documentele acestei foi de parcurs nu au fost încă descărcate.')) + '</div>';
+    }
+    var last = dls[0];
+    var h = '<div class="wbd-dl ' + (added.length ? 'wbd-dl-ch' : 'wbd-dl-ok') + '"><div><b>' +
+      (added.length ? '⚠️ ' + esc(tt('wdl.changed', 'Modificat după ultima descărcare')) : '✅ ' + esc(tt('wdl.ok', 'Descărcat')))  + '</b> · ' +
+      esc(fmt(last.downloaded_at)) + (last.downloaded_by ? ' · ' + esc(last.downloaded_by) : '') + '</div>';
+    if (added.length) {
+      h += '<div class="wbd-dl-sub">' + esc(tt('wdl.addedSince', 'Adăugate / modificate după descărcare:')) + '</div><ul>' +
+        added.map(function (a) { return '<li>' + esc(a.file_name || a.key) + ' <span>' + esc(fmt(a.t)) + '</span></li>'; }).join('') + '</ul>';
+    }
+    h += '<details><summary>' + esc(tt('wdl.history', 'Descărcări anterioare (disponibile 1 an)')) + ' (' + dls.length + ')</summary><ul>' +
+      dls.map(function (d) {
+        return '<li>' + esc(fmt(d.downloaded_at)) + (d.downloaded_by ? ' · ' + esc(d.downloaded_by) : '') +
+          ' · ' + esc(tt('wdl.nDocs', '{n} documente').replace('{n}', d.doc_count)) +
+          (d.has_pdf ? ' · <a href="/api/waybill-download/' + d.id + '">⬇️ ' + esc(tt('wdl.redownload', 'Descarcă din nou')) + '</a>' : '') + '</li>';
+      }).join('') + '</ul></details></div>';
+    return h;
+  }
   function renderManage() {
     var docs = (st.info && st.info.docs) || [];
     var hasOrders = ((st.info && st.info.orders) || []).length > 0;
     var w = (st.info && st.info.waybill) || {};
     // Maga a menetlevél is kijelölhető → a csoportos PDF elejére kerül.
-    var body = checkHtml() + '<div class="wbd-grp">' + esc(tt('wbd.waybillItself', '📋 Foaia de parcurs')) + '</div>' +
+    var addedKeys = {};
+    ((st.info && st.info.added_since) || []).forEach(function (a) { addedKeys[a.key] = 1; });
+    var body = downloadsHtml() + checkHtml() + '<div class="wbd-grp">' + esc(tt('wbd.waybillItself', '📋 Foaia de parcurs')) + '</div>' +
       '<div class="wbd-row"><input type="checkbox" class="wbd-chk wbd-sel" value="wb:' + esc(st.wid) + '" checked>' +
       '<div><div class="wbd-name">' + esc(w.numar_fisa || w.file_name || st.wid) + '</div>' +
       '<div class="wbd-meta">' + esc(tt('wbd.waybillHint', 'Foaia de parcurs completă — inclusă la începutul PDF-ului')) + '</div></div>' +
@@ -337,7 +369,8 @@ window.WaybillDocs = (function () {
           return '<div class="wbd-row"><input type="checkbox" class="wbd-chk wbd-sel" value="' + esc(key) + '" checked>' +
             '<div><div class="wbd-name">' + esc(d.file_name) + (d.has_signed ? ' ✍️' : '') +
               (d.fuvar_no ? '<span class="wbd-badge">🚚 ' + esc(d.fuvar_no) + '</span>' : '') +
-              (drv ? '<span class="wbd-badge" style="background:#ecfdf5;color:#065f46;">📷 ' + esc(tt('wbd.fromDriver', 'încărcat de șofer')) + '</span>' : '') + '</div>' +
+              (drv ? '<span class="wbd-badge" style="background:#ecfdf5;color:#065f46;">📷 ' + esc(tt('wbd.fromDriver', 'încărcat de șofer')) + '</span>' : '') +
+              (addedKeys[key] ? '<span class="wbd-badge" style="background:#fef3c7;color:#92400e;">🆕 ' + esc(tt('wdl.newBadge', 'după descărcare')) + '</span>' : '') + '</div>' +
             '<div class="wbd-meta">' + esc(fmtSize(d.file_size)) + (d.created_at ? ' · ' + new Date(d.created_at).toLocaleDateString('ro-RO') : '') +
             (d.uploaded_by ? ' · ' + esc(d.uploaded_by) : '') + (d.note ? ' · ' + esc(d.note) : '') + '</div>' +
             (drv ? '' : '<div class="wbd-sels">' + typeSelect(d.doc_type, 'onchange="WaybillDocs._upd(' + d.id + ',this.value,null)"') +
@@ -565,10 +598,28 @@ window.WaybillDocs = (function () {
       var w = (st.info && st.info.waybill) || {};
       var base = String(w.numar_fisa || w.id || 'foaie').replace(/[^\w.-]+/g, '_');
       saveBlob(new Blob([bytes], { type: 'application/pdf' }), base + '_documente.pdf');
+      logDownload(ids, base + '_documente.pdf', bytes);
       if (skipped.length) note(tt('wbd.skipped', 'Nu au putut fi incluse în PDF (descarcă-le separat): ') + skipped.join(', '), 'err');
       else note(tt('wbd.pdfDone', '✅ PDF descărcat'), 'ok');
     }).catch(function (e) { note(e.message || 'Eroare', 'err'); })
       .then(function () { if (btn) { btn.disabled = false; btn.textContent = tt('wbd.pdfBtn', '📄 Descarcă selecția într-un PDF'); } });
+  }
+
+  // A letöltés naplózása + a letöltött PDF megőrzése (1 évig újra letölthető).
+  function bytesToB64(bytes) {
+    var bin = '', CH = 0x8000;
+    for (var i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+  }
+  function logDownload(keys, name, bytes) {
+    var wid = st.wid;
+    var pdf = null;
+    try { pdf = 'data:application/pdf;base64,' + bytesToB64(bytes); } catch (e) { pdf = null; }
+    gas('waybillDownloadSave', [{ waybill_id: wid, keys: keys, file_name: name, pdf: pdf }]).then(function (r) {
+      if (!r || !r.ok) { note(tt('wdl.logFail', 'Descărcarea nu a putut fi înregistrată: ') + ((r && r.err) || ''), 'err'); return; }
+      refreshList();
+      if (st.wid === wid && document.getElementById('wbdOv')) openManage(wid);
+    });
   }
 
   // A menetlevél-lista 📎 számlálójának frissítése.

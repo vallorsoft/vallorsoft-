@@ -342,6 +342,41 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         } catch (ckErr) {
           if (!(ckErr && (ckErr.code === '42P01' || ckErr.code === '42703'))) console.error('dokumentum-csomag állapot hiba (a lista folytatódik):', ckErr.message);
         }
+        // Letöltési állapot (📥 jelvény): letöltve-e az iratcsomag, és került-e hozzá
+        // irat a legutóbbi letöltés óta — best-effort.
+        try {
+          const ids = rows.map(f => f.id);
+          const dl = await pool.query(
+            `SELECT DISTINCT ON (waybill_id) waybill_id, downloaded_at, downloaded_by
+               FROM waybill_doc_downloads WHERE company_id = $1 AND waybill_id = ANY($2::varchar[])
+              ORDER BY waybill_id, downloaded_at DESC`, [cid, ids]);
+          const last = {};
+          dl.rows.forEach(d => { last[d.waybill_id] = d; });
+          const withDl = rows.filter(f => last[f.id]);
+          const changed = new Set();
+          if (withDl.length) {
+            const ch = await pool.query(
+              `SELECT w.id
+                 FROM unnest($2::varchar[], $3::timestamptz[]) AS w(id, t)
+                 JOIN fuvarlevelek f ON f.id = w.id
+                WHERE EXISTS (SELECT 1 FROM order_documents od LEFT JOIN orders o ON o.id = od.order_id
+                               WHERE (od.company_id = $1 OR o.company_id = $1)
+                                 AND (od.waybill_id = w.id OR f.order_ids @> jsonb_build_array(od.order_id))
+                                 AND GREATEST(od.created_at, COALESCE(od.updated_at, od.created_at))::timestamptz > w.t)
+                   OR EXISTS (SELECT 1 FROM documents d JOIN orders o ON o.id = d.order_id AND o.company_id = $1
+                               WHERE f.order_ids @> jsonb_build_array(d.order_id) AND d.created_at::timestamptz > w.t)`,
+              [cid, withDl.map(f => f.id), withDl.map(f => last[f.id].downloaded_at)]);
+            ch.rows.forEach(r => changed.add(r.id));
+          }
+          rows.forEach(f => {
+            const d = last[f.id];
+            f.dl_state = d ? (changed.has(f.id) ? 'changed' : 'ok') : 'none';
+            f.dl_at = d ? d.downloaded_at : null;
+            f.dl_by = d ? d.downloaded_by : null;
+          });
+        } catch (dlErr) {
+          if (!(dlErr && (dlErr.code === '42P01' || dlErr.code === '42703'))) console.error('letöltési állapot hiba (a lista folytatódik):', dlErr.message);
+        }
       }
       return res.json({ result: rows });
     } catch (err) {

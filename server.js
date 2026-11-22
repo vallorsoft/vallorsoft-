@@ -192,6 +192,7 @@ app.use(require('./middleware/sessionRevalidate').sessionRevalidate);
 // Általános kérés-korlát (felhasználónként / névtelenül IP-nként) + kérés-törzs.
 app.use(botShield.apiRateLimit);
 app.use(botShield.bodyParsers);
+app.use(require('./middleware/archiveLock').archiveLock); // éves dokumentum-archívum: zár az utolsó 5 napban
 
 // ===== ROUTE-OK MOUNTOLASA =====
 app.use(require('./routes/firebase'));
@@ -201,6 +202,7 @@ app.use(require('./routes/pages'));
 app.use(require('./routes/auth'));
 app.use(require('./routes/public-register')); // nyilvános regisztráció + trial
 app.use(require('./routes/soferApi'));
+app.use(require('./routes/docArchive'));   // cég-archívum ZIP + menetlevél-csomag újraletöltés
 app.use(require('./routes/execute'));
 app.use(require('./routes/push'));
 app.use(require('./routes/ordersRest'));
@@ -251,7 +253,7 @@ app.use((err, req, res, next) => {
 // e-mailek/push-ok/IMAP-feldolgozás), és csak a DB-migrációk UTÁN indulnak
 // (friss deploynál az első tick ne fusson hiányzó táblába). lib/schedulerLeader.js
 const schedulerLeader = require('./lib/schedulerLeader');
-const { startWaybillDocCheckScheduler, startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler } = require('./services/scheduler');
+const { startDocArchiveScheduler, startWaybillDocCheckScheduler, startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler } = require('./services/scheduler');
 function startAllSchedulers() {
   startIntakeScheduler();
   startExpiryScheduler();
@@ -271,6 +273,7 @@ function startAllSchedulers() {
   startGpsTrackHistoryScheduler();   // GPS útvonal-előzmény: teljes pont-sor naponként mentve + úthálózatra illesztve
   startFuelLossScheduler();          // üzemanyag-hiány riasztás (GPS tartály-szint, 100 / 250 L)
   startBorderAutoScheduler();        // határátlépés automatikusan a GPS-ből (Románia-geozóna)
+  startDocArchiveScheduler();        // éves dokumentum-archívum: figyelmeztetés + régi csomagok törlése
   startWaybillDocCheckScheduler();   // menetlevél dokumentum-csomag ellenőrzése (helyben)
   startStopMatchScheduler();         // tényleges fel-/lerakási címek a GPS-ből (csak Admin/Manager látja)
   startOrderRouteKmScheduler();      // fuvar teljes km (minden állomás, üres km is) + menetlevél Plecare→Sosire
