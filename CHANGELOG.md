@@ -14,7 +14,11 @@
 
 ---
 
-## 2026-11-22 — 🧠 Menetlevél-iratok: tanulás ügyfelenként + jel-súlyok
+## 2026-11-22 — 🔎 Menetlevél-iratok: helyi szövegfelismerés (OCR) szkennelt PDF-hez és fotóhoz
+- Új `lib/localOcr.js` — tesseract.js (WebAssembly) a SAJÁT szerveren; a nyelvi modellek npm-csomagban (`@tesseract.js-data/ron|hun|eng|deu`), futás közben nincs letöltés, irat nem megy ki. Alapnyelvek: román + magyar + angol (`WAYBILL_DOC_OCR_LANGS`, pl. `ron+hun+eng+deu`; más nyelvhez a megfelelő csomag kell). Szkennelt PDF: a beágyazott JPEG-oldalakat olvassa (DCTDecode, max. 4 oldal); más tömörítésű kép-PDF „nem olvasható" marad.
+- `lib/waybillDocCheck.js` `ocrRound` az ütemező körében (kör / 3 irat, `WAYBILL_DOC_OCR_PER_ROUND`; kikapcsolás `WAYBILL_DOC_OCR=0`): irataként egyszer (`order_documents.ocr_at`), siker → `text_status='ocr'`, majd az érintett menetlevél újraellenőrzése. OCR-rel olvasott irat ×0,9 pontszám + „OCR" jelzés. Migráció `db/waybill-doc-ocr.sql`; cache-bust `?v=20261122ocr`. Teszt: `tests/unit/localOcr.test.js` + 1 eset; valódi DB-n: fotózott számla → OCR → 99% ✅.
+
+## 2026-11-22 — 🧠 Menetlevél-iratok: tanulás ügyfelenként + jel-súlyok (PR #668)
 - A ✓ visszaigazolásból `lib/waybillDocCheck.js` `learnFromDecision` megjegyzi, milyen felirat után áll az ügyfél (vagy alvállalkozó) referenciája / a fuvar-szám (pl. „nr comanda") — `waybill_doc_patterns` (ügyfél/alvállalkozó + megrendelő/számla). A következő iratnál a felirat utáni értéket a fuvarral veti össze: egyezés +45 (`learned_ref`), eltérés → az irat NEM párosítható ehhez a fuvarhoz (`learned_mismatch`) — így ugyanazon ügyfél MÁSIK fuvarjának megrendelője is kiszűrődik.
 - Jel-súlyok cégenként (`waybill_doc_feedback`): ✓/✗ döntésenként a jelek jó/rossz számlálója; legalább 5 döntés után a jel 0,5…1,2-szeres súlyt kap (`weightOf`).
 - A tanult feliratok a 🧠 Tanult adatok fülön (`learnedDataList` `wbDocPattern`, törölhető). Migráció `db/waybill-doc-learn.sql`; cache-bust `?v=20261122wdc3`. Teszt +4 eset.

@@ -233,7 +233,7 @@ window.WaybillDocs = (function () {
   var WHY_FB = { linked: 'legat de cursă', fuvar_no: 'nr. cursă', ref: 'referință', cui: 'CUI', name: 'denumire',
     amount: 'sumă', plate: 'nr. auto', load_city: 'loc încărcare', unload_city: 'loc descărcare', date: 'dată',
     other_cui: 'alt CUI', kind_unknown: 'tip nesigur', confirmed: 'confirmat', unreadable: 'nu se poate citi',
-    learned_ref: 'referință învățată', learned_mismatch: 'altă referință' };
+    learned_ref: 'referință învățată', learned_mismatch: 'altă referință', ocr: 'citit prin OCR (scanat / poză)' };
   function whyText(list) {
     return (list || []).map(function (r) {
       var k = String(r).split(':')[0], v = String(r).slice(k.length + 1);

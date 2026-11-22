@@ -1967,6 +1967,11 @@ function startWaybillDocCheckScheduler() {
     if (running) return;
     running = true;
     try {
+      // előbb a szkennelt / fotó iratok helyi OCR-je (kevés irat / kör — CPU, memória)
+      try {
+        const k = await chk.ocrRound(Math.max(1, Math.min(10, parseInt(process.env.WAYBILL_DOC_OCR_PER_ROUND, 10) || 3)));
+        if (k) console.log('[WaybillDocCheck] OCR', k, 'irat');
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillDocCheck] OCR hiba', e.message); }
       const n = await chk.runRound(PER);
       if (n) console.log('[WaybillDocCheck] ellenőrizve', n, 'menetlevél');
     } catch (e) {

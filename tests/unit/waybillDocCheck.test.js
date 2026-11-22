@@ -184,3 +184,11 @@ describe('tanulás — ügyfelenkénti referencia-felirat + jel-súly', () => {
     expect(chk.weightOf(20, 0)).toBeCloseTo(1.2, 1);
   });
 });
+
+test('OCR-rel olvasott irat: jelölve, kicsit óvatosabb pontszám', () => {
+  const plain = chk.scoreDocOrder(doc(1, 'Comanda de transport\nDACIA LOG SRL\nOradea -> Sibiu'), ORD_B, 'client', OWN);
+  const viaOcr = chk.scoreDocOrder(doc(1, 'Comanda de transport\nDACIA LOG SRL\nOradea -> Sibiu', { ocr: true }), ORD_B, 'client', OWN);
+  expect(plain.score).toBeLessThan(99);
+  expect(viaOcr.reasons).toContain('ocr');
+  expect(viaOcr.score).toBeLessThan(plain.score);
+});
