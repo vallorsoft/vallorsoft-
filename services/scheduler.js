@@ -2019,6 +2019,11 @@ function startDocArchiveScheduler() {
         await _emailAlertToAdmins(c.id, subject, html, 'doc_archive');
       });
       if (n) console.log('[DocArchive] értesítés kiküldve', n, 'cégnek');
+      // fizetős archiválás: a felhő-példány (Cloudflare R2) elkészítése / havi frissítése
+      try {
+        const c = await require('../lib/docArchiveCloud').round();
+        if (c && c.ok) console.log('[DocArchive] felhő-archívum feltöltve', c.files, 'fájl,', c.bytes, 'bájt');
+      } catch (e) { console.warn('[DocArchive] felhő-archívum hiba', e.message); }
       const del = await arch.cleanupDownloads();
       if (del) console.log('[DocArchive] lejárt letöltött csomag törölve:', del);
     } catch (e) { console.warn('[DocArchive] ütemező hiba', e.message); }

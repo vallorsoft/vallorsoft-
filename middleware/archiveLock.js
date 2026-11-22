@@ -5,7 +5,7 @@
 const arch = require('../lib/docArchive');
 
 const LOCKED_ROLES = new Set(['Admin', 'Manager']);
-const ALLOWED_FUNCS = new Set(['authMe', 'authLogout', 'getMyFeatures', 'docArchiveStatus', 'docArchiveConfirm',
+const ALLOWED_FUNCS = new Set(['authMe', 'authLogout', 'getMyFeatures', 'docArchiveStatus', 'docArchiveConfirm', 'docArchiveQuote', 'docArchiveOrder',
   'getMySubscription', 'getMyLegalPending']);
 const ALLOWED_PATHS = [/^\/api\/doc-archive\//, /^\/api\/legal\//, /^\/api\/me$/, /^\/api\/logout$/, /^\/api\/push\/(vapid|public)/];
 const MSG = 'Arhiva documentelor trebuie descărcată. Până la descărcarea și confirmarea arhivei nu poți face altceva.';

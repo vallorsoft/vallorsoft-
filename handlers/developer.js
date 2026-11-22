@@ -1042,4 +1042,43 @@ handlers.devAuditUsage = async function (req, res, args) {
   }
 };
 
+// ── Fizetős dokumentum-archiválás (lib/docArchive) — kérések + aktiválás ────
+handlers.devGetArchiveOrders = async function (req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    await pool.query(`UPDATE doc_archive_orders SET status='expired' WHERE status='pending' AND pay_until < NOW()`);
+    const r = await pool.query(
+      `SELECT o.id, o.company_id, c.nev AS company_nev, o.reference, o.years, o.gb, o.size_bytes, o.amount_eur, o.total_ron,
+              o.status, o.requested_by, o.created_at, o.pay_until, o.activated_at, o.covered_until,
+              d.status AS cloud_status, d.bytes AS cloud_bytes, d.updated_at AS cloud_at, d.error AS cloud_error
+         FROM doc_archive_orders o LEFT JOIN companies c ON c.id = o.company_id
+         LEFT JOIN doc_archive_cloud d ON d.company_id = o.company_id
+        ORDER BY o.created_at DESC LIMIT 200`);
+    return res.json({ result: { ok: true, orders: r.rows, r2_configured: require('../lib/r2').configured() } });
+  } catch (e) {
+    if (e && e.code === '42P01') return res.json({ result: { ok: true, orders: [], r2_configured: false } });
+    console.error('devGetArchiveOrders hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+handlers.devActivateArchiveOrder = async function (req, res, args) {
+  const u = req.session.user;
+  if (!u?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const [id] = args || [];
+  const r = await require('../lib/docArchive').activateOrder(parseInt(id, 10) || 0, u.email);
+  if (r.ok) {
+    try { await require('../lib/docArchiveCloud').queue(r.company_id); } catch (e) { console.warn('[DocArchive] felhő-sorba állítás hiba', e.message); }
+    require('../lib/audit').fromReq(req, 'doc_archive.activate', 'company', r.company_id, { order_id: id, covered_until: r.covered_until });
+  }
+  return res.json({ result: r });
+};
+handlers.devCancelArchiveOrder = async function (req, res, args) {
+  const u = req.session.user;
+  if (!u?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const [id] = args || [];
+  const r = await require('../lib/docArchive').cancelOrder(parseInt(id, 10) || 0);
+  if (r.ok) require('../lib/audit').fromReq(req, 'doc_archive.order_cancel', 'doc_archive_order', String(id), {});
+  return res.json({ result: r });
+};
+
 module.exports = handlers;
