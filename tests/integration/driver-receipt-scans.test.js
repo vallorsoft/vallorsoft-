@@ -39,20 +39,54 @@ beforeEach(() => { reset(); extractJson.mockReset(); });
 // ═════════════════════════════════════════════
 //  scanReceipt — pending sor INSERT
 // ═════════════════════════════════════════════
-describe('scanReceipt — docPrivacy', () => {
-  test('a bon fotója nem megy ki: AI nem hívódik, nincs pending INSERT', async () => {
+describe('scanReceipt persistence', () => {
+  test('sikeres AI kiolvasás → INSERT pending sor, pending_id visszaadva', async () => {
     setUser(fixtures.sofer);
-    extractJson.mockClear();
+    extractJson.mockResolvedValueOnce({
+      json: { kind: 'fuel', loc: 'OMV Cluj', litru: 300, suma: 1500, valuta: 'RON', plata: 'Card' },
+      model: 'gemini-2.0-flash',
+    });
     const pool = require('../../db');
-    pool.query.mockClear();
+    // loadCompanySamples SELECT (few-shot) → üres; utána INSERT
+    pool.query
+      .mockResolvedValueOnce(rows([]))                       // receipt_scan_samples
+      .mockResolvedValueOnce(rows([{ id: 42 }]));            // INSERT driver_receipt_scans
     const res = await request(app).post('/api/execute').send({
       functionName: 'scanReceipt',
-      arguments: [{ mimeType: 'image/jpeg', data: 'AAAA' }],
+      arguments: [{
+        mimeType: 'image/jpeg',
+        data: 'AAAA', // dummy base64
+        thumb_b64: 'data:image/jpeg;base64,QUFB',
+      }],
     });
-    expect(res.body.result.ok).toBe(false);
-    expect(res.body.result.local_only).toBe(true);
-    expect(extractJson).not.toHaveBeenCalled();
-    expect(pool.query.mock.calls.some((c) => /INSERT INTO driver_receipt_scans/i.test(c[0]))).toBe(false);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.pending_id).toBe(42);
+    // Az INSERT paraméterei
+    const insertSql = pool.query.mock.calls[1][0];
+    const insertParams = pool.query.mock.calls[1][1];
+    expect(insertSql).toMatch(/INSERT INTO driver_receipt_scans/i);
+    expect(insertParams[0]).toBe(fixtures.sofer.company_id);
+    expect(insertParams[1]).toBe(fixtures.sofer.email);
+    expect(insertParams[2]).toBe('fuel');
+    expect(insertParams[4]).toMatch(/QUFB/); // thumbnail benne
+  });
+
+  test('pending INSERT hiba (migráció nem futott) → a scan-válasz akkor is ok=true, pending_id null', async () => {
+    setUser(fixtures.sofer);
+    extractJson.mockResolvedValueOnce({
+      json: { kind: 'purchase', loc: 'Kaufland', suma: 20, valuta: 'RON', plata: 'Cash' },
+      model: 'gemini-2.0-flash',
+    });
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([]))                                 // samples
+      .mockRejectedValueOnce(new Error('relation "driver_receipt_scans" does not exist')); // INSERT dob
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'scanReceipt',
+      arguments: [{ mimeType: 'image/jpeg', data: 'AA' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.pending_id).toBe(null);
   });
 });
 

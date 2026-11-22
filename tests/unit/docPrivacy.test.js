@@ -30,6 +30,17 @@ describe('lib/docPrivacy', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  test('csak a bon (fileKind=receipt) vihet fájlt; más fajta címke nem nyit kaput', async () => {
+    const img = [{ inlineData: { mimeType: 'image/jpeg', data: 'AAAA' } }];
+    for (const k of ['order', 'invoice', 'uit', 'photo', undefined]) {
+      await expect(extractJson({ systemPrompt: 'x', parts: img, fileKind: k }))
+        .rejects.toMatchObject({ code: 'DOCS_LOCAL_ONLY' });
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(docPrivacy.fileAllowed('receipt')).toBe(true);
+    expect(docPrivacy.ALLOWED_FILE_KINDS).toEqual(['receipt']);
+  });
+
   test('megrendelő-kiolvasás (fájl + szöveg) mindig helyi, hálózat nélkül', async () => {
     const r = await orderAi.extractFields({
       text: 'Comanda nr. REF-123 CUI RO47859317 pret 1500 EUR',
