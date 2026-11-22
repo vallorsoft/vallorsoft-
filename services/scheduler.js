@@ -1955,7 +1955,30 @@ function startBnrRatesScheduler() {
   setInterval(tick, 3 * 60 * 60 * 1000).unref();
 }
 
-module.exports = { startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
+// ── Menetlevél dokumentum-csomag ellenőrzése (lib/waybillDocCheck) ───────
+// Helyben, AI nélkül. A még nem ellenőrzött és a hiányos csomagú menetleveleket
+// 10 percenként újranézi (a PDF szövege cache-elve), amíg a csomag nem teljes.
+function startWaybillDocCheckScheduler() {
+  const chk = require('../lib/waybillDocCheck');
+  const MIN = Math.max(2, parseInt(process.env.WAYBILL_DOC_CHECK_INTERVAL_MIN, 10) || 10);
+  const PER = Math.max(1, Math.min(200, parseInt(process.env.WAYBILL_DOC_CHECK_PER_ROUND, 10) || 40));
+  let running = false;
+  async function tick() {
+    if (running) return;
+    running = true;
+    try {
+      const n = await chk.runRound(PER);
+      if (n) console.log('[WaybillDocCheck] ellenőrizve', n, 'menetlevél');
+    } catch (e) {
+      if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillDocCheck] kör hiba', e.message);
+    } finally { running = false; }
+  }
+  setTimeout(tick, 90 * 1000);
+  setInterval(tick, MIN * 60 * 1000);
+  console.log('[WaybillDocCheck] ütemező elindítva —', MIN, 'percenként');
+}
+
+module.exports = { startWaybillDocCheckScheduler, startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
 // Belső segédek (nem ütemezők) — a lib/* riasztók is ezeket használják
 Object.defineProperty(module.exports, '_emailAlertToAdmins', { enumerable: false, value: _emailAlertToAdmins });
 Object.defineProperty(module.exports, '_roundSize', { enumerable: false, value: roundSize });

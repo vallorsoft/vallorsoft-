@@ -164,6 +164,7 @@ handlers.waybillDocUpload = async function (req, res, args) {
     } finally { client.release(); }
     audit.fromReq(req, 'waybill_doc.upload', 'waybill', wb.id,
       { count: ids.length, types: rows.map((r) => r.type), orders: rows.map((r) => r.orderId).filter(Boolean) });
+    require('../lib/waybillDocCheck').touch(u.company_id, { waybillId: wb.id });
     return res.json({ result: { ok: true, ids } });
   } catch (err) {
     console.error('waybillDocUpload hiba:', err);
@@ -194,6 +195,7 @@ handlers.waybillDocUpdate = async function (req, res, args) {
         WHERE id = $1`,
       [id, type, orderId, wb.id, a.note !== undefined ? _clip(a.note, 500) : doc.note, u.company_id]);
     audit.fromReq(req, 'waybill_doc.update', 'waybill', wb.id, { doc_id: id, doc_type: type, order_id: orderId });
+    require('../lib/waybillDocCheck').touch(u.company_id, { waybillId: wb.id });
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('waybillDocUpdate hiba:', err);
@@ -251,6 +253,7 @@ handlers.waybillDocDelete = async function (req, res, args) {
     if (!doc) return res.json({ result: { ok: false, err: 'Nu a fost găsit' } });
     await pool.query('DELETE FROM order_documents WHERE id = $1', [id]);
     audit.fromReq(req, 'waybill_doc.delete', 'waybill', wb.id, { doc_id: id, file_name: doc.file_name, order_id: doc.order_id });
+    require('../lib/waybillDocCheck').touch(u.company_id, { waybillId: wb.id });
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('waybillDocDelete hiba:', err);

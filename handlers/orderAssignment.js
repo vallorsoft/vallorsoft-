@@ -427,6 +427,7 @@ handlers.orderAssignmentAttachToDocs = async function (req, res, args) {
 
     audit.fromReq(req, 'orderAssignment.attach', 'order_documents', r.rows[0].id,
       { order_id: orderId, signed });
+    require('../lib/waybillDocCheck').touch(cid, { orderId });
     return res.json({ result: { ok:true, docId: r.rows[0].id } });
   } catch (err) {
     console.error('orderAssignmentAttachToDocs hiba:', err);

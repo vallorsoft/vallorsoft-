@@ -70,6 +70,13 @@ window.WaybillDocs = (function () {
       '.wbd-grp{font-size:12px;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px}' +
       '.wbd-empty{padding:22px;text-align:center;color:#475569}' +
       '.wbd-badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;margin-left:6px}' +
+      '.wdc{border:1.5px solid #c7d2fe;border-radius:14px;padding:12px 14px;background:#f8faff;margin-bottom:6px}' +
+      '.wdc-h{font-weight:800;font-size:14px;color:#0f172a;margin-bottom:2px}.wdc-sub{font-size:11.5px;color:#475569;margin-bottom:8px}' +
+      '.wdc-o{border-top:1px solid #e2e8f0;padding:8px 0 4px}.wdc-ot{font-weight:700;font-size:13px;color:#0f172a}.wdc-ot small{font-weight:500;color:#475569}' +
+      '.wdc-s{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 0 4px 6px;font-size:12.5px;color:#0f172a}' +
+      '.wdc-s .wdc-r{font-size:11px;color:#475569}.wdc-s button{padding:4px 9px;border-radius:8px;border:1.5px solid #64748b;background:#fff;color:#0f172a;cursor:pointer;font-size:12px}' +
+      '.wdc-pc{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:999px;margin-left:6px}' +
+      '.wdc-ok{background:#dcfce7;color:#166534}.wdc-rv{background:#fef9c3;color:#854d0e}.wdc-lo{background:#ffedd5;color:#9a3412}.wdc-ms{background:#fee2e2;color:#991b1b}.wdc-ur{background:#e2e8f0;color:#334155}' +
       '@media(max-width:560px){.wbd-row{grid-template-columns:1fr auto}.wbd-row .wbd-chk{display:none}}';
     document.head.appendChild(s);
   }
@@ -208,14 +215,109 @@ window.WaybillDocs = (function () {
 
   // ─── Kezelés ───────────────────────────────────────────────
   function openManage(wid) {
-    load(wid).then(renderManage).catch(function (e) { note(e.message, 'err'); });
+    load(wid).then(function () {
+      st.check = null;
+      renderManage();
+      // Dokumentum-csomag ellenőrzés (helyben, a háttérben is fut) — nem blokkolja a nézetet.
+      return gas('waybillDocCheckGet', [{ waybill_id: wid }]).then(function (r) {
+        if (st.wid !== wid || !document.getElementById('wbdOv')) return;
+        st.check = (r && r.ok) ? r : null;
+        renderManage();
+      }).catch(function () {});
+    }).catch(function (e) { note(e.message, 'err'); });
+  }
+
+  // ─── Dokumentum-csomag ellenőrzés (lib/waybillDocCheck) ─────
+  var SLOT_FB = { client_order: '📄 Comanda clientului', client_invoice: '🧾 Factura către client',
+    carrier_order: '📤 Comanda către subcontractor', carrier_invoice: '🧾 Factura subcontractorului' };
+  var WHY_FB = { linked: 'legat de cursă', fuvar_no: 'nr. cursă', ref: 'referință', cui: 'CUI', name: 'denumire',
+    amount: 'sumă', plate: 'nr. auto', load_city: 'loc încărcare', unload_city: 'loc descărcare', date: 'dată',
+    other_cui: 'alt CUI', kind_unknown: 'tip nesigur', confirmed: 'confirmat', unreadable: 'nu se poate citi' };
+  function whyText(list) {
+    return (list || []).map(function (r) {
+      var k = String(r).split(':')[0], v = String(r).slice(k.length + 1);
+      var lbl = tt('wdc.why.' + k, WHY_FB[k] || k);
+      return k === 'other_cui' ? '⚠️ ' + lbl + ' ' + v : lbl;
+    }).join(' · ');
+  }
+  function pct(s) {
+    if (s.level === 'missing') return '<span class="wdc-pc wdc-ms">' + esc(tt('wdc.missing', 'LIPSEȘTE')) + '</span>';
+    if (s.level === 'unreadable') return '<span class="wdc-pc wdc-ur">' + esc(tt('wdc.unreadable', 'nu se poate citi')) + '</span>';
+    var cls = s.level === 'ok' ? 'wdc-ok' : s.level === 'review' ? 'wdc-rv' : 'wdc-lo';
+    return '<span class="wdc-pc ' + cls + '">' + (s.confirmed ? '✓ ' + esc(tt('wdc.confirmed', 'confirmat')) : (s.conf + '%')) + '</span>';
+  }
+  function checkHtml() {
+    var c = st.check;
+    if (!c) return '<div class="wdc"><div class="wdc-sub">⏳ ' + esc(tt('wdc.loading', 'Se verifică pachetul de documente…')) + '</div></div>';
+    if (c.status === 'none') {
+      return '<div class="wdc"><div class="wdc-h">📑 ' + esc(tt('wdc.title', 'Pachetul de documente')) + '</div>' +
+        '<div class="wdc-sub">' + esc(tt('wdc.none', 'Nicio descărcare pe această foaie de parcurs — nu sunt documente obligatorii.')) + '</div></div>';
+    }
+    var head = c.status === 'complete' ? '✅ ' + tt('wdc.complete', 'Pachet complet')
+      : '⚠️ ' + tt('wdc.incomplete', 'Pachet incomplet') + ' — ' +
+        [c.missing_cnt ? tt('wdc.nMissing', '{n} lipsă', { n: c.missing_cnt }) : '',
+         c.wrong_cnt ? tt('wdc.nWrong', '{n} nu aparțin', { n: c.wrong_cnt }) : '',
+         c.review_cnt ? tt('wdc.nReview', '{n} de confirmat', { n: c.review_cnt }) : ''].filter(Boolean).join(' · ');
+    var h = '<div class="wdc"><div class="wdc-h">📑 ' + esc(head) + '</div>' +
+      '<div class="wdc-sub">' + esc(tt('wdc.hint', 'Verificare automată, locală (fără AI). Sunt obligatorii documentele curselor descărcate pe această foaie. Confirmă (✓) sau respinge (✗) — sistemul învață.')) + '</div>';
+    (c.orders || []).forEach(function (o) {
+      var lbl = (o.fuvar_no || o.id) + (o.client ? ' · ' + o.client : '');
+      var route = (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—');
+      h += '<div class="wdc-o"><div class="wdc-ot">' + (o.state === 'in_progress' ? '⏳ ' : '🚚 ') + esc(lbl) +
+        ' <small>' + esc(route) + (o.carrier ? ' · ' + esc(tt('wdc.carrier', 'subcontractor')) + ': ' + esc(o.carrier) : '') + '</small></div>';
+      if (o.state === 'in_progress') {
+        h += '<div class="wdc-s"><span></span><span class="wdc-r">' + esc(tt('wdc.inProgress', 'Descărcarea nu este pe această foaie — cursa este încă în desfășurare (Alocat); documentele nu sunt necesare aici.')) + '</span><span></span></div>';
+      }
+      (o.slots || []).forEach(function (s) {
+        var ico = s.level === 'ok' ? '✅' : s.level === 'missing' ? '❌' : s.level === 'unreadable' ? '❔' : '🟡';
+        var mid = '<b>' + esc(tt('wdc.slot.' + s.slot, SLOT_FB[s.slot])) + '</b>' + pct(s);
+        if (s.doc_id) mid += '<div class="wdc-r">' + esc(s.file_name || '') + (s.reasons && s.reasons.length ? ' — ' + esc(whyText(s.reasons)) : '') + '</div>';
+        else if (s.hint === 'assignment_in_system') mid += '<div class="wdc-r">' + esc(tt('wdc.assignHint', 'Comanda a fost creată în sistem — atașeaz-o la cursă (📎 din editorul comenzii).')) + '</div>';
+        var act = '';
+        if (s.doc_id && !s.confirmed) {
+          act = '<button title="' + esc(tt('wdc.yes', 'Corect')) + '" onclick="WaybillDocs._dec(' + s.doc_id + ',\'' + esc(o.id) + '\',\'' + s.slot + '\',\'ok\')">✓</button> ' +
+            '<button title="' + esc(tt('wdc.no', 'Nu este acesta')) + '" onclick="WaybillDocs._dec(' + s.doc_id + ',\'' + esc(o.id) + '\',\'' + s.slot + '\',\'no\')">✗</button>';
+        } else if (s.doc_id && s.confirmed) {
+          act = '<button title="' + esc(tt('wdc.undo', 'Anulează confirmarea')) + '" onclick="WaybillDocs._dec(' + s.doc_id + ',\'' + esc(o.id) + '\',\'' + s.slot + '\',\'reset\')">↩</button>';
+        } else {
+          act = '<button onclick="WaybillDocs.openUpload(\'' + esc(st.wid) + '\')">' + esc(tt('wbd.upload', '📎 Încarcă')) + '</button>';
+        }
+        h += '<div class="wdc-s"><span>' + ico + '</span><div>' + mid + '</div><div>' + act + '</div></div>';
+      });
+      h += '</div>';
+    });
+    if ((c.foreign || []).length) {
+      h += '<div class="wdc-o"><div class="wdc-ot">❌ ' + esc(tt('wdc.foreign', 'Nu aparțin acestei foi de parcurs')) + '</div>';
+      c.foreign.forEach(function (f) {
+        h += '<div class="wdc-s"><span>❌</span><div><b>' + esc(f.file_name || '') + '</b>' +
+          '<div class="wdc-r">' + esc(tt('wdc.foreignWhy', 'Nu se potrivește cu nicio cursă de pe această foaie')) +
+          (f.other_cui ? ' · ' + esc(tt('wdc.why.other_cui', 'alt CUI')) + ' ' + esc(f.other_cui) : '') + '</div></div>' +
+          '<div><button title="🗑" onclick="WaybillDocs._del(' + f.doc_id + ')">🗑</button></div></div>';
+      });
+      h += '</div>';
+    }
+    (c.extra || []).forEach(function (x) {
+      var why = x.reason === 'duplicate' ? tt('wdc.dup', 'document în plus pentru o cursă deja acoperită')
+        : x.reason === 'other_waybill' ? tt('wdc.otherWb', 'aparține unei curse descărcate pe altă foaie de parcurs')
+          : tt('wdc.extraUnreadable', 'nu se poate citi (scanat / poză) — verifică manual');
+      h += '<div class="wdc-s"><span>ℹ️</span><div><b>' + esc(x.file_name || '') + '</b><div class="wdc-r">' + esc(why) + '</div></div><div></div></div>';
+    });
+    return h + '</div>';
+  }
+  function _dec(docId, orderId, slot, verdict) {
+    gas('waybillDocDecide', [{ waybill_id: st.wid, doc_id: docId, order_id: orderId, slot: slot, verdict: verdict }]).then(function (r) {
+      if (!r || !r.ok) { note((r && r.err) || 'Eroare', 'err'); return; }
+      st.check = r;
+      renderManage();
+      refreshList();
+    });
   }
   function renderManage() {
     var docs = (st.info && st.info.docs) || [];
     var hasOrders = ((st.info && st.info.orders) || []).length > 0;
     var w = (st.info && st.info.waybill) || {};
     // Maga a menetlevél is kijelölhető → a csoportos PDF elejére kerül.
-    var body = '<div class="wbd-grp">' + esc(tt('wbd.waybillItself', '📋 Foaia de parcurs')) + '</div>' +
+    var body = checkHtml() + '<div class="wbd-grp">' + esc(tt('wbd.waybillItself', '📋 Foaia de parcurs')) + '</div>' +
       '<div class="wbd-row"><input type="checkbox" class="wbd-chk wbd-sel" value="wb:' + esc(st.wid) + '" checked>' +
       '<div><div class="wbd-name">' + esc(w.numar_fisa || w.file_name || st.wid) + '</div>' +
       '<div class="wbd-meta">' + esc(tt('wbd.waybillHint', 'Foaia de parcurs completă — inclusă la începutul PDF-ului')) + '</div></div>' +
@@ -473,6 +575,6 @@ window.WaybillDocs = (function () {
   return {
     openUpload: openUpload, openManage: openManage, close: close,
     _stAdd: _stAdd, _stType: _stType, _stAll: _stAll, _stOrder: _stOrder, _stDel: _stDel, _send: _send,
-    _selAll: _selAll, _upd: _upd, _del: _del, _dl: _dl, _view: _view, _pdf: _pdf
+    _selAll: _selAll, _upd: _upd, _del: _del, _dl: _dl, _view: _view, _pdf: _pdf, _dec: _dec
   };
 })();

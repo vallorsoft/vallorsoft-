@@ -383,6 +383,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     } catch (cErr) {
       console.error('driver puncte → auto-Finalizat hiba (a mentés sikeres):', cErr.message);
     }
+    require('../lib/waybillDocCheck').touch(cid, { waybillId: id });
     res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
