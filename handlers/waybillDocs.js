@@ -112,7 +112,31 @@ handlers.waybillDocList = async function (req, res, args) {
         uploaded_by: x.nume_sofer || x.email_sofer, created_at: x.created_at, has_signed: false, editable: false,
       }));
     } catch (e) { console.error('waybillDocList sofőr-dokumentumok (folytatjuk):', e.message); }
-    return res.json({ result: { ok: true, types: DOC_TYPES, orders, docs,
+    // Letöltési napló: az eddigi összefűzött letöltések (1 évig újra letölthetők) +
+    // a legutóbbi letöltés óta hozzáadott / módosított iratok.
+    let downloads = [], addedSince = [];
+    try {
+      const dl = await pool.query(
+        `SELECT id, file_name, doc_count, pdf_size, downloaded_by, downloaded_at, expires_at, (pdf_data IS NOT NULL) AS has_pdf
+           FROM waybill_doc_downloads WHERE company_id = $1 AND waybill_id = $2
+          ORDER BY downloaded_at DESC LIMIT 30`, [cid, wb.id]);
+      downloads = dl.rows;
+      if (downloads.length) {
+        const ch = await pool.query(
+          `SELECT 'od:' || od.id AS key, od.file_name, GREATEST(od.created_at, COALESCE(od.updated_at, od.created_at))::timestamptz AS t
+             FROM order_documents od LEFT JOIN orders o ON o.id = od.order_id
+            WHERE (od.company_id = $1 OR o.company_id = $1)
+              AND (od.waybill_id = $2 OR od.order_id = ANY($3::varchar[]))
+              AND GREATEST(od.created_at, COALESCE(od.updated_at, od.created_at))::timestamptz > $4
+           UNION ALL
+           SELECT 'drv:' || d.id, d.file_name, d.created_at::timestamptz
+             FROM documents d JOIN orders o ON o.id = d.order_id AND o.company_id = $1
+            WHERE d.order_id = ANY($3::varchar[]) AND d.created_at::timestamptz > $4
+           ORDER BY 3`, [cid, wb.id, ownOids, downloads[0].downloaded_at]);
+        addedSince = ch.rows;
+      }
+    } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.error('waybillDocList letöltési napló (folytatjuk):', e.message); }
+    return res.json({ result: { ok: true, types: DOC_TYPES, orders, docs, downloads, added_since: addedSince,
       waybill: { id: wb.id, numar_fisa: wb.numar_fisa, file_name: wb.file_name } } });
   } catch (err) {
     console.error('waybillDocList hiba:', err);
@@ -258,6 +282,39 @@ handlers.waybillDocDelete = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('waybillDocDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// waybillDownloadSave({ waybill_id, keys:[...], file_name, pdf }) — az összefűzött
+// PDF letöltésének naplózása; a letöltött változat 1 évig újra letölthető.
+const MAX_PDF_B64 = 55 * 1024 * 1024;   // ~40 MB PDF
+handlers.waybillDownloadSave = async function (req, res, args) {
+  try {
+    const u = req.session.user;
+    if (!_am(u)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const a = (args && args[0]) || {};
+    const cid = u.company_id;
+    const wb = await _ownWaybill(cid, a.waybill_id);
+    if (!wb) return res.json({ result: { ok: false, err: 'Foaia de parcurs nu a fost găsită.' } });
+    const keys = (Array.isArray(a.keys) ? a.keys : []).map((k) => String(k)).filter((k) => /^(wb|od|drv):[\w-]{1,40}$/.test(k)).slice(0, 300);
+    let buf = null;
+    if (typeof a.pdf === 'string' && a.pdf) {
+      if (a.pdf.length > MAX_PDF_B64) return res.json({ result: { ok: false, err: 'PDF-ul este prea mare pentru a fi păstrat (max. 40 MB).' } });
+      const raw = a.pdf.slice(a.pdf.indexOf(',') + 1);
+      buf = Buffer.from(raw, 'base64');
+      if (buf.slice(0, 5).toString('latin1') !== '%PDF-') return res.json({ result: { ok: false, err: 'Fișier PDF invalid.' } });
+    }
+    const sha = buf ? require('crypto').createHash('sha256').update(buf).digest('hex') : null;
+    const r = await pool.query(
+      `INSERT INTO waybill_doc_downloads (company_id, waybill_id, file_name, doc_keys, doc_count, pdf_data, pdf_size, sha256, downloaded_by)
+       VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9) RETURNING id, downloaded_at, expires_at`,
+      [cid, wb.id, _clip(a.file_name, 255), JSON.stringify(keys), keys.length, buf, buf ? buf.length : null, sha, u.email || u.nume || null]);
+    audit.fromReq(req, 'waybill_doc.download', 'waybill', wb.id, { download_id: r.rows[0].id, docs: keys.length, bytes: buf ? buf.length : 0 });
+    return res.json({ result: Object.assign({ ok: true }, r.rows[0]) });
+  } catch (err) {
+    if (err && err.code === '42P01') return res.json({ result: { ok: false, err: 'Repornește serverul pentru a rula migrațiile.' } });
+    console.error('waybillDownloadSave hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

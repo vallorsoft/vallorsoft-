@@ -3038,6 +3038,19 @@ function loadWbDocCheckBand(){
   }).catch(function(){ band.style.display='none'; });
 }
 
+// Letöltési jelvény a menetlevél-szám előtt: nincs letöltve / letöltve / letöltés óta változott.
+function wbDlBadge(f){
+  var st=f&&f.dl_state; if(!st) return '';
+  var when=f.dl_at?new Date(f.dl_at).toLocaleString('ro-RO'):'';
+  var map={
+    none:{ico:'⬇️',bg:'#f1f5f9',fg:'#334155',bd:'#94a3b8',txt:t('wdl.badgeNone')},
+    ok:{ico:'✅',bg:'#dcfce7',fg:'#14532d',bd:'#22c55e',txt:t('wdl.badgeOk')},
+    changed:{ico:'⚠️',bg:'#fef3c7',fg:'#78350f',bd:'#f59e0b',txt:t('wdl.badgeChanged')}
+  };
+  var m=map[st]||map.none;
+  var tip=m.txt+(when?' · '+when:'')+(f.dl_by?' · '+f.dl_by:'');
+  return '<span class="wb-dl-badge" title="'+esc(tip)+'" style="display:inline-block;margin-right:6px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:800;background:'+m.bg+';color:'+m.fg+';border:1px solid '+m.bd+';cursor:pointer;" onclick="WaybillDocs.openManage(\''+esc(f.id)+'\')">'+m.ico+' '+esc(m.txt)+'</span>';
+}
 function loadReceivedFuvarlevelek(){
   try{ if(window.DocInbox) DocInbox.mount(); }catch(e){}
   loadMissingWaybills();
@@ -3047,7 +3060,7 @@ function loadReceivedFuvarlevelek(){
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
-      +`<td><b style="color:#6366f1;">${esc(f.numar_fisa||'—')}</b></td>`
+      +`<td style="white-space:nowrap;">${wbDlBadge(f)}<b style="color:#6366f1;">${esc(f.numar_fisa||'—')}</b></td>`
       +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b>${fuvAnomalyBadge(f)}${wbDocCheckBadge(f)}</td>`
       +`<td>${esc(f.nume_sofer||f.email_sofer||'—')}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
@@ -5172,7 +5185,7 @@ function elofRenderPlans(plans) {
           : '<div style="font-size:20px;font-weight:800;color:#6366f1;">€' + amount.toFixed(0) + '<span style="font-size:11px;font-weight:500;color:var(--muted);">' + per + '</span></div>')
       + (isFree
           ? '<a href="mailto:vallorsoft@gmail.com" style="display:block;text-align:center;margin-top:10px;padding:7px;background:#1e293b;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Contactați-ne</a>'
-          : '<button style="width:100%;margin-top:8px;padding:7px;background:#6366f1;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;" onclick="elofRequestPlan(' + p.id + ')">📧 Kérelem</button>')
+          : '<button style="width:100%;margin-top:8px;padding:7px;background:#4f46e5;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;" onclick="elofRequestPlan(' + p.id + ')">📧 Kérelem</button>')
       + '</div>';
   }).join('');
 }

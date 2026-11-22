@@ -475,16 +475,16 @@ function escHtml(s) {
 }
 
 // PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
-router.get('/api/pdf-download/:id', async (req, res) => {
-  try {
-    if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
+// A menetlevél nyomtatható lapja (HTML) — a /api/pdf-download és a cég-archívum
+// (lib/docArchive) közös forrása. user: { company_id, pozicio, email }.
+async function buildWaybillHtml(user, id) {
     // Sofőr CSAK a saját menetlevelét nézheti/töltheti le; Admin/Manager
     // (diszpécser) a cégen belül bármelyiket. E-mail kisbetűsítve illeszkedik.
-    const isSofer = req.session.user.pozicio === 'Sofer';
-    const params = [req.params.id, req.session.user.company_id];
+    const isSofer = user.pozicio === 'Sofer';
+    const params = [id, user.company_id];
     let ownClause = '';
     if (isSofer) {
-      params.push((req.session.user.email || '').toLowerCase());
+      params.push((user.email || '').toLowerCase());
       ownClause = ' AND LOWER(f.email_sofer) = $3';
     }
     const r = await pool.query(
@@ -495,7 +495,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
          AND (f.company_id = $2 OR f.email_sofer IN (SELECT email FROM users WHERE company_id = $2))${ownClause}`,
       params
     );
-    if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
+    if (!r.rows.length) return { status: 404, body: 'Nu a fost gasit.' };
     const f = r.rows[0];
     const companyName = f.company_denumire || 'VallorSoft';
 
@@ -503,7 +503,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     // A cég törzsadatai + a feltöltött logó/pecsét. Best-effort: ha egy régi
     // cégnél hiányzik az oszlop vagy a `company_branding` sor, a lap attól még
     // renderelődik (csak a logó/pecsét/meta marad el).
-    const cid = req.session.user.company_id;
+    const cid = user.company_id;
     let comp = { cui: null, reg_com: null, adresa: null, telefon: null, email_contact: null };
     try {
       const cR = await pool.query(
@@ -666,7 +666,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     // Fuvar ID-k
     const orderIdsStr = orderIds.length ? escHtml(orderIds.join(', ')) : '—';
 
-    res.send(`
+    return { status: 200, body: `
   <html>
   <head>
     <title>${escHtml(f.file_name)}</title>
@@ -896,7 +896,14 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       }
     </script>
   </body>
-  </html>`);
+  </html>` };
+}
+
+router.get('/api/pdf-download/:id', async (req, res) => {
+  try {
+    if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
+    const out = await buildWaybillHtml(req.session.user, req.params.id);
+    return res.status(out.status).send(out.body);
   } catch (err) {
     console.error('pdf-download hiba:', err);
     res.status(500).send('Eroare de server');
@@ -904,3 +911,4 @@ router.get('/api/pdf-download/:id', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.buildWaybillHtml = buildWaybillHtml;

@@ -1993,7 +1993,41 @@ function startWaybillDocCheckScheduler() {
   console.log('[WaybillDocCheck] ütemező elindítva —', MIN, 'percenként');
 }
 
-module.exports = { startWaybillDocCheckScheduler, startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
+// Kötelező éves dokumentum-archívum: figyelmeztető e-mail az Admin/Manager
+// felhasználóknak 30 / 14 / 7 / 5 / 3 / 1 nappal a határidő előtt (csak románul),
+// + az 1 évnél régebbi letöltött menetlevél-csomagok törlése. Óránként.
+function startDocArchiveScheduler() {
+  const arch = require('../lib/docArchive');
+  const tick = async () => {
+    try {
+      const appUrl = require('../lib/appUrl').appBaseUrl('https://app.vallorsoft.ro');
+      const n = await arch.noticeRound(async (c, left) => {
+        const locked = left <= arch.LOCK_DAYS;
+        const subject = locked
+          ? 'Arhiva documentelor — descărcare obligatorie (' + left + ' zile)'
+          : 'Arhiva documentelor — termen în ' + left + ' zile';
+        const html = _alertEmailBody(
+          locked ? '⛔ Descarcă acum arhiva documentelor' : '📦 Descarcă arhiva documentelor firmei',
+          'Termenul anual pentru arhiva documentelor firmei <b>' + (c.nev || '') + '</b> expiră în <b>' + left + ' zile</b>. ' +
+          'Arhiva conține toate documentele încărcate sau generate de utilizatorii firmei, împărțite în foldere pe luni.',
+          '<p style="margin:0 0 10px;font-size:14px;color:#5a5048;">' +
+            (locked
+              ? 'În ultimele ' + arch.LOCK_DAYS + ' zile nu mai poți folosi nicio funcție în afara descărcării arhivei, până când o descarci și confirmi codul din fișierul KOD-ARHIVA.txt.'
+              : 'Dacă amâni, în ultimele ' + arch.LOCK_DAYS + ' zile nu vei mai putea face nimic în aplicație până nu descarci arhiva și confirmi codul din fișierul KOD-ARHIVA.txt.') +
+          '</p><p><a href="' + appUrl + '/admin" style="display:inline-block;padding:10px 18px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;">Deschide VallorSoft</a></p>',
+          'VallorSoft — arhivă anuală a documentelor');
+        await _emailAlertToAdmins(c.id, subject, html, 'doc_archive');
+      });
+      if (n) console.log('[DocArchive] értesítés kiküldve', n, 'cégnek');
+      const del = await arch.cleanupDownloads();
+      if (del) console.log('[DocArchive] lejárt letöltött csomag törölve:', del);
+    } catch (e) { console.warn('[DocArchive] ütemező hiba', e.message); }
+  };
+  setTimeout(tick, 90 * 1000);
+  setInterval(tick, 60 * 60 * 1000);
+}
+
+module.exports = { startDocArchiveScheduler, startWaybillDocCheckScheduler, startBnrRatesScheduler, startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler, startChatHistoryCleanup, startGpsTrackHistoryScheduler, startStopMatchScheduler, startOrderRouteKmScheduler, startBorderAutoScheduler, startFuelLossScheduler };
 // Belső segédek (nem ütemezők) — a lib/* riasztók is ezeket használják
 Object.defineProperty(module.exports, '_emailAlertToAdmins', { enumerable: false, value: _emailAlertToAdmins });
 Object.defineProperty(module.exports, '_roundSize', { enumerable: false, value: roundSize });

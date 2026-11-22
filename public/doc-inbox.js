@@ -74,6 +74,7 @@ window.DocInbox = (function () {
         '<label class="btn primary" style="cursor:pointer;">📤 ' + esc(tt('dib.pick', 'Alege documentele')) +
           '<input type="file" id="dibFile" multiple accept="application/pdf,image/png,image/jpeg,image/webp" style="display:none" onchange="DocInbox._pick(this.files);this.value=\'\'"></label>' +
         '<button class="btn ghost" onclick="DocInbox.open()">🗂️ ' + esc(tt('dib.openList', 'Lista documentelor')) + '</button>' +
+        (window.DocArchive ? '<button class="btn ghost" onclick="DocArchive.open()">📦 ' + esc(tt('dar.open', 'Arhiva documentelor')) + '</button>' : '') +
         '<span id="dibStats"></span><span id="dibProg" class="dib-prog"></span>' +
       '</div>';
     refresh(true);
