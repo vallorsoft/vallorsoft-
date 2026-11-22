@@ -1,11 +1,11 @@
 // ============================================================
 //  VallorSoft — handlers/backup.js
-//  Cégenkénti Google Drive biztonsági mentés — beállítások + napló.
+//  Cégenkénti biztonsági mentés (Cloudflare R2) — beállítások + napló + visszaállítás.
 //  Cég-oldal: csak Admin (a saját cégére). Developer-oldal: is_dev.
 // ============================================================
 const pool = require('../db');
 const audit = require('../lib/audit');
-const drive = require('../lib/googleDrive');
+const r2 = require('../lib/r2');
 const backup = require('../services/companyBackup');
 const { featureEnabled } = require('../lib/featureEnabled');
 const restore = require('../services/companyRestore');
@@ -20,9 +20,9 @@ function runRow(r) {
   return {
     id: r.id, trigger: r.trigger, kind: r.kind, status: r.status,
     started_at: r.started_at, finished_at: r.finished_at, size_bytes: r.size_bytes != null ? Number(r.size_bytes) : null,
-    row_count: r.row_count, drive_status: r.drive_status, vs_status: r.vs_status,
+    row_count: r.row_count, r2_status: r.r2_status || null,
     error: r.error ? String(r.error).slice(0, 300) : null,
-    has_drive_copy: !!r.drive_file_id, has_vs_copy: !!r.vs_file_id,
+    has_copy: !!r.r2_key,
   };
 }
 
@@ -31,21 +31,14 @@ handlers.backupGetStatus = async function (req, res) {
     if (!isAdmin(req)) return deny(res);
     const cid = req.session.user.company_id;
     const feature = await featureEnabled(cid, 'drive-backup');
-    const integ = await pool.query(
-      `SELECT status, status_message, meta, credentials_enc IS NOT NULL AS connected
-         FROM company_integrations WHERE company_id=$1 AND provider='gdrive_backup'`, [cid]);
     const settings = await backup.getSettings(cid);
     const runs = await pool.query(
       `SELECT * FROM company_backup_runs WHERE company_id=$1 ORDER BY started_at DESC LIMIT 15`, [cid]).catch(() => ({ rows: [] }));
-    const vs = await backup.getVsDrive().catch(() => null);
-    const i = integ.rows[0];
     return res.json({ result: {
-      ok: true, feature, configured: drive.isConfigured(),
-      connected: !!(i && i.connected), email: i && i.meta ? i.meta.email || null : null,
-      status: i ? i.status : null, status_message: i ? i.status_message : null,
-      enabled: settings.enabled !== false, run_hour: Number(settings.run_hour), drive_retention: settings.drive_retention,
-      retention_options: backup.RETENTION_OPTIONS, vs_copy: !!vs, vs_retention_days: backup.VS_RETENTION_DAYS,
-      running: backup.isRunning(cid), folder_name: backup.COMPANY_FOLDER,
+      ok: true, feature, configured: r2.configured(),
+      enabled: settings.enabled !== false, run_hour: Number(settings.run_hour), drive_retention: String(settings.drive_retention),
+      retention_options: backup.RETENTION_OPTIONS, daily_keep_days: backup.DAILY_KEEP_DAYS,
+      running: backup.isRunning(cid),
       runs: runs.rows.map(runRow),
     } });
   } catch (e) {
@@ -62,7 +55,7 @@ handlers.backupSaveSettings = async function (req, res, args) {
     const f = (args && args[0]) || {};
     const hour = parseInt(f.run_hour, 10);
     if (!Number.isInteger(hour) || hour < 0 || hour > 23) return deny(res, 'Ora invalidă');
-    const ret = String(f.drive_retention || 'forever');
+    const ret = String(f.drive_retention || backup.DEFAULT_RETENTION);
     if (backup.RETENTION_OPTIONS.indexOf(ret) === -1) return deny(res, 'Perioadă de păstrare invalidă');
     const enabled = f.enabled !== false;
     await pool.query(
@@ -78,32 +71,14 @@ handlers.backupSaveSettings = async function (req, res, args) {
   }
 };
 
-// Kapcsolat bontása: a token visszavonva + törölve. A Drive-on lévő mentések MEGMARADNAK.
-handlers.backupDisconnect = async function (req, res) {
-  try {
-    if (!isAdmin(req)) return deny(res);
-    const cid = req.session.user.company_id;
-    const cur = await backup.getCompanyDrive(cid).catch(() => null);
-    if (cur) await drive.revoke(cur.refreshToken);
-    await pool.query(`DELETE FROM company_integrations WHERE company_id=$1 AND provider='gdrive_backup'`, [cid]);
-    audit.fromReq(req, 'backup.drive_disconnect', 'company_integration', 'gdrive_backup', {});
-    return res.json({ result: { ok: true } });
-  } catch (e) {
-    console.error('backupDisconnect hiba:', e);
-    return deny(res, 'Eroare de server');
-  }
-};
-
 // Azonnali mentés (háttérben fut, a kérés nem várja meg).
 handlers.backupRunNow = async function (req, res) {
   try {
     if (!isAdmin(req)) return deny(res);
     const cid = req.session.user.company_id;
     if (!(await featureEnabled(cid, 'drive-backup'))) return deny(res, 'Funcție indisponibilă');
-    if (!drive.isConfigured()) return deny(res, 'Integrarea Google Drive nu este configurată');
+    if (!r2.configured()) return deny(res, 'Stocarea pentru backup nu este configurată');
     if (backup.isRunning(cid)) return deny(res, 'Un backup este deja în curs');
-    const conn = await backup.getCompanyDrive(cid).catch(() => null);
-    if (!conn) return deny(res, 'Conectați mai întâi Google Drive');
     const recent = await pool.query(
       `SELECT 1 FROM company_backup_runs WHERE company_id=$1 AND trigger='manual'
          AND started_at > now() - ($2 || ' minutes')::interval LIMIT 1`, [cid, String(MANUAL_COOLDOWN_MIN)]);
@@ -131,10 +106,10 @@ handlers.backupRestorePreview = async function (req, res, args) {
     const cid = req.session.user.company_id;
     if (!(await featureEnabled(cid, 'drive-backup'))) return deny(res, 'Funcție indisponibilă');
     const f = (args && args[0]) || {};
-    const source = f.source === 'vs' ? 'vs' : 'company';
+    const source = 'r2';
     const run = await restore.loadRun(cid, parseInt(f.run_id, 10));
     if (!run || run.status === 'running' || run.status === 'error') return deny(res, 'Backup inexistent sau incomplet');
-    if (source === 'vs' ? !run.vs_file_id : !run.drive_file_id) return deny(res, 'Copia nu mai există pe această sursă');
+    if (!run.r2_key) return deny(res, 'Copia nu mai există în stocare');
     if (await restore.activeJob(cid)) return deny(res, 'O restaurare este deja în curs');
     const ins = await pool.query(
       `INSERT INTO company_backup_restores (company_id, run_id, source, status, requested_by)
@@ -193,40 +168,25 @@ handlers.backupRestoreConfirm = async function (req, res, args) {
   }
 };
 
-// ---- Developer: a VallorSoft saját Drive-ja + áttekintés ----
+// ---- Developer: áttekintés ----
 handlers.devBackupStatus = async function (req, res) {
   try {
     if (!req.session.user || !req.session.user.is_dev) return deny(res);
-    const vs = await backup.getVsDrive().catch(() => null);
     const runs = await pool.query(
       `SELECT b.*, c.nev AS company_name FROM company_backup_runs b
          JOIN companies c ON c.id = b.company_id
         ORDER BY b.started_at DESC LIMIT 60`).catch(() => ({ rows: [] }));
-    const connected = await pool.query(
-      `SELECT COUNT(*)::int AS n FROM company_integrations WHERE provider='gdrive_backup' AND credentials_enc IS NOT NULL`)
-      .catch(() => ({ rows: [{ n: 0 }] }));
+    const tot = await pool.query(
+      `SELECT COUNT(*)::int AS n, COALESCE(SUM(size_bytes), 0)::bigint AS bytes FROM company_backup_runs WHERE r2_key IS NOT NULL`)
+      .catch(() => ({ rows: [{ n: 0, bytes: 0 }] }));
+    const rep = r2.configReport(); delete rep.expected;
     return res.json({ result: {
-      ok: true, configured: drive.isConfigured(), redirect_uri: drive.redirectUri(),
-      vs_connected: !!vs, vs_email: vs ? vs.value.email || null : null, vs_retention_days: backup.VS_RETENTION_DAYS,
-      companies_connected: connected.rows[0].n,
+      ok: true, configured: rep.ok, r2_env: rep, daily_keep_days: backup.DAILY_KEEP_DAYS,
+      stored_files: tot.rows[0].n, stored_bytes: Number(tot.rows[0].bytes),
       runs: runs.rows.map((r) => Object.assign(runRow(r), { company_id: r.company_id, company_name: r.company_name })),
     } });
   } catch (e) {
     console.error('devBackupStatus hiba:', e);
-    return deny(res, 'Eroare de server');
-  }
-};
-
-handlers.devBackupVsDisconnect = async function (req, res) {
-  try {
-    if (!req.session.user || !req.session.user.is_dev) return deny(res);
-    const vs = await backup.getVsDrive().catch(() => null);
-    if (vs) await drive.revoke(vs.refreshToken);
-    await pool.query(`DELETE FROM developer_settings WHERE key='backup_vs_drive'`);
-    audit.fromReq(req, 'backup.vs_drive_disconnect', 'developer_settings', 'backup_vs_drive', {});
-    return res.json({ result: { ok: true } });
-  } catch (e) {
-    console.error('devBackupVsDisconnect hiba:', e);
     return deny(res, 'Eroare de server');
   }
 };

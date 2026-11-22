@@ -497,13 +497,13 @@
 
     <!-- Árva menetlevelek: company_id NULL (törölt sofőr + nincs fuvar/rendszám-jel) -->
     <div class="dev-pane hidden" id="pane-backup">
-      <div class="section-title">🛡️ Cégenkénti biztonsági mentés — Google Drive</div>
-      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Minden cég éjszakai, titkosított mentése a cég saját Drive-jára (ha összekötötte) ÉS a VallorSoft saját Drive-jára (biztonsági háló, 30 nap után automatikusan törlődik). A VallorSoft Drive bekötése után MINDEN aktív cégről készül mentés.</p>
+      <div class="section-title">🛡️ Cégenkénti biztonsági mentés — Cloudflare R2</div>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Minden aktív cég éjszakai, cégenkénti kulccsal titkosított mentése a VallorSoft Cloudflare R2 tárhelyére (<code>backups/c&lt;cég&gt;/</code>). 30 napig minden napi mentés megmarad, utána havonta egy, a cég által választott ideig (30/90/180/365 nap).</p>
       <div class="glass" style="padding:16px;margin-bottom:16px;" id="bkVsBox">Betöltés...</div>
       <div class="glass" style="padding:0;overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Időpont</th><th>Cég</th><th>Indítás</th><th>Méret</th><th>Sorok</th><th>Cég Drive</th><th>VallorSoft</th><th>Állapot</th></tr></thead>
-          <tbody id="bkRunsTbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+          <thead><tr><th>Időpont</th><th>Cég</th><th>Indítás</th><th>Méret</th><th>Sorok</th><th>R2</th><th>Állapot</th></tr></thead>
+          <tbody id="bkRunsTbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1983,39 +1983,25 @@ async function loadBackupPane() {
   const box = document.getElementById('bkVsBox');
   const tbody = document.getElementById('bkRunsTbody');
   if (!d || !d.ok) { box.innerHTML = '<span style="color:#ef4444;">Hiba: ' + escDev(d && d.err || 'ismeretlen') + '</span>'; return; }
-  let h = '';
-  if (!d.configured) {
-    h += '<div style="color:#f59e0b;font-weight:600;">⚠️ A Google OAuth nincs beállítva.</div>'
-      + '<div style="font-size:13px;color:var(--muted);margin-top:6px;">Fly.io secret: <code>GOOGLE_OAUTH_CLIENT_ID</code> + <code>GOOGLE_OAUTH_CLIENT_SECRET</code>. Engedélyezett visszahívási cím a Google Cloud konzolban: <code>' + escDev(d.redirect_uri) + '</code></div>';
-  } else if (d.vs_connected) {
-    h += '<div>✅ VallorSoft Drive összekötve: <b>' + escDev(d.vs_email || 'Google') + '</b> · megőrzés ' + d.vs_retention_days + ' nap · saját Drive-ot bekötött cégek: <b>' + d.companies_connected + '</b></div>'
-      + '<button class="btn ghost" style="margin-top:10px;" onclick="devBackupVsDisconnect()">Kapcsolat bontása</button>';
-  } else {
-    h += '<div>VallorSoft Drive: <b>nincs összekötve</b> · saját Drive-ot bekötött cégek: <b>' + d.companies_connected + '</b></div>'
-      + '<a class="btn primary" style="margin-top:10px;display:inline-block;text-decoration:none;" href="/api/backup/google/connect?target=vs">🔗 VallorSoft Google Drive összekötése</a>'
-      + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">Visszahívási cím: <code>' + escDev(d.redirect_uri) + '</code></div>';
-  }
-  box.innerHTML = h;
-  const sz = (b) => b == null ? '—' : (b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
-  const stl = { ok: '✅', partial: '⚠️', error: '❌', running: '⏳', skipped: '—', deleted: '🗑' };
-  if (!d.runs.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Még nincs mentés.</td></tr>'; return; }
+  const sz = (b) => b == null ? '—' : (b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : b < 1073741824 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1073741824).toFixed(2) + ' GB');
+  const env = d.r2_env || {};
+  box.innerHTML = (d.configured
+      ? '<div>✅ Cloudflare R2 beállítva · tárolt mentések: <b>' + d.stored_files + '</b> fájl, <b>' + sz(d.stored_bytes) + '</b></div>'
+      : '<div style="color:#f59e0b;font-weight:600;">⚠️ A Cloudflare R2 nincs beállítva — nem készül mentés.</div>')
+    + '<div style="font-size:12px;color:var(--muted);margin-top:6px;">' + ['account', 'key', 'secret', 'bucket', 'endpoint'].map(function (k) { return k + ': ' + (env[k] ? '✓ ' + escDev(env[k]) : '—'); }).join(' · ') + '</div>'
+    + '<button onclick="bkR2Test()" style="margin-top:10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">🔌 R2 kapcsolat tesztje</button> <span id="bkR2TestRes" style="font-size:12px;font-weight:700;"></span>';
+  const stl = { ok: '✅', partial: '⚠️', error: '❌', running: '⏳', deleted: '🗑' };
+  if (!d.runs.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">Még nincs mentés.</td></tr>'; return; }
   tbody.innerHTML = d.runs.map((r) => '<tr' + (r.error ? ' title="' + escDev(r.error) + '"' : '') + '><td>' + escDev(new Date(r.started_at).toLocaleString('hu-HU')) + '</td><td>' + escDev(r.company_name) + ' (#' + r.company_id + ')</td>'
     + '<td>' + escDev(r.trigger) + '</td><td>' + sz(r.size_bytes) + '</td><td>' + (r.row_count != null ? r.row_count : '—') + '</td>'
-    + '<td>' + (stl[r.drive_status] || '—') + '</td><td>' + (stl[r.vs_status] || '—') + '</td><td>' + (stl[r.status] || escDev(r.status)) + ' ' + escDev(r.status) + '</td></tr>').join('');
+    + '<td>' + (r.has_copy ? '☁️' : (stl[r.r2_status] || '—')) + '</td><td>' + (stl[r.status] || '') + ' ' + escDev(r.status) + '</td></tr>').join('');
 }
-async function devBackupVsDisconnect() {
-  if (!confirm('Bontod a VallorSoft Drive kapcsolatot? A meglévő fájlok a Drive-on maradnak.')) return;
-  const d = await gas('devBackupVsDisconnect');
-  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
-  loadBackupPane();
+async function bkR2Test() {
+  const el = document.getElementById('bkR2TestRes');
+  if (el) { el.style.color = 'var(--muted)'; el.textContent = '⏳'; }
+  const d = await gas('devR2Test');
+  if (el) { el.style.color = d && d.ok ? '#22c55e' : '#ef4444'; el.textContent = d && d.ok ? '✅ OK (' + d.ms + ' ms)' : '✗ ' + ((d && d.err) || 'hiba'); }
 }
-(function () {
-  const m = /[?&]gdrive=([a-z]+)/.exec(location.search || '');
-  if (!m) return;
-  try { history.replaceState(null, '', location.pathname); } catch (e) {}
-  const msg = { ok: 'VallorSoft Google Drive összekötve ✓', denied: 'A Google-hozzáférés nem lett engedélyezve.', error: 'Az összekötés nem sikerült.', state: 'Lejárt összekötési kérés — próbáld újra.', noconfig: 'A Google OAuth nincs beállítva.' };
-  window.addEventListener('load', () => setTimeout(() => { alert(msg[m[1]] || m[1]); showPane('backup'); loadBackupPane(); }, 600));
-})();
 
 
 async function loadAuditUsage() {

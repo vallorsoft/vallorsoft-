@@ -1,7 +1,7 @@
 // ============================================================
-//  Unit-teszt — cégenkénti Google Drive biztonsági mentés
-//  (lib/backupFile, services/companyBackup, lib/googleDrive, handlers/backup)
-//  Mock DB-vel — éles DB és Google nem kell.
+//  Unit-teszt — cégenkénti biztonsági mentés (Cloudflare R2)
+//  (lib/backupFile, services/companyBackup, handlers/backup)
+//  Mock DB-vel — éles DB és R2 nem kell.
 // ============================================================
 process.env.INTEGRATION_ENC_KEY = process.env.INTEGRATION_ENC_KEY || 'a'.repeat(64);
 jest.mock('../../db', () => require('../helpers/db-mock').pool);
@@ -14,7 +14,6 @@ const path = require('path');
 const { pool, rows, reset } = require('../helpers/db-mock');
 const bf = require('../../lib/backupFile');
 const svc = require('../../services/companyBackup');
-const drive = require('../../lib/googleDrive');
 const H = require('../../handlers/backup');
 
 const tmp = (n) => path.join(os.tmpdir(), 'vsbk-test-' + process.pid + '-' + n + '.vsbk');
@@ -125,35 +124,18 @@ describe('mit mentünk', () => {
   });
 });
 
-describe('lib/googleDrive', () => {
-  test('authUrl: csak drive.file + offline + state', () => {
-    process.env.GOOGLE_OAUTH_CLIENT_ID = 'cid'; process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'sec';
-    const u = new URL(drive.authUrl('st123'));
-    expect(u.searchParams.get('scope')).toContain('https://www.googleapis.com/auth/drive.file');
-    expect(u.searchParams.get('scope')).not.toMatch(/auth\/drive(\s|$)/);
-    expect(u.searchParams.get('access_type')).toBe('offline');
-    expect(u.searchParams.get('state')).toBe('st123');
-    expect(u.searchParams.get('redirect_uri')).toMatch(/\/api\/backup\/google\/callback$/);
-  });
-  test('emailFromIdToken', () => {
-    const tok = 'x.' + Buffer.from(JSON.stringify({ email: 'a@b.ro' })).toString('base64url') + '.y';
-    expect(drive.emailFromIdToken(tok)).toBe('a@b.ro');
-    expect(drive.emailFromIdToken('rossz')).toBeNull();
-  });
-});
-
 describe('handlers/backup — jogosultság + validáció', () => {
   const ADMIN = { id: 1, pozicio: 'Admin', company_id: 7 };
   const MGR = { id: 2, pozicio: 'Manager', company_id: 7 };
   const SOFER = { id: 3, pozicio: 'Sofer', company_id: 7 };
 
-  test.each(['backupGetStatus', 'backupSaveSettings', 'backupDisconnect', 'backupRunNow'])(
+  test.each(['backupGetStatus', 'backupSaveSettings', 'backupRunNow'])(
     '%s — csak Admin (Manager/Sofer tiltva, DB-hívás nélkül)', async (fn) => {
       for (const u of [MGR, SOFER, null]) expect((await call(H[fn], u, [{}])).ok).toBe(false);
       expect(pool.query).not.toHaveBeenCalled();
     });
 
-  test.each(['devBackupStatus', 'devBackupVsDisconnect'])('%s — csak developer', async (fn) => {
+  test.each(['devBackupStatus'])('%s — csak developer', async (fn) => {
     expect((await call(H[fn], ADMIN, [])).ok).toBe(false);
     expect(pool.query).not.toHaveBeenCalled();
   });
@@ -171,25 +153,51 @@ describe('handlers/backup — jogosultság + validáció', () => {
     expect(pool.query.mock.calls[0][1]).toEqual([7, true, 3, '365']);
   });
 
-  test('backupRunNow: Drive nélkül nem indul', async () => {
-    process.env.GOOGLE_OAUTH_CLIENT_ID = 'cid'; process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'sec';
-    pool.query.mockResolvedValueOnce(rows([])); // nincs gdrive_backup integráció
+  test('backupRunNow: tárhely (R2) nélkül nem indul, DB-hívás nélkül', async () => {
+    ['R2_ACCOUNT_ID', 'R2_BUCKET', 'R2_ENDPOINT', 'CLOUDFLARE_ACCOUNT_ID', 'R2_BUCKET_NAME'].forEach((k) => delete process.env[k]);
     const r = await call(H.backupRunNow, ADMIN, []);
     expect(r.ok).toBe(false);
-    expect(pool.query.mock.calls[0][1]).toEqual([7]);
+    expect(pool.query).not.toHaveBeenCalled();
   });
 
-  test('backupGetStatus: a token sosem kerül a válaszba', async () => {
+  test('backupGetStatus: csak a saját cég mentései, R2-kulcs nem kerül ki', async () => {
     pool.query
-      .mockResolvedValueOnce(rows([{ status: 'connected', status_message: null, meta: { email: 'x@y.ro' }, connected: true }]))
       .mockResolvedValueOnce(rows([]))   // settings
-      .mockResolvedValueOnce(rows([]))   // runs
-      .mockResolvedValueOnce(rows([]));  // vs drive
+      .mockResolvedValueOnce(rows([{ id: 4, status: 'ok', trigger: 'schedule', r2_key: 'backups/c7/x.vsbk', r2_status: 'ok', size_bytes: '10' }]));
     const r = await call(H.backupGetStatus, ADMIN, []);
     expect(r.ok).toBe(true);
-    expect(r.connected).toBe(true);
-    expect(r.email).toBe('x@y.ro');
-    expect(JSON.stringify(r)).not.toMatch(/credentials|refresh/);
+    expect(r.runs[0].has_copy).toBe(true);
+    expect(JSON.stringify(r)).not.toMatch(/backups\/c7/);
+    expect(pool.query.mock.calls[1][1]).toEqual([7]);
+    expect(r.retention_options).toEqual(['30', '90', '180', '365']);
+  });
+});
+
+describe('services/companyBackup — R2 mentés + megőrzés (hamis S3-szerver)', () => {
+  let fake;
+  const ENV = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_ENDPOINT'];
+  const saved = {};
+  beforeAll(async () => {
+    fake = await require('../helpers/fake-s3').start();
+    ENV.forEach((k) => { saved[k] = process.env[k]; });
+    Object.assign(process.env, { R2_ACCOUNT_ID: 'a', R2_ACCESS_KEY_ID: 'k', R2_SECRET_ACCESS_KEY: 's', R2_BUCKET: 'b', R2_ENDPOINT: fake.url });
+  });
+  afterAll(() => { fake.server.close(); ENV.forEach((k) => { if (saved[k] == null) delete process.env[k]; else process.env[k] = saved[k]; }); });
+
+  test('r2KeyFor: cégenkénti előtag', () => {
+    expect(svc.r2KeyFor(7, 'f.vsbk')).toBe('backups/c7/f.vsbk');
+  });
+
+  test('megőrzés: a lekérdezés a saját cégre szűr, a kijelölt fájlok törlődnek az R2-ről', async () => {
+    fake.objects.set('backups/c7/old.vsbk', Buffer.from('x'));
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 11, r2_key: 'backups/c7/old.vsbk' }]))
+      .mockResolvedValue(rows([]));
+    const n = await svc.applyRetention(7, { drive_retention: '90' });
+    expect(n).toBe(1);
+    expect(fake.objects.has('backups/c7/old.vsbk')).toBe(false);
+    expect(pool.query.mock.calls[0][1]).toEqual([7, '90', '30']);
+    expect(pool.query.mock.calls[1][1]).toEqual([11, 7]);
   });
 });
 

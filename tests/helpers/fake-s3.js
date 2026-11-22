@@ -27,6 +27,8 @@ function start() {
         return res.end('<CompleteMultipartUploadResult/>');
       }
       if (req.method === 'DELETE' && u.searchParams.get('uploadId')) { uploads.delete(u.searchParams.get('uploadId')); res.statusCode = 204; return res.end(); }
+      if (req.method === 'PUT' && !u.searchParams.get('uploadId')) { objects.set(key, body); res.setHeader('etag', '"x"'); return res.end(); }
+      if (req.method === 'HEAD') { const o = objects.get(key); if (!o) { res.statusCode = 404; return res.end(); } res.setHeader('content-length', o.length); return res.end(); }
       if (req.method === 'GET') { const o = objects.get(key); if (!o) { res.statusCode = 404; return res.end(); } return res.end(o); }
       if (req.method === 'DELETE') { objects.delete(key); res.statusCode = 204; return res.end(); }
       res.statusCode = 400; res.end();

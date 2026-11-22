@@ -1,31 +1,33 @@
 // ============================================================
 //  VallorSoft — services/companyBackup.js
-//  Cégenkénti automatikus biztonsági mentés Google Drive-ba.
+//  Cégenkénti automatikus biztonsági mentés a saját Cloudflare R2 tárhelyünkre.
 //
 //  - Minden éjjel (a cég által megadott órában, Europe/Bucharest) egy
 //    teljes, titkosított pillanatkép készül a cég ÖSSZES adatáról
 //    (minden company_id-s tábla + a fuvarokhoz kötött gyerek-táblák +
 //    a sofőr-e-mailhez kötött naplók + maga a cég-sor), benne a
 //    dokumentumokkal, fotókkal, GPS-útvonalakkal.
-//  - A fájl a cég SAJÁT Drive-jára kerül (ha összekötötte) — onnan mi nem
-//    törlünk, csak ha a cég megőrzési korlátot állított be —, és a VallorSoft
-//    saját Drive-jára is (biztonsági háló), ahol 30 napig őrizzük.
+//  - A fájl cégenkénti kulccsal titkosított (lib/backupFile), és a Cloudflare
+//    R2-re kerül (lib/r2): backups/c<cégId>/<fájl>.vsbk.
+//  - Megőrzés: 30 napig minden napi mentés megmarad, utána havonta egy
+//    (a hónap első sikeres mentése) a cég által választott ideig (30/90/180/365 nap).
 //  - Csak az ütemező-vezető fut (lib/schedulerLeader), egyszerre egy mentés.
+//  - A korábbi Google Drive-os mentés kivezetve (a tárolt tokeneket egyszer visszavonjuk).
 // ============================================================
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { finished } = require('stream/promises');
 const pool = require('../db');
 const log = require('../lib/logger');
-const { encrypt, decrypt } = require('../lib/crypto');
-const drive = require('../lib/googleDrive');
+const { decrypt } = require('../lib/crypto');
+const r2 = require('../lib/r2');
 const { createWriter, companyKey } = require('../lib/backupFile');
 
-const VS_RETENTION_DAYS = 30;
+const DAILY_KEEP_DAYS = 30;
 const PAGE = 1000;
-const COMPANY_FOLDER = 'VallorSoft – Backup';
-const VS_ROOT_FOLDER = 'VallorSoft – Backup cegek';
-const RETENTION_OPTIONS = ['forever', '365', '180', '90'];
+const RETENTION_OPTIONS = ['30', '90', '180', '365'];
+const DEFAULT_RETENTION = '365';
 // Ezeket nem mentjük: munkamenet / rendszer-könyvelés / maga a mentés-napló.
 const SKIP_TABLES = new Set(['session', 'schema_migrations', 'scheduler_leader', 'company_backup_runs', 'company_backup_restores']);
 
@@ -141,125 +143,67 @@ async function buildSnapshot(db, cid, filePath) {
   return { counts, rows, size: res.size };
 }
 
-// ---- Drive-kapcsolatok ----
-async function getCompanyDrive(cid) {
-  const r = await pool.query(
-    `SELECT credentials_enc, meta, status FROM company_integrations WHERE company_id = $1 AND provider = 'gdrive_backup'`, [cid]);
-  if (!r.rows.length || !r.rows[0].credentials_enc) return null;
-  return { refreshToken: decrypt(r.rows[0].credentials_enc), meta: r.rows[0].meta || {}, status: r.rows[0].status };
-}
-async function setCompanyDriveMeta(cid, patch, status, message) {
-  await pool.query(
-    `UPDATE company_integrations
-        SET meta = COALESCE(meta, '{}'::jsonb) || $2::jsonb,
-            status = COALESCE($3, status), status_message = $4, last_check = now(), updated_at = now()
-      WHERE company_id = $1 AND provider = 'gdrive_backup'`,
-    [cid, JSON.stringify(patch || {}), status || null, message || null]);
-}
-async function getVsDrive() {
-  const r = await pool.query(`SELECT value FROM developer_settings WHERE key = 'backup_vs_drive'`).catch(() => ({ rows: [] }));
-  const v = r.rows[0] && r.rows[0].value;
-  if (!v || !v.refresh_enc) return null;
-  return { refreshToken: decrypt(v.refresh_enc), value: v };
-}
-async function patchVsDrive(patch) {
-  await pool.query(
-    `UPDATE developer_settings SET value = value || $1::jsonb, updated_at = now() WHERE key = 'backup_vs_drive'`,
-    [JSON.stringify(patch)]);
-}
-
-async function saveCompanyDrive(cid, refreshToken, email) {
-  await pool.query(
-    `INSERT INTO company_integrations (company_id, provider, category, enabled, credentials_enc, status, meta, updated_at)
-     VALUES ($1, 'gdrive_backup', 'backup', true, $2, 'connected', $3::jsonb, now())
-     ON CONFLICT (company_id, provider) DO UPDATE
-       SET credentials_enc = EXCLUDED.credentials_enc, enabled = true, status = 'connected',
-           status_message = NULL, meta = EXCLUDED.meta, updated_at = now()`,
-    [cid, encrypt(refreshToken), JSON.stringify({ email: email || null, connected_at: new Date().toISOString() })]);
-}
-async function saveVsDrive(refreshToken, email) {
-  await pool.query(
-    `INSERT INTO developer_settings (key, value, updated_at) VALUES ('backup_vs_drive', $1::jsonb, now())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
-    [JSON.stringify({ refresh_enc: encrypt(refreshToken), email: email || null, connected_at: new Date().toISOString() })]);
-}
+function r2KeyFor(cid, fileName) { return 'backups/c' + Number(cid) + '/' + fileName; }
 
 async function getSettings(cid) {
   const r = await pool.query('SELECT enabled, run_hour, drive_retention FROM company_backup_settings WHERE company_id = $1', [cid])
     .catch(() => ({ rows: [] }));
-  return r.rows[0] || { enabled: true, run_hour: 2, drive_retention: 'forever' };
+  const s = r.rows[0] || { enabled: true, run_hour: 2, drive_retention: DEFAULT_RETENTION };
+  if (RETENTION_OPTIONS.indexOf(String(s.drive_retention)) === -1) s.drive_retention = DEFAULT_RETENTION;
+  return s;
 }
 
 // ---- Egy cég mentése ----
 const _running = new Set();
 function isRunning(cid) { return _running.has(Number(cid)); }
 
+async function uploadToR2(filePath, key) {
+  const up = r2.createUploadStream(key, 'application/octet-stream');
+  const done = finished(up);
+  fs.createReadStream(filePath).pipe(up);
+  await done;
+  const h = await r2.headObject(key);
+  if (!h) throw new Error('R2: a feltöltött fájl nem található');
+  return h.size;
+}
+
 async function runCompanyBackup(cid, opts) {
   cid = Number(cid);
   const trigger = (opts && opts.trigger) || 'schedule';
   if (_running.has(cid)) return { ok: false, err: 'Backup deja în curs' };
+  if (!r2.configured()) return { ok: false, err: 'Stocarea pentru backup nu este configurată' };
   _running.add(cid);
   const started = new Date();
   const fileName = backupFileName(cid, started);
+  const key = r2KeyFor(cid, fileName);
   const tmp = path.join(os.tmpdir(), 'vsbk-' + cid + '-' + Date.now() + '.vsbk');
   let runId = null;
   try {
     const settings = await getSettings(cid);
-    const companyDrive = settings.enabled !== false ? await getCompanyDrive(cid).catch(() => null) : null;
-    const vsDrive = await getVsDrive().catch(() => null);
-    if (!companyDrive && !vsDrive) return { ok: false, err: 'Google Drive neconectat' };
-
     const ins = await pool.query(
       `INSERT INTO company_backup_runs (company_id, trigger, kind, status, started_at, file_name)
        VALUES ($1, $2, 'full', 'running', $3, $4) RETURNING id`, [cid, trigger, started, fileName]);
     runId = ins.rows[0].id;
 
     const snap = await buildSnapshot(pool, cid, tmp);
-    const res = { drive_file_id: null, drive_status: 'skipped', vs_file_id: null, vs_status: 'skipped', errors: [] };
-
-    if (companyDrive) {
-      try {
-        const token = await drive.accessToken(companyDrive.refreshToken);
-        const folderId = await drive.ensureFolder(token, COMPANY_FOLDER, null, companyDrive.meta.folder_id);
-        res.drive_file_id = await drive.uploadFile(token, folderId, fileName, tmp);
-        res.drive_status = 'ok';
-        await setCompanyDriveMeta(cid, { folder_id: folderId }, 'connected', null);
-      } catch (e) {
-        res.drive_status = 'error'; res.errors.push('Drive firmă: ' + e.message);
-        const revoked = e.code === 'invalid_grant';
-        await setCompanyDriveMeta(cid, {}, revoked ? 'error' : null,
-          revoked ? 'Accesul la Google Drive a fost revocat — reconectați.' : e.message).catch(() => {});
-      }
-    }
-    if (vsDrive) {
-      try {
-        const token = await drive.accessToken(vsDrive.refreshToken);
-        const rootId = await drive.ensureFolder(token, VS_ROOT_FOLDER, null, vsDrive.value.root_folder_id);
-        if (rootId !== vsDrive.value.root_folder_id) await patchVsDrive({ root_folder_id: rootId });
-        const sub = await drive.ensureFolder(token, 'firma-' + cid, rootId, null);
-        res.vs_file_id = await drive.uploadFile(token, sub, fileName, tmp);
-        res.vs_status = 'ok';
-      } catch (e) {
-        res.vs_status = 'error'; res.errors.push('Drive VallorSoft: ' + e.message);
-      }
-    }
-    const okCount = [res.drive_status, res.vs_status].filter((s) => s === 'ok').length;
-    const tried = [res.drive_status, res.vs_status].filter((s) => s !== 'skipped').length;
-    const status = okCount === 0 ? 'error' : (okCount < tried ? 'partial' : 'ok');
+    let status = 'ok', error = null, stored = null;
+    try { stored = await uploadToR2(tmp, key); }
+    catch (e) { status = 'error'; error = 'Cloudflare R2: ' + e.message; r2.deleteObject(key).catch(() => {}); }
     await pool.query(
       `UPDATE company_backup_runs SET status=$2, finished_at=now(), size_bytes=$3, row_count=$4, table_counts=$5::jsonb,
-              drive_file_id=$6, drive_status=$7, vs_file_id=$8, vs_status=$9, error=$10 WHERE id=$1`,
-      [runId, status, snap.size, snap.rows, JSON.stringify(snap.counts), res.drive_file_id, res.drive_status,
-        res.vs_file_id, res.vs_status, res.errors.join(' | ').slice(0, 1000) || null]);
+              r2_key=$6, r2_status=$7, error=$8 WHERE id=$1`,
+      [runId, status, stored != null ? stored : snap.size, snap.rows, JSON.stringify(snap.counts),
+        status === 'ok' ? key : null, status, error ? error.slice(0, 1000) : null]);
     log.info('backup: kész', { company_id: cid, status, size: snap.size, rows: snap.rows });
-    await applyRetention(cid, settings, companyDrive, vsDrive).catch((e) => log.warn('backup: retenció hiba', { company_id: cid, err: e.message }));
-    return { ok: status !== 'error', status, runId };
+    if (status === 'ok') await applyRetention(cid, settings).catch((e) => log.warn('backup: retenció hiba', { company_id: cid, err: e.message }));
+    return { ok: status === 'ok', status, runId };
   } catch (e) {
     log.error('backup: hiba', { company_id: cid, err: e.message });
     if (runId) {
       await pool.query(`UPDATE company_backup_runs SET status='error', finished_at=now(), error=$2 WHERE id=$1`,
         [runId, String(e.message).slice(0, 1000)]).catch(() => {});
     }
+    r2.deleteObject(key).catch(() => {});
     return { ok: false, err: 'Backup eșuat' };
   } finally {
     _running.delete(cid);
@@ -268,62 +212,76 @@ async function runCompanyBackup(cid, opts) {
 }
 
 // ---- Megőrzés ----
-// VallorSoft Drive: 30 nap után törlés. A cég Drive-ja: csak ha a cég korlátot kért.
-async function applyRetention(cid, settings, companyDrive, vsDrive) {
-  if (vsDrive) {
-    const old = await pool.query(
-      `SELECT id, vs_file_id FROM company_backup_runs
-        WHERE company_id=$1 AND vs_file_id IS NOT NULL AND started_at < now() - ($2 || ' days')::interval`,
-      [cid, String(VS_RETENTION_DAYS)]);
-    if (old.rows.length) {
-      const token = await drive.accessToken(vsDrive.refreshToken);
-      for (const r of old.rows) {
-        try { await drive.deleteFile(token, r.vs_file_id); await pool.query(`UPDATE company_backup_runs SET vs_file_id=NULL, vs_status='deleted' WHERE id=$1`, [r.id]); }
-        catch (e) { log.warn('backup: VS-törlés hiba', { run: r.id, err: e.message }); }
-      }
-    }
+// 30 napig minden napi mentés; utána havonta a hónap első sikeres mentése marad,
+// a cég által választott ideig; minden más törlődik az R2-ről.
+async function applyRetention(cid, settings) {
+  const days = Math.max(DAILY_KEEP_DAYS, parseInt(settings && settings.drive_retention, 10) || parseInt(DEFAULT_RETENTION, 10));
+  const old = await pool.query(
+    `WITH monthly AS (
+       SELECT DISTINCT ON (date_trunc('month', started_at)) id
+         FROM company_backup_runs
+        WHERE company_id = $1 AND r2_key IS NOT NULL AND status = 'ok'
+        ORDER BY date_trunc('month', started_at), started_at)
+     SELECT id, r2_key FROM company_backup_runs
+      WHERE company_id = $1 AND r2_key IS NOT NULL
+        AND (started_at < now() - ($2 || ' days')::interval
+             OR (started_at < now() - ($3 || ' days')::interval AND id NOT IN (SELECT id FROM monthly)))`,
+    [cid, String(days), String(DAILY_KEEP_DAYS)]);
+  for (const r of old.rows) {
+    try {
+      await r2.deleteObject(r.r2_key);
+      await pool.query(`UPDATE company_backup_runs SET r2_key=NULL, r2_status='deleted' WHERE id=$1 AND company_id=$2`, [r.id, cid]);
+    } catch (e) { log.warn('backup: R2-törlés hiba', { run: r.id, err: e.message }); }
   }
-  const days = parseInt(settings && settings.drive_retention, 10);
-  if (companyDrive && Number.isFinite(days) && days > 0) {
-    const old = await pool.query(
-      `SELECT id, drive_file_id FROM company_backup_runs
-        WHERE company_id=$1 AND drive_file_id IS NOT NULL AND started_at < now() - ($2 || ' days')::interval`,
-      [cid, String(days)]);
-    if (old.rows.length) {
-      const token = await drive.accessToken(companyDrive.refreshToken);
-      for (const r of old.rows) {
-        try { await drive.deleteFile(token, r.drive_file_id); await pool.query(`UPDATE company_backup_runs SET drive_file_id=NULL, drive_status='deleted' WHERE id=$1`, [r.id]); }
-        catch (e) { log.warn('backup: cég-Drive törlés hiba', { run: r.id, err: e.message }); }
-      }
-    }
-  }
-  // A napló sorai 400 nap után törlődnek (a Drive-fájlok sorsától függetlenül).
+  // A napló sorai 400 nap után törlődnek, ha már nincs hozzájuk fájl.
   await pool.query(`DELETE FROM company_backup_runs WHERE company_id=$1 AND started_at < now() - interval '400 days'
-                      AND drive_file_id IS NULL AND vs_file_id IS NULL`, [cid]);
+                      AND r2_key IS NULL`, [cid]);
+  return old.rows.length;
+}
+
+// ---- A korábbi Google Drive-kapcsolatok kivezetése (egyszer) ----
+// A tárolt frissítő-tokeneket visszavonjuk a Google-nél, majd töröljük.
+async function revokeLegacyDriveTokens() {
+  const tokens = [];
+  try {
+    const c = await pool.query(`SELECT company_id, credentials_enc FROM company_integrations WHERE provider='gdrive_backup' AND credentials_enc IS NOT NULL`);
+    c.rows.forEach((r) => { try { tokens.push(decrypt(r.credentials_enc)); } catch (_) {} });
+    const v = await pool.query(`SELECT value FROM developer_settings WHERE key='backup_vs_drive'`);
+    const vv = v.rows[0] && v.rows[0].value;
+    if (vv && vv.refresh_enc) { try { tokens.push(decrypt(vv.refresh_enc)); } catch (_) {} }
+  } catch (e) { return 0; }
+  for (const t of tokens) {
+    try {
+      await fetch('https://oauth2.googleapis.com/revoke', { method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'token=' + encodeURIComponent(t) });
+    } catch (_) { /* best-effort */ }
+  }
+  await pool.query(`DELETE FROM company_integrations WHERE provider='gdrive_backup'`).catch(() => {});
+  await pool.query(`DELETE FROM developer_settings WHERE key='backup_vs_drive'`).catch(() => {});
+  if (tokens.length) log.info('backup: Google Drive-tokenek visszavonva', { n: tokens.length });
+  return tokens.length;
 }
 
 // ---- Ütemező ----
 async function dueCompanies(now) {
-  const vs = await getVsDrive().catch(() => null);
-  // Jelöltek: aktív cégek, ahol van cél (saját Drive bekapcsolva, vagy a VallorSoft Drive él).
   const r = await pool.query(
     `SELECT c.id,
             COALESCE(s.run_hour, 2) AS run_hour,
             COALESCE(s.enabled, true) AS enabled,
-            (ci.credentials_enc IS NOT NULL) AS has_drive,
             (SELECT MAX(started_at) FROM company_backup_runs b WHERE b.company_id = c.id AND b.trigger = 'schedule') AS last_run
        FROM companies c
        LEFT JOIN company_backup_settings s ON s.company_id = c.id
-       LEFT JOIN company_integrations ci ON ci.company_id = c.id AND ci.provider = 'gdrive_backup'
       WHERE COALESCE(c.subscription_status, 'active') <> 'cancelled'`);
-  return r.rows.filter((x) => (vs || (x.enabled && x.has_drive)) && isDue(Number(x.run_hour), x.last_run, now)).map((x) => x.id);
+  return r.rows.filter((x) => x.enabled && isDue(Number(x.run_hour), x.last_run, now)).map((x) => x.id);
 }
 
-let _tickBusy = false;
+let _tickBusy = false, _legacyDone = false;
 async function tick() {
-  if (_tickBusy || !drive.isConfigured()) return;
+  if (_tickBusy) return;
   _tickBusy = true;
   try {
+    if (!_legacyDone) { _legacyDone = true; await revokeLegacyDriveTokens().catch(() => {}); }
+    if (!r2.configured()) return;
     const ids = await dueCompanies(new Date());
     for (const cid of ids) await runCompanyBackup(cid, { trigger: 'schedule' });
   } catch (e) {
@@ -334,12 +292,12 @@ async function tick() {
 function startCompanyBackupScheduler() {
   setTimeout(tick, 90 * 1000);
   setInterval(tick, 10 * 60 * 1000);
-  log.info('Cégenkénti Drive-mentés ütemező elindítva (10 perces ellenőrzés)');
+  log.info('Cégenkénti biztonsági mentés ütemező elindítva (Cloudflare R2, 10 perces ellenőrzés)');
 }
 
 module.exports = {
-  VS_RETENTION_DAYS, RETENTION_OPTIONS, COMPANY_FOLDER,
-  bucharestParts, isDue, backupFileName, discoverTables, scopeWhere, buildSnapshot,
-  saveCompanyDrive, saveVsDrive, getCompanyDrive, getVsDrive, getSettings,
-  runCompanyBackup, isRunning, startCompanyBackupScheduler, dueCompanies, _tick: tick,
+  DAILY_KEEP_DAYS, RETENTION_OPTIONS, DEFAULT_RETENTION,
+  bucharestParts, isDue, backupFileName, discoverTables, scopeWhere, buildSnapshot, r2KeyFor,
+  getSettings, runCompanyBackup, isRunning, startCompanyBackupScheduler, dueCompanies, applyRetention,
+  revokeLegacyDriveTokens, _tick: tick,
 };
