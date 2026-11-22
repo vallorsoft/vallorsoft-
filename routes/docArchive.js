@@ -38,6 +38,25 @@ router.get('/api/doc-archive/download', async (req, res) => {
   }
 });
 
+// A fizetős archiválás felhő-példánya (Cloudflare R2) — visszafejtve, csak a saját cégé.
+router.get('/api/doc-archive/cloud-download', async (req, res) => {
+  const u = req.session && req.session.user;
+  if (!_am(u)) return res.status(403).send('Acces interzis');
+  try {
+    const cloud = require('../lib/docArchiveCloud');
+    const inf = await cloud.info(u.company_id);
+    if (!inf || inf.status !== 'ok') return res.status(404).send('Arhiva din cloud nu este încă disponibilă.');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="VallorSoft_arhiva_cloud_' + new Date(inf.updated_at).toISOString().slice(0, 10) + '.zip"');
+    res.setHeader('Cache-Control', 'no-store');
+    audit.fromReq(req, 'doc_archive.cloud_download', 'company', u.company_id, {});
+    await cloud.download(u.company_id, res);
+  } catch (err) {
+    console.error('cloud-download hiba:', err);
+    if (!res.headersSent) res.status(500).send('Eroare de server'); else res.destroy(err);
+  }
+});
+
 router.get('/api/waybill-download/:id', async (req, res) => {
   try {
     const u = req.session && req.session.user;

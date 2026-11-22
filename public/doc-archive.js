@@ -22,6 +22,7 @@ window.DocArchive = (function () {
     });
   }
   function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ro-RO') : ''; }
+  function fmtDT(d) { return d ? new Date(d).toLocaleString('ro-RO') : ''; }
   function fmtSize(b) { b = Number(b) || 0; return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
   function call(fn, args) {
     return fetch('/api/execute', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
@@ -58,7 +59,7 @@ window.DocArchive = (function () {
     var host = document.getElementById('mainContent') || document.querySelector('.main-content');
     var old = document.getElementById('darBand');
     var s = st.s;
-    if (!host || !s || s.phase === 'ok') { if (old) old.remove(); return; }
+    if (!host || !s || s.phase === 'ok' || s.phase === 'paid') { if (old) old.remove(); return; }
     if (!old) {
       old = document.createElement('div');
       old.id = 'darBand';
@@ -68,7 +69,8 @@ window.DocArchive = (function () {
     var lock = s.phase === 'lock';
     old.className = 'dar-band ' + (lock ? 'dar-lockb' : 'dar-warn');
     old.innerHTML = '<span>' + (lock ? '⛔' : '📦') + '</span><span class="dar-sp">' +
-      esc(lock ? tt('dar.bandLock', 'Arhiva documentelor trebuie descărcată acum — până atunci nu poți folosi nimic altceva.')
+      esc(s.phase === 'grace' && s.order ? tt('dar.bandGrace', 'Arhivare în cloud solicitată — plătește până la {t} (referință {ref}). Până atunci restricțiile sunt ridicate.', { t: fmtDT(s.order.pay_until), ref: s.order.reference })
+        : lock ? tt('dar.bandLock', 'Arhiva documentelor trebuie descărcată acum — până atunci nu poți folosi nimic altceva.')
         : tt('dar.bandWarn', 'Descarcă arhiva anuală a documentelor în {d} zile (până la {date}). Dacă amâni, în ultimele {l} zile nu vei mai putea face nimic până nu o descarci.',
           { d: Math.max(s.days_left, 0), date: fmtDate(s.due_at), l: s.lock_days })) +
       '</span><button onclick="DocArchive.open()">' + esc(tt('dar.open', 'Arhiva documentelor')) + '</button>';
@@ -97,8 +99,12 @@ window.DocArchive = (function () {
     if (!mod) return;
     var s = st.s || {};
     var lock = s.phase === 'lock';
-    var alertCls = lock ? 'dar-a-lock' : s.phase === 'warn' ? 'dar-a-warn' : 'dar-a-ok';
-    var alertTxt = lock
+    var alertCls = lock ? 'dar-a-lock' : (s.phase === 'warn' || s.phase === 'grace') ? 'dar-a-warn' : 'dar-a-ok';
+    var alertTxt = s.phase === 'paid'
+      ? tt('dar.alertPaid', '✅ Arhivarea în cloud este activă până la {date}. Descărcarea arhivei nu este obligatorie în această perioadă.', { date: fmtDate(s.paid_until) })
+      : s.phase === 'grace' && s.order
+        ? tt('dar.alertGrace', '⏳ Arhivare solicitată — plătește până la {t}. Până atunci restricțiile sunt ridicate; dacă plata nu sosește, obligația de descărcare revine.', { t: fmtDT(s.order.pay_until) })
+        : lock
       ? tt('dar.alertLock', '⛔ Termenul expiră în {d} zile (până la {date}). Până nu descarci arhiva și nu confirmi codul, nu poți folosi nicio altă funcție.', { d: Math.max(s.days_left || 0, 0), date: fmtDate(s.due_at) })
       : s.phase === 'warn'
         ? tt('dar.alertWarn', '⚠️ Termenul expiră în {d} zile (până la {date}). Dacă amâni, în ultimele {l} zile nu vei mai putea face nimic în aplicație până nu descarci arhiva.', { d: s.days_left, date: fmtDate(s.due_at), l: s.lock_days })
@@ -121,11 +127,77 @@ window.DocArchive = (function () {
         '<div class="dar-code"><input id="darCode" inputmode="numeric" autocomplete="off" placeholder="' + esc(tt('dar.codePh', 'ex. 4821093375510248')) + '">' +
         '<button class="dar-btn ok" onclick="DocArchive._confirm()">✓ ' + esc(tt('dar.confirm', 'Confirmă')) + '</button></div>' +
         '<div class="dar-msg" id="darMsg"></div></div>' +
+      cloudHtml(s) +
       (hist ? '<details class="dar-hist"><summary>' + esc(tt('dar.history', 'Arhive anterioare')) + '</summary><ul>' + hist + '</ul></details>' : '') +
       '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;">' +
         (lock ? '<button class="dar-btn gh" onclick="DocArchive._logout()">' + esc(tt('dar.logout', 'Deconectare')) + '</button>'
           : '<button class="dar-btn gh" onclick="DocArchive.close()">' + esc(tt('common.close', 'Închide')) + '</button>') +
       '</div>';
+  }
+
+
+  // ── Felhő-archiválás (fizetős) ─────────────────────────────
+  function money(v) { return (Number(v) || 0).toFixed(2); }
+  function cloudHtml(s) {
+    var o = s.order, c = s.cloud;
+    var h = '<div class="dar-step dar-cloud"><b>☁️ ' + esc(tt('dar.cloudTitle', 'Sau: arhivare în cloud (fără descărcare obligatorie)')) + '</b>';
+    if (s.phase === 'paid') {
+      h += '<p>' + esc(tt('dar.cloudActive', 'Arhivarea este activă până la {date}. Arhiva se actualizează lunar, criptat, pe serverul nostru de stocare (Cloudflare).', { date: fmtDate(s.paid_until) })) + '</p>';
+      if (c && c.status === 'ok') {
+        h += '<a class="dar-btn" href="/api/doc-archive/cloud-download">⬇️ ' + esc(tt('dar.cloudDl', 'Descarcă arhiva din cloud')) + '</a>' +
+          '<div class="dar-hist" style="margin-top:6px;">' + esc(tt('dar.cloudLast', 'Ultima actualizare: {d} · {n} fișiere · {s}', { d: fmtDT(c.updated_at), n: c.file_count || 0, s: fmtSize(c.bytes) })) + '</div>';
+      } else {
+        h += '<p class="dar-hist">⏳ ' + esc(tt('dar.cloudPreparing', 'Arhiva se pregătește — va fi disponibilă în curând.')) + '</p>';
+      }
+      return h + '</div>';
+    }
+    if (o && o.status === 'pending') {
+      h += '<p>' + esc(tt('dar.cloudPending', 'Cerere trimisă: {y} an(i), {gb} GB — {eur} EUR{ron}. Instrucțiunile de plată au fost trimise pe e-mail. Termen de plată: {t}. Referință: {ref}.', {
+        y: o.years, gb: o.gb, eur: money(o.amount_eur), ron: o.total_ron ? ' (' + money(o.total_ron) + ' RON cu TVA)' : '', t: fmtDT(o.pay_until), ref: o.reference })) + '</p>';
+      return h + '</div>';
+    }
+    if (o && o.status === 'expired') h += '<p class="dar-msg dar-err">' + esc(tt('dar.cloudExpired', 'Cererea anterioară ({ref}) a expirat — plata nu a sosit în 48 de ore.', { ref: o.reference })) + '</p>';
+    var opts = '';
+    for (var y = 1; y <= 5; y++) opts += '<option value="' + y + '">' + y + ' ' + (y === 1 ? tt('dar.year', 'an') : tt('dar.years', 'ani')) + '</option>';
+    h += '<p>' + esc(tt('dar.cloudHint', 'Păstrăm noi arhiva documentelor firmei, criptat. Tarif anual: până la 1 GB 10 EUR, 1–5 GB 20 EUR, 5–15 GB 32 EUR, 15–50 GB 68 EUR; peste 50 GB ofertă individuală. Alege perioada — îți arătăm cât costă.')) + '</p>' +
+      '<div class="dar-code"><select id="darYears" style="flex:0 0 120px;padding:10px;border:1.5px solid #64748b;border-radius:10px;font-size:14px;color:#0f172a;background:#fff;">' + opts + '</select>' +
+      '<button class="dar-btn gh" onclick="DocArchive._quote()">💶 ' + esc(tt('dar.cloudQuote', 'Calculează prețul')) + '</button></div>' +
+      '<div id="darQuote"></div>';
+    return h + '</div>';
+  }
+  function _quote() {
+    var y = parseInt((document.getElementById('darYears') || {}).value, 10) || 1;
+    var box = document.getElementById('darQuote');
+    if (box) box.innerHTML = '<p class="dar-hist">⏳</p>';
+    call('docArchiveQuote', [{ years: y }]).then(function (q) {
+      if (!box) return;
+      if (!q || !q.ok) { box.innerHTML = '<div class="dar-msg dar-err">' + esc((q && q.err) || 'Eroare') + '</div>'; return; }
+      st.quote = q;
+      if (q.consult) {
+        box.innerHTML = '<div class="dar-alert dar-a-warn" style="margin-top:10px;">' + esc(tt('dar.qConsult', 'Documentele firmei ocupă {s} — peste {max} GB arhivarea se stabilește individual. Contactați-ne: vallorsoft@gmail.com.', { s: fmtSize(q.size_bytes), max: q.max_gb })) + '</div>';
+        return;
+      }
+      var tierTxt = (q.tier.min_gb ? q.tier.min_gb + '–' : '≤ ') + q.tier.max_gb + ' GB';
+      box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0;color:#0f172a;">' +
+        '<tr><td style="color:#475569;">' + esc(tt('dar.qSize', 'Volumul documentelor')) + '</td><td style="text-align:right;"><b>' + esc(fmtSize(q.size_bytes)) + '</b></td></tr>' +
+        '<tr><td style="color:#475569;">' + esc(tt('dar.qTier', 'Pachet')) + '</td><td style="text-align:right;">' + esc(tierTxt) + ' · ' + money(q.annual_eur) + ' EUR / ' + esc(tt('dar.year', 'an')) + ' × ' + q.years + '</td></tr>' +
+        '<tr><td style="color:#475569;">' + esc(tt('dar.qNet', 'Total net')) + '</td><td style="text-align:right;"><b>' + money(q.amount_eur) + ' EUR</b>' + (q.amount_ron ? ' = ' + money(q.amount_ron) + ' RON' : '') + '</td></tr>' +
+        (q.total_ron ? '<tr><td style="color:#475569;">' + esc(tt('dar.qGross', 'Total cu TVA 21%')) + '</td><td style="text-align:right;"><b>' + money(q.total_ron) + ' RON</b></td></tr>' : '') +
+        '</table><p class="dar-hist">' + esc(tt('dar.qNote', 'După cerere primești pe e-mail instrucțiunile de plată (tu și toți administratorii firmei). Ai 48 de ore să plătești; până atunci restricțiile sunt ridicate.')) + '</p>' +
+        '<button class="dar-btn ok" onclick="DocArchive._order()">📧 ' + esc(tt('dar.cloudOrder', 'Cer instrucțiunile de plată')) + '</button><div class="dar-msg" id="darOrderMsg"></div>';
+    });
+  }
+  function _order() {
+    var q = st.quote; if (!q) return;
+    var msg = document.getElementById('darOrderMsg');
+    call('docArchiveOrder', [{ years: q.years }]).then(function (r) {
+      if (!r || !r.ok) { if (msg) { msg.className = 'dar-msg dar-err'; msg.textContent = (r && r.err) || 'Eroare'; } return; }
+      var wasLocked = st.s && st.s.phase === 'lock';
+      refresh().then(function () {
+        renderModal();
+        if (wasLocked) setTimeout(function () { location.reload(); }, 1500);
+      });
+    });
   }
 
   function _dl() {
@@ -170,5 +242,5 @@ window.DocArchive = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 600); });
   else setTimeout(init, 600);
 
-  return { open: open, close: close, refresh: refresh, _dl: _dl, _confirm: _confirm, _logout: _logout };
+  return { open: open, close: close, refresh: refresh, _quote: _quote, _order: _order, _dl: _dl, _confirm: _confirm, _logout: _logout };
 })();

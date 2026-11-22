@@ -166,7 +166,7 @@
     <div class="dev-tab" onclick="showPane('pushtempl')">🔔 Push értesítések</div>
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
     <div class="dev-tab" onclick="showPane('bank');loadBankDetails()">🏦 Banki adatok</div>
-    <div class="dev-tab" onclick="showPane('payments');loadPaymentRequests()">💸 Fizetési kérelmek</div>
+    <div class="dev-tab" onclick="showPane('payments');loadPaymentRequests();loadArchiveOrders()">💸 Fizetési kérelmek</div>
     <div class="dev-tab" onclick="showPane('orphanwb');loadOrphanWaybills()">🧾 Árva menetlevelek</div>
     <div class="dev-tab" onclick="showPane('backup');loadBackupPane()">🛡️ Biztonsági mentés</div>
     <div class="dev-tab" onclick="showPane('usage');loadAuditUsage()">📈 Használat (audit)</div>
@@ -482,6 +482,15 @@
             <th>Referencia</th><th>EUR</th><th>RON bruttó</th><th>Státusz</th><th>Művelet</th>
           </tr></thead>
           <tbody id="paymentReqTbody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="section-title" style="margin-top:28px;">📦 Dokumentum-archiválás (felhő — Cloudflare R2)</div>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 10px;">A cég a kötelező éves letöltés helyett archiválást kérhet (éves díj: ≤1 GB 10 EUR, ≤5 GB 20, ≤15 GB 32, ≤50 GB 68 EUR; felette egyedi ajánlat). 48 óra a fizetési határidő — addig a zár fel van oldva. A pénz beérkezése után aktiváld: az archívum titkosítva felkerül az R2-re, és havonta frissül.</p>
+      <div id="archOrdersWarn"></div>
+      <div class="glass" style="padding:0;overflow:auto;">
+        <table class="table">
+          <thead><tr><th>Dátum</th><th>Cég</th><th>Referencia</th><th>Év</th><th>GB</th><th>EUR</th><th>RON bruttó</th><th>Fizetési határidő</th><th>Státusz</th><th>Felhő</th><th>Művelet</th></tr></thead>
+          <tbody id="archOrdersTbody"><tr><td colspan="11" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1898,6 +1907,46 @@ async function activatePayment(id) {
   if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
   alert('✅ Aktiválva! Új lejárat: ' + (d.paid_until || '—'));
   loadPaymentRequests();
+}
+
+// ── Dokumentum-archiválási kérések (felhő) ──
+async function loadArchiveOrders() {
+  const d = await gas('devGetArchiveOrders');
+  const tb = document.getElementById('archOrdersTbody');
+  const warn = document.getElementById('archOrdersWarn');
+  if (!tb) return;
+  if (warn) warn.innerHTML = (d && d.ok && !d.r2_configured)
+    ? '<div class="glass" style="padding:10px 14px;margin-bottom:10px;border:1px solid #f59e0b;color:#f59e0b;font-weight:600;">⚠️ A Cloudflare R2 nincs beállítva (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET) — aktiválás után a felhő-feltöltés addig vár.</div>' : '';
+  if (!d || !d.ok || !d.orders.length) { tb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:20px;">Nincs archiválási kérés</td></tr>'; return; }
+  const col = { pending: '#f59e0b', paid: '#22c55e', expired: '#94a3b8', cancelled: '#94a3b8' };
+  tb.innerHTML = d.orders.map(function (o) {
+    const dt = o.created_at ? new Date(o.created_at).toLocaleString('ro-RO') : '—';
+    const pu = o.pay_until ? new Date(o.pay_until).toLocaleString('ro-RO') : '—';
+    const cloud = o.status === 'paid' ? (escDev(o.cloud_status || '—') + (o.cloud_bytes ? ' · ' + (o.cloud_bytes / 1048576).toFixed(1) + ' MB' : '') + (o.cloud_error ? ' · ' + escDev(o.cloud_error) : '')) : '';
+    const btns = (o.status === 'pending' || o.status === 'expired')
+      ? '<button onclick="archOrderActivate(' + o.id + ')" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">✅ Pénz megérkezett — aktiválás</button> '
+        + '<button onclick="archOrderCancel(' + o.id + ')" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;">Visszavonás</button>'
+      : (o.status === 'paid' ? 'aktív: ' + (o.covered_until ? new Date(o.covered_until).toLocaleDateString('ro-RO') : '') + '-ig' : '');
+    return '<tr><td style="white-space:nowrap;">' + dt + '</td><td>' + escDev(o.company_nev || o.company_id) + '</td>'
+      + '<td style="font-family:monospace;font-weight:700;">' + escDev(o.reference) + '</td><td>' + o.years + '</td><td>' + o.gb + '</td>'
+      + '<td style="text-align:right;">€' + (parseFloat(o.amount_eur) || 0).toFixed(2) + '</td>'
+      + '<td style="text-align:right;font-weight:600;">' + (o.total_ron ? parseFloat(o.total_ron).toFixed(2) + ' RON' : '—') + '</td>'
+      + '<td style="white-space:nowrap;">' + pu + '</td><td><span style="color:' + (col[o.status] || '#94a3b8') + ';font-weight:600;">' + escDev(o.status) + '</span></td>'
+      + '<td style="font-size:12px;">' + cloud + '</td><td>' + btns + '</td></tr>';
+  }).join('');
+}
+async function archOrderActivate(id) {
+  if (!confirm('Megérkezett az archiválás díja? Aktiválod? (A cég archívuma felkerül a Cloudflare R2-re.)')) return;
+  const d = await gas('devActivateArchiveOrder', [id]);
+  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
+  alert('✅ Aktiválva, eddig: ' + (d.covered_until || '').slice(0, 10));
+  loadArchiveOrders();
+}
+async function archOrderCancel(id) {
+  if (!confirm('Visszavonod ezt az archiválási kérést?')) return;
+  const d = await gas('devCancelArchiveOrder', [id]);
+  if (!d || !d.ok) { alert('Nem vonható vissza.'); return; }
+  loadArchiveOrders();
 }
 
 function escDev(s) {
