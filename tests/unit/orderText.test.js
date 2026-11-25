@@ -120,3 +120,38 @@ describe('minta-megrendelők (tests/fixtures/order-text)', () => {
     expect(f.deliveries.map((d) => d.data)).toEqual(['2026-12-10', '2026-12-10T14:00']);
   });
 });
+
+describe('dátumok a címben + ismétlődő pontok', () => {
+  const P = (t) => parseOrderText(t).fields;
+  test('a dátum (napnévvel, szöveges hónappal, év nélkül) nem kerül a címbe, de beolvasódik', () => {
+    const f = P('Loc incarcare: Arad, Str. Industriei 5, Joi 27 noiembrie 2026, 08:00-12:00\nLoc descarcare: Budapest, Ipari u. 3, 28.11. 10:00\nPret: 1200 EUR');
+    expect(f.loc_incarcare).toBe('Arad, Str. Industriei 5');
+    expect(f.data_incarcare).toBe('2026-11-27T08:00');
+    expect(f.loc_descarcare).toBe('Budapest, Ipari u. 3');
+    expect(f.data_descarcare).toBe('2026-11-28T10:00');
+  });
+  test('angol hónap-elöl dátum + tartomány (a kezdő nap)', () => {
+    expect(findDate('Nov 27, 2026 08:00')).toMatchObject({ date: '2026-11-27', time: '08:00' });
+    expect(findDate('28-29.11.2026').date).toBe('2026-11-28');
+  });
+  test('utcanév hónappal („1 Decembrie", „1 Mai") nem dátum', () => {
+    const f = P('Loc incarcare: Alba Iulia, Str. 1 Decembrie 1918 nr. 5\nData incarcare: 27.11.2026\nLoc descarcare: Deva, Str. 1 Mai 3\nData descarcare: 28.11.2026');
+    expect(f.loc_incarcare).toMatch(/1 Decembrie 1918/);
+    expect(f.loc_descarcare).toMatch(/1 Mai 3/);
+    expect(f.data_descarcare).toBe('2026-11-28');
+  });
+  test('az összesítőben újra leírt cím nem új felrakó / lerakó', () => {
+    const f = P('Loading address: Arad, Str. Industriei 5\nLoading date: Nov 27, 2026 08:00\nUnloading address: Wien, Hauptstr 1\nUnloading date: 28.11.2026\nSUMMARY OF ORDER\nLoading address: Arad, Str. Industriei 5\nUnloading address: Wien, Hauptstr 1');
+    expect(f.pickups).toBeNull();
+    expect(f.deliveries).toBeNull();
+    expect(f.data_incarcare).toBe('2026-11-27T08:00');
+  });
+  test('azonos cím más dátummal vagy más rámpával külön pont marad', () => {
+    const f = P('Loc incarcare: Arad, Str. Industriei 5\nData incarcare: 27.11.2026\nLoc incarcare: Arad, Str. Industriei 5, Rampa 3\nData incarcare: 27.11.2026\nLoc incarcare: Arad, Str. Industriei 5\nData incarcare: 28.11.2026\nLoc descarcare: Wien\nData descarcare: 29.11.2026');
+    expect(f.pickups.map((p) => [p.loc, p.data])).toEqual([
+      ['Arad, Str. Industriei 5', '2026-11-27'],
+      ['Arad, Str. Industriei 5, Rampa 3', '2026-11-27'],
+      ['Arad, Str. Industriei 5', '2026-11-28'],
+    ]);
+  });
+});

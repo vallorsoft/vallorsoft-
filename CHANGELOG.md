@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-25 — 📄 Megbízás-kiolvasás: dátum nem kerül a címbe + ismételt cím nem új felrakó (PR #685)
+- **Dátum:** a címből kikerül minden dátum (napnévvel — „Joi, 27 noiembrie 2026" —, szöveges hónappal, év nélkül „28.11.", tartománnyal „28-29.11.2026"), és beolvasódik a ponthoz. Új formák: „Nov 27, 2026", év nélküli „28.11." (a megbízás évével), tartománynál a kezdő nap. Az „1 Decembrie" / „1 Mai" utcanév nem dátum.
+- **Ismétlődő cím:** ugyanaz a cím (pl. a megbízás végi összesítőben újra leírva) nem lesz második felrakó / lerakó — összevonódik. Külön pont marad, ha más a dátum / óra, más a cég, vagy a cím más rakodóhelyet jelöl (rampa / hala / kapu / raktár / dock …).
+- `lib/orderText.js` `_dateCands` / `_stripDates` / `_dedupeStops`. Teszt: `tests/unit/orderText.test.js` (+5).
+
 ## 2026-11-25 — 🏢 Megrendelő automatikusan az ügyfelek közé (ANAF, CUI alapján) + ANAF gomb a fuvar-kiíráson (PR #684)
 - **Kiolvasáskor:** ha a megrendelőn van CUI, a rendszer megnézi a cég ügyfelei közt; ha nincs, lekéri az ANAF-ból (hivatalos név, cím, Reg. Com.) és felveszi az Ügyfelek közé. A fuvar-kiíró ügyfél-választója kiválasztja, a megrendelő neve a hivatalos ANAF-név lesz. Állapot-sor: „Megrendelő felvéve az ANAF-ból" / „Megrendelő az ügyfelek közül" / „A CUI nem található". ANAF-hiba nem akasztja meg a kiolvasást.
 - **Fuvar-kiírás:** az ügyfél-választó mellett új **ANAF** gomb → CUI beírása → ha már ügyfél, azt választja ki; ha nem, felveszi az ANAF-adatokkal (`POST /api/clients/from-cui`, Admin/Manager). Az ügyfél-választó feliratai RO+HU.
