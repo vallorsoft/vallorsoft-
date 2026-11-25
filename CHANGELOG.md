@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-25 — 📄 Megbízás-kiolvasás AI nélkül: helyi felirat-értelmező + helyi OCR (PR #__PR__)
+## 2026-11-25 — 📄 Megbízás-kiolvasás AI nélkül: helyi felirat-értelmező + helyi OCR (PR #680)
 - **Gond:** az AI kivétele (PR #665, `lib/docPrivacy`) után a megrendelő-kiolvasás egy minimális regex-tartalékra esett vissza (csak CUI / egy dátum / ár / rendszám), helyszínt, megbízót, céget nem olvasott, fotóból / szkennelt PDF-ből semmit.
 - **Új `lib/orderText.js`** — címke-szegmentáló RO / HU / EN (+ DE) feliratokkal, ékezet-függetlenül: a sor bármely pontján felismeri a címkéket, az egybeolvadt táblázat-cellákat is szétválasztja („Loc de încărcareDebrecen", „ReferințăDLT-…Tip transportFTL"), a két sorra tört címkét összefűzi, blokkos (több felrakó / lerakó) elrendezést is ért, és folyó szöveges tartalékai vannak („emisă de X SRL", „tariful … este de 1.760 EUR", „Traseu: Linz → Timișoara"). Kiolvas: megbízó + CUI, referencia, fel-/lerakás helye, cége, dátuma + órája (multi-drop `pickups[]`/`deliveries[]`), ár + pénznem, súly (t → kg), FTL/LTL, méretek, rendszámok, megjegyzés. A saját cég nem lesz megbízó.
 - **Helyi OCR** (`services/order-ai/index.js` → `lib/localOcr`): ha a PDF-nek nincs szövegrétege vagy fotó jött, a szöveget a saját szerveren futó tesseract adja (~6 mp/oldal, max. 4 oldal). Mindhárom úton: fuvar-kiíró feltöltés, e-mailes megrendelés, újrafeldolgozás.
