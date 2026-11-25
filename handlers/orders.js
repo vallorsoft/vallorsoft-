@@ -720,6 +720,19 @@ handlers.comCreate = async function (req, res, args) {
         await orderStops.replaceStopsForOrder(pool, id, company_id, norm);
       } catch (e) { console.error('order-stops beszúrás hiba (fuvar mentve, de stopok nem):', e); }
 
+      // Ügyfél-kötés (orders.client_id): a kiválasztott / ANAF-ból felvett ügyfél.
+      // Csak a SAJÁT cég ügyfele köthető (tulajdon-ellenőrzés). Best-effort.
+      const clientIdIn = parseInt(o.client_id, 10);
+      if (clientIdIn > 0) {
+        try {
+          await pool.query(
+            `UPDATE orders SET client_id=$1
+              WHERE id=$2 AND company_id=$3
+                AND EXISTS (SELECT 1 FROM clients WHERE id=$1 AND company_id=$3)`,
+            [clientIdIn, id, company_id]);
+        } catch (e) { console.error('ügyfél-kötés hiba (fuvar mentve):', e.message); }
+      }
+
       // UIT-kódok (opcionális, több) — a diszpécser a kiíráskor beírja.
       // Best-effort: hiba esetén a fuvar mentve marad, a UIT-eket a szerkesztőben
       // vagy a UIT-panelen (⋯ menü) utólag felviheti.

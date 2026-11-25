@@ -30,6 +30,7 @@ const pdfx = require('../services/pdf-extract');
 const { featureEnabled } = require('../lib/featureEnabled');
 const audit = require('../lib/audit');
 const orderLearn = require('../lib/orderLearn');
+const clientByCui = require('../lib/clientByCui');
 
 const handlers = {};
 
@@ -227,6 +228,20 @@ handlers.scanOrderDocument = async function (req, res, args) {
       } catch (_) { /* tábla hiányzik → tanulás nélkül */ }
     }
     const fields = sanitize(r.fields);
+    // ── Megrendelő a CUI alapján: ha a cég ügyfelei közt megvan, azt kötjük a
+    //    fuvarhoz; ha nincs, az ANAF-ból lekérjük és felvesszük (közös út a
+    //    szöveges fuvarkiírással — lib/clientByCui). Best-effort.
+    let clientInfo = null;
+    if (fields.client_cui) {
+      try {
+        const cr = await clientByCui.ensureClientByCui(cid, fields.client_cui, { req, source: 'order_scan_anaf' });
+        if (cr.client) {
+          fields.client = cr.client.denumire;
+          clientInfo = { id: cr.client.id, denumire: cr.client.denumire, cui_cif: cr.client.cui_cif || fields.client_cui, created: !!cr.created };
+        } else if (cr.notFound) clientInfo = { not_found: true, cui: fields.client_cui };
+        else if (cr.err) clientInfo = { anaf_error: cr.err, cui: fields.client_cui };
+      } catch (_) { /* ügyfél-felvétel nélkül */ }
+    }
     // A kiolvasás eltárolása a mentésig (a javításokból így tanulhatunk) — max. 3 napig.
     let scanId = null;
     try {
@@ -258,6 +273,7 @@ handlers.scanOrderDocument = async function (req, res, args) {
         ocr_used: !!r.ocr_used,
         learned_from: Object.keys(applied).length,
         scan_id: scanId,
+        client: clientInfo,
       },
     });
   } catch (e) {

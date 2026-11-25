@@ -635,29 +635,7 @@ async function resolveDraft(cid, input, opts) {
 // ANAF-adatokból új ügyfél mentése (a cégre szűrve). Kiterjesztett
 // cím-mezők, ha a migráció már lefutott; különben az alap oszlopok.
 async function _saveAnafClient(cid, an) {
-  const adresa = an.address || null;
-  const complet = !!(an.cui && adresa);
-  try {
-    const r = await pool.query(
-      `INSERT INTO clients (company_id, denumire, tip, cui_cif, reg_com, tara, judet, localitate, adresa,
-                            strada, nr_strada, detalii_adresa, oras, cod_postal, telefon,
-                            complet_facturare, anaf_status, anaf_last_check)
-       VALUES ($1,$2,'PJ',$3,$4,'RO',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
-       RETURNING id, denumire`,
-      [cid, an.name, an.cui, an.regCom, an.county, an.locality, adresa,
-        an.street, an.streetNumber, an.addressDetails, an.city, an.postalCode, an.phone,
-        complet, an.active ? 'activ' : 'inactiv']);
-    return r.rows[0];
-  } catch (e) {
-    try {
-      const r = await pool.query(
-        `INSERT INTO clients (company_id, denumire, tip, cui_cif, reg_com, tara, judet, localitate, adresa,
-                              telefon, complet_facturare)
-         VALUES ($1,$2,'PJ',$3,$4,'RO',$5,$6,$7,$8,$9) RETURNING id, denumire`,
-        [cid, an.name, an.cui, an.regCom, an.county, an.locality, adresa, an.phone, complet]);
-      return r.rows[0];
-    } catch (e2) { console.error('orderChat ügyfél-mentés hiba:', e2.message); return null; }
-  }
+  return require('../lib/clientByCui').saveAnafClient(cid, an);
 }
 
 // A kliensre menő vázlat (a belső útvonal-geometria nélkül, de az aláírással).

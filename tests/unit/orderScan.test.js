@@ -22,6 +22,10 @@ jest.mock('../../services/pdf-extract', () => ({
 const mockExtract = jest.fn();
 jest.mock('../../services/order-ai', () => ({ extractFields: (...a) => mockExtract(...a) }));
 
+// Ügyfél a CUI alapján (ANAF) — mockolva, nincs valódi ANAF-hívás.
+const mockEnsure = jest.fn(async () => ({ client: null, created: false, invalid: true }));
+jest.mock('../../lib/clientByCui', () => ({ ensureClientByCui: (...a) => mockEnsure(...a) }));
+
 const handler = require('../../handlers/orderScan');
 
 function call(user, args) {
@@ -330,5 +334,42 @@ describe('handlers/orderScan — confirmOrderScanTemplate', () => {
     const r = await callConfirm(ADMIN, [{ fields: { client: 'DHL' } }]);
     expect(r.result.ok).toBe(true);
     expect(r.result.noop).toBe(true);
+  });
+});
+
+describe('handlers/orderScan — megrendelő a CUI alapján (ANAF)', () => {
+  beforeEach(() => { mockFeatureOn = true; mockEnsure.mockReset(); });
+
+  test('új ügyfél az ANAF-ból → a hivatalos név + client a válaszban', async () => {
+    mockGeminiJson({ client: 'Valami', client_cui: 'RO47859317', loc_incarcare: 'Arad' });
+    mockEnsure.mockResolvedValue({ client: { id: 55, denumire: 'VALLOR TEAM SRL', cui_cif: '47859317' }, created: true });
+    const r = await call(ADMIN, IMG);
+    expect(mockEnsure).toHaveBeenCalledWith(1, 'RO47859317', expect.objectContaining({ source: 'order_scan_anaf' }));
+    expect(r.result.ok).toBe(true);
+    expect(r.result.fields.client).toBe('VALLOR TEAM SRL');
+    expect(r.result.client).toEqual({ id: 55, denumire: 'VALLOR TEAM SRL', cui_cif: '47859317', created: true });
+  });
+
+  test('ANAF nem találja → not_found, a kiolvasott név marad', async () => {
+    mockGeminiJson({ client: 'Valami SRL', client_cui: '12345678' });
+    mockEnsure.mockResolvedValue({ client: null, created: false, notFound: true });
+    const r = await call(MANAGER, IMG);
+    expect(r.result.fields.client).toBe('Valami SRL');
+    expect(r.result.client).toEqual({ not_found: true, cui: '12345678' });
+  });
+
+  test('nincs CUI → nincs ANAF-hívás', async () => {
+    mockGeminiJson({ client: 'Valami SRL' });
+    const r = await call(ADMIN, IMG);
+    expect(mockEnsure).not.toHaveBeenCalled();
+    expect(r.result.client).toBeNull();
+  });
+
+  test('ANAF-hiba nem buktatja a kiolvasást', async () => {
+    mockGeminiJson({ client: 'Valami SRL', client_cui: '12345678' });
+    mockEnsure.mockRejectedValue(new Error('timeout'));
+    const r = await call(ADMIN, IMG);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.client).toBeNull();
   });
 });

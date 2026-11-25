@@ -1182,7 +1182,9 @@ function orderScanFile(input){
         var filled=orderScanFill(r.fields||{});
         _ordScanInfo=r.fields||{};
         window._ordScanId=r.scan_id||null;
-        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used, ocr_used:r.ocr_used, learned:r.learned_from||0 });
+        // Megrendelő: a CUI alapján megtalált / ANAF-ból felvett ügyfél a választóba
+        if(r.client&&r.client.id&&window._orderClientPicker){ try{ window._orderClientPicker.select(r.client); }catch(e){} }
+        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used, ocr_used:r.ocr_used, learned:r.learned_from||0, client:r.client||null });
         toast(t('cs.os.done')+filled,'ok');
       }else{
         _ordScanPending=null;
@@ -1292,6 +1294,10 @@ function renderOrdScanStatus(o){
   var extra=[];
   var f=_ordScanInfo||{};
   if(f.client_cui) extra.push('CUI: '+esc(f.client_cui));
+  var cl=o.client;
+  if(cl&&cl.id) extra.push('<span style="color:var(--status-ok);">'+esc(t(cl.created?'cs.os.clientCreated':'cs.os.clientFound'))+': <b>'+esc(cl.denumire)+'</b></span>');
+  else if(cl&&cl.not_found) extra.push('<span style="color:var(--status-warn);">'+esc(t('cs.os.clientNotFound'))+'</span>');
+  else if(cl&&cl.anaf_error) extra.push('<span style="color:var(--status-warn);">'+esc(t('cs.os.clientAnafErr'))+'</span>');
   if(f.valuta) extra.push(esc(t('cs.os.currency'))+': '+esc(f.valuta));
   if(f.observatii) extra.push(esc(t('cs.os.note'))+': '+esc(String(f.observatii).slice(0,200)));
   var conf=(o.confidence!=null)?(Math.round(o.confidence*100)+'%'):'—';
@@ -1382,6 +1388,7 @@ function createOrder(){
   });
   const p={
     client:document.getElementById('oClient').value.trim(),
+    client_id:(document.getElementById('orderClientId')||{}).value||null,
     ref:document.getElementById('oRef').value.trim(),
     series_id:(document.getElementById('oSeria')||{}).value||null,
     pret:document.getElementById('oPret').value,
@@ -1436,7 +1443,7 @@ function createOrder(){
         } catch(_) { /* csendes */ }
       }
       loadOrders();
-      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon','oUit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});window._oUitScanned=[];_renderOUitScanList();
+      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon','oUit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});window._oUitScanned=[];_renderOUitScanList();if(window._orderClientPicker)window._orderClientPicker.clear();
       const _el=document.getElementById('oExtraStopsList'); if(_el) _el.innerHTML='';
       try { window.__ocStopsSeq = null; } catch (_) {}
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
@@ -4965,9 +4972,17 @@ function mountClientPicker(){
   if(_clientPickerMounted || !window.ClientPicker) return;
   var box=document.getElementById('clientPickerBox');
   if(!box) return;
-  ClientPicker.mount(box, {
+  window._orderClientPicker=ClientPicker.mount(box, {
     hiddenInputId:'orderClientId',
+    anaf:true,
     onSelect:function(c){ var t=document.getElementById('oClient'); if(t) t.value=c.denumire||''; }
+  });
+  // Ha a megrendelő nevét kézzel átírják, a kiválasztott ügyfél-kötés megszűnik.
+  var oc=document.getElementById('oClient');
+  if(oc) oc.addEventListener('input',function(){
+    var h=document.getElementById('orderClientId');
+    var c=window._orderClientPicker&&window._orderClientPicker.current();
+    if(h&&h.value&&c&&String(oc.value).trim()!==String(c.denumire||'').trim()) window._orderClientPicker.clear();
   });
   _clientPickerMounted=true;
 }
