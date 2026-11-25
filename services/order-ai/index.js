@@ -35,7 +35,7 @@ async function _own(companyId) {
   if (!companyId) return null;
   try {
     const pool = require('../../db');
-    const r = await pool.query('SELECT nev, (to_jsonb(c) ->> \'cui\') AS cui FROM companies c WHERE id=$1', [companyId]);
+    const r = await pool.query("SELECT nev, (to_jsonb(c) ->> 'cui') AS cui FROM companies c WHERE id=$1", [companyId]);
     const row = r.rows[0];
     return row ? { ownNames: [row.nev].filter(Boolean), ownCui: row.cui || '' } : null;
   } catch (_) { return null; }
