@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-25 — 📄 Megbízás-kiolvasás: valódi (EUROLEXIM-típusú) megbízás is (PR #__PR__)
+## 2026-11-25 — 📄 Megbízás-kiolvasás: valódi (EUROLEXIM-típusú) megbízás is (PR #681)
 - Szóközzel írt dátum („24 11 2026"), „LOCUL INCARCARII / DATA  DESCARCARII" (rag + dupla szóköz), „PRETUL TRANSPORTULUI", „CANTITATEA MARFURILOR 23.5" (tonna → kg), „TIPUL CAMIONULUI … COMPLET" → FTL, fejléc-szám címke nélkül („NR8228/23 11 2026" → 8228), címke nélküli „RO 15650427" CUI a fejlécben.
 - Több soros felrakó-cím: a cég a jogi formánál válik le („KLINKIER PRZYSUCHA S.A."), irányítószám-sor megmarad, a folytatás az időpontnál véget ér és az óra a ponté lesz (16:30). Az egyszavas nagybetűs cím-folytatás („NOVOTEL") nem szakasz-fejléc.
 - A valódi megbízáson 13 mező helyes (előtte 2). Kitakart minta: `tests/fixtures/order-text/ro-real-eurolexim.txt`.
