@@ -1,0 +1,52 @@
+Document demonstrativ - VT-TEST-001/25.11.2026 : Toate datele comerciale sunt fictive
+
+COMANDANT / BENEFICIAR TRANSPORTATOR
+
+DANUBIA LOGISTICS TEST SRL VALLOR TEAM SRL
+
+Str. Fabricii nr. 18, Oradea, România Arcuș, jud. Covasna, România
+
+CUI fictiv: RO00000001 vallorsoftEgmail.com
+1. DATE PRIVIND TRANSPORTUL
+
+Loc de încărcare Debrecen, Ungaria Data / interval 26.11.2026
+
+Depozit industrial - Poarta 3 08:00-10:00
+
+Loc de Brașov, România Data / interval 27.11.2026
+
+descărcare Parc Logistic - Rampă 12 08:00-12:00
+
+Marfă Paleti cu componente metalice Cantitate 24 europaleti
+
+Vehicul Cap tractor + semiremorcă prelată Greutate 18.500 kg
+
+Referinţă DLT-261126-084 Tip transport FTL - marfă generală
+2. CONDIȚII FINANCIARE
+
+Tarif transport 1.450 EUR + TVA, dacă este Termen de plată — 30 zile de la primirea facturii și CMR-ului
+
+aplicabil
+
+Facturare După livrare, pe baza CMR semnat Monedă EUR
+3. INSTRUCȚIUNI ȘI OBLIGAȚII
+* Transportatorul va asigura un ansamblu rutier corespunzător, cu prelată și chingi suficiente pentru fixarea mărfii.
+* Şoferul va verifica numărul coletelor și starea aparentă a ambalajelor; orice neconcordanta se menționează pe
+CMR înainte de plecare.
++ Beneficiarul asigură încărcarea și descărcarea în intervalele comunicate. Timpul de așteptare peste 24 de ore se
+negociază separat.
+* Este interzisă transbordarea mărfii fără acordul scris al beneficiarului.
+* Transportatorul va transmite confirmarea încărcării și dovada livrării la adresa de e-mail comunicată.
+4. DOCUMENTE ȘI COMUNICARE
+La finalul cursei, transportatorul transmite CMR-ul semnat și ștampilat, după caz, precum și factura. Comunicarea
+operațională se face prin e-mail.
+
+BENEFICIAR / COMANDANT TRANSPORTATOR
+
+Societate: DANUBIA LOGISTICS TEST SRL VALLOR TEAM SRL
+
+Nume / semnătură Reprezentant:
+
+Data: Data:
+NOTĂ: Acesta este un model de test, fără valoare contractuală. Denumirile societăților, persoanele, adresele, referintele și datele
+operaționale sunt fictive.

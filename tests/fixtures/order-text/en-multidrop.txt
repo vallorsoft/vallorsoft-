@@ -1,0 +1,21 @@
+TRANSPORT ORDER
+Order no: TO-55102 / 25.11.2026
+Customer
+Baltic Line Logistics Ltd
+VAT number: DE987654321
+Carrier: VALLOR TEAM SRL
+LOADING
+Company: Kaufland Logistik GmbH
+Address: Robert-Bosch-Str. 5, Neckarsulm, Germany
+Date: 08.12.2026 06:00
+UNLOADING 1
+Company: Kaufland Romania SCS
+Address: Str. Fabricii 1, Turda, Romania
+Date: 10.12.2026
+UNLOADING 2
+Address: Bd. Muncii 18, Cluj-Napoca, Romania
+Date: 10.12.2026 14:00
+Gross weight: 21 t
+Freight rate: EUR 1.890,00
+Reference: KAUF-RO-778
+Remarks: Pallet exchange required.

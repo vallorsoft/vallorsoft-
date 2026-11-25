@@ -92,3 +92,29 @@ test('segédek: szám és dátum', () => {
   expect(findDate('14 noiembrie 2026').date).toBe('2026-11-14');
   expect(findDate('31.02.2026')).toBeNull();
 });
+
+// Valós minta-megrendelők (fiktív adatokkal) — PDF szövegréteg + OCR-szöveg.
+describe('minta-megrendelők (tests/fixtures/order-text)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const read = (n) => fs.readFileSync(path.join(__dirname, '../fixtures/order-text', n), 'utf8');
+  const CASES = [
+    ['ro-test-1.txt', { client: 'DANUBIA LOGISTICS TEST SRL', client_cui: 'RO00000001', ref: 'DLT-261126-084', data_incarcare: '2026-11-26T08:00', data_descarcare: '2026-11-27T08:00', pret: 1450, valuta: 'EUR', greutate: 18500, load_type: 'FTL' }, /Debrecen/, /Brașov/],
+    ['ro-test-1-ocr.txt', { client: 'DANUBIA LOGISTICS TEST SRL', ref: 'DLT-261126-084', data_incarcare: '2026-11-26T08:00', data_descarcare: '2026-11-27T08:00', pret: 1450, greutate: 18500 }, /Debrecen/, /Brașov/],
+    ['ro-test-2.txt', { client: 'CARPATHIA CARGO TEST SRL', ref: 'CCT-281126-219', data_incarcare: '2026-11-28T13:00', data_descarcare: '2026-11-29T07:00', pret: 1180, greutate: 9200 }, /Győr/, /Žilina/],
+    ['ro-test-3.txt', { client: 'NORDIC ROUTE PARTNER SRL', client_cui: 'RO00000003', ref: 'NRP-LNZ-301126-77', data_incarcare: '2026-11-30T06:30', data_descarcare: '2026-12-01T09:00', pret: 1760, greutate: 7800, load_type: 'FTL' }, /Linz, Austria$/, /Timișoara/],
+    ['ro-test-4.txt', { client: 'ARCADIA FREIGHT SOLUTIONS SRL', client_cui: 'RO00000004', ref: 'AFS-CZ-0212-58', data_incarcare: '2026-12-02T15:00', data_descarcare: '2026-12-03T10:00', pret: 1325, valuta: 'EUR', greutate: 11400 }, /Celje/, /Brno/],
+    ['hu-table.txt', { client: 'Pannon Freight Kft.', client_cui: 'HU12345678', ref: 'PF-0312-55', data_incarcare: '2026-12-03T07:00', data_descarcare: '2026-12-04', pret: 980, greutate: 14200, load_type: 'FTL', rendszam_camion: 'CV10VLR', rendszam_remorca: 'CV20VLR' }, /Kecskemét/, /Cluj-Napoca/],
+    ['en-multidrop.txt', { client: 'Baltic Line Logistics Ltd', client_cui: 'DE987654321', ref: 'KAUF-RO-778', data_incarcare: '2026-12-08T06:00', pret: 1890, greutate: 21000, firma_incarcare: 'Kaufland Logistik GmbH' }, /Neckarsulm/, /Turda/],
+  ];
+  test.each(CASES)('%s', (file, want, pick, drop) => {
+    const f = parseOrderText(read(file), OWN).fields;
+    for (const [k, v] of Object.entries(want)) expect([k, f[k]]).toEqual([k, v]);
+    expect(f.loc_incarcare).toMatch(pick);
+    expect(f.loc_descarcare).toMatch(drop);
+  });
+  test('angol, két lerakó → deliveries[]', () => {
+    const f = parseOrderText(read('en-multidrop.txt'), OWN).fields;
+    expect(f.deliveries.map((d) => d.data)).toEqual(['2026-12-10', '2026-12-10T14:00']);
+  });
+});

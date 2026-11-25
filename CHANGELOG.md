@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-25 — 📄 Megbízás-kiolvasás AI nélkül: helyi felirat-értelmező + helyi OCR (PR #__PR__)
+- **Gond:** az AI kivétele (PR #665, `lib/docPrivacy`) után a megrendelő-kiolvasás egy minimális regex-tartalékra esett vissza (csak CUI / egy dátum / ár / rendszám), helyszínt, megbízót, céget nem olvasott, fotóból / szkennelt PDF-ből semmit.
+- **Új `lib/orderText.js`** — címke-szegmentáló RO / HU / EN (+ DE) feliratokkal, ékezet-függetlenül: a sor bármely pontján felismeri a címkéket, az egybeolvadt táblázat-cellákat is szétválasztja („Loc de încărcareDebrecen", „ReferințăDLT-…Tip transportFTL"), a két sorra tört címkét összefűzi, blokkos (több felrakó / lerakó) elrendezést is ért, és folyó szöveges tartalékai vannak („emisă de X SRL", „tariful … este de 1.760 EUR", „Traseu: Linz → Timișoara"). Kiolvas: megbízó + CUI, referencia, fel-/lerakás helye, cége, dátuma + órája (multi-drop `pickups[]`/`deliveries[]`), ár + pénznem, súly (t → kg), FTL/LTL, méretek, rendszámok, megjegyzés. A saját cég nem lesz megbízó.
+- **Helyi OCR** (`services/order-ai/index.js` → `lib/localOcr`): ha a PDF-nek nincs szövegrétege vagy fotó jött, a szöveget a saját szerveren futó tesseract adja (~6 mp/oldal, max. 4 oldal). Mindhárom úton: fuvar-kiíró feltöltés, e-mailes megrendelés, újrafeldolgozás.
+- **Tanulás helyben:** a megbízó megerősített mintájából (`order_scan_samples`) a pénznem / FTL-LTL / méretek kitöltődnek, ha a dokumentumban nincsenek.
+- Ellenőrizve a tulajdonos 4 minta-megrendelőjén (szöveges PDF, fotó és szkennelt PDF formában is) + HU/EN mintán: minden fő mező helyes. Teszt: `tests/unit/orderText.test.js` + `tests/fixtures/order-text/`. Felület: „🔒 Citire locală" jelzés.
+
 ## 2026-11-25 — 🛰️ Menetlevél-idő GPS-javítás: a régi menetlevelek csak egyszer (PR #679)
 - A már meglévő (régi) menetlevelek csak EGYSZER, most kapják meg a 3 fordulós ellenőrzést; a kétszeri szabály (beküldéskor + 24 óra múlva) csak az új menetlevelekre él. Migráció `db/zzz-waybill-gps-time-fix-3.sql`: a háttérben már ellenőrzött régi menetlevél (az ellenőrzés > 1 órával a kitöltés után) → kész; a még nem ellenőrzött régi → egyetlen ellenőrzés azonnal, utána kész. A beküldéskor ellenőrzött új menetlevél 24 óra múlva megkapja a második ellenőrzést. Valódi Postgres 16-on ellenőrizve.
 
