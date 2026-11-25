@@ -1,0 +1,50 @@
+ARCADIA FREIGHT SOLUTIONS · EXEMPLU FICTIV1
+DISPECERAT
+COMANDĂ FERMĂ
+FIȘĂ DE TRANSPORT · SERIA DCF · 0048/2026
+Prezenta comandă este emisă de ARCADIA FREIGHT SOLUTIONS SRL, cu sediul fictiv în Str. Portului nr.
+9, Galați, România (CUI fictiv RO00000004), reprezentată de Elena Stan, e-mail:
+operatiuni@arcadiafreight-test.ro.
+CURSA PE SCURT
+SLOVENIA → CEHIA
+Punct de încărcare: Celje, Slovenia – Industrijska cesta 6, hala C
+Prezentare la rampă: 02.12.2026, ora 15:00 (programare fixă)
+Punct de descărcare: Brno, Cehia – Vídeňská ён 101, depozit 2
+Termen de livrare: 03.12.2026, până la ora 10:00
+MARFA ȘI ECHIPAREA CAMIONULUI
+Se transportă role de folie industrială pentru ambalare, ambalate individual și așezate pe paleți speciali.
+Cantitatea este de 22 paleți, greutatea brută totală de 11.400 kg, marfă fără regim ADR. Este necesar un
+ansamblu cu semiremorcă standard, podea curată și uscată, minimum 10 chingi și covorașe antiderapante.
+Identificare operațiune: AFS-CZ-0212-58. Șoferul va prezenta acest cod la încărcare și va menționa numărul
+comenzii pe documentele de transport.
+PREȚUL CONVENIT
+1.325 EUR
+Tarif total pentru transportul descris, fără TVA. TVA se adaugă numai dacă este datorată potrivit regimului
+fiscal aplicabil. Scadența facturii: 40 de zile calendaristice de la data emiterii, cu condiția transmiterii
+CMR-ului lizibil și confirmat la destinație.
+REGULI DE EXECUȚIE
+01 / Confirmarea vehiculului. Transportatorul comunică numărul de înmatriculare al capului tractor și al
+semiremorcii, precum și numele șoferului, cel târziu cu 12 ore înainte de încărcare.
+02 / Protecția mărfii. Șoferul verifică distribuția încărcăturii și fixarea acesteia înainte de plecare. Nu se
+acceptă transportul rolelor deteriorate sau cu ambalaj compromis fără mențiune scrisă.
+03 / Actualizări. Beneficiarul primește mesaj la încărcare, la trecerea frontierei și la sosirea la descărcare.
+Întârzierile se notifică imediat, cu motiv și oră estimată de sosire.
+04 / Cheltuieli suplimentare. Taxele, serviciile sau staționările care nu sunt incluse în tariful de mai sus se
+acceptă numai dacă au fost aprobate în scris înainte de efectuare.
+05 / Închiderea cursei. După descărcare, transportatorul transmite copia CMR semnată și confirmarea de
+livrare. Originalele se păstrează și se expediază dacă beneficiarul le solicită.
+CONFIRMARE
+Comanda se consideră acceptată după confirmarea scrisă a transportatorului. Orice modificare a traseului,
+calendarului sau tarifului trebuie aprobată în scris de ambele părți.
+EMITENT
+ARCADIA FREIGHT SOLUTIONS SRL
+Elena Stan
+
+ARCADIA FREIGHT SOLUTIONS · EXEMPLU FICTIV2
+Semnătură: ______________________
+TRANSPORTATOR
+VALLOR TEAM SRL
+Reprezentant: ___________________
+Semnătură: ______________________
+DOCUMENT FICTIV – creat exclusiv pentru testarea formatului și a fluxului de procesare. Datele comerciale și persoanele menționate
+nu reprezintă parteneri reali.

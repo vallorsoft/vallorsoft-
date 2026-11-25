@@ -1,0 +1,50 @@
+COMANDĂ DE TRANSPORT
+Document demonstrativ – VT-TEST-002/25.11.2026 · Toate datele comerciale sunt fictive
+COMANDANT / BENEFICIAR
+CARPATHIA CARGO TEST SRL
+Bd. Industriei nr. 7, Sibiu, România
+CUI fictiv: RO00000002
+TRANSPORTATOR
+VALLOR TEAM SRL
+Arcuș, jud. Covasna, România
+vallorsoft@gmail.com
+1. DATE PRIVIND TRANSPORTUL
+Loc de încărcareGyőr, Ungaria
+Centru logistic – Poarta B
+Data / interval28.11.2026
+13:00–15:00
+Loc de
+descărcare
+Žilina, Slovacia
+Zona industrială – hala 4
+Data / interval29.11.2026
+07:00–09:00
+MarfăAmbalaje din carton pe palețiCantitate18 paleți / 13,6 LDM
+VehiculCap tractor + semiremorcă megaGreutate9.200 kg
+ReferințăCCT-281126-219Tip transportFTL – marfă nepericuloasă
+2. CONDIȚII FINANCIARE
+Tarif transport1.180 EUR + TVA, dacă este
+aplicabil
+Termen de plată45 zile de la data facturii
+FacturareDupă descărcare, cu CMR și confirmarea
+de livrare
+MonedăEUR
+3. INSTRUCȚIUNI ȘI OBLIGAȚII
+• Vehiculul trebuie să fie curat, uscat și fără mirosuri persistente; marfa se transportă ferită de umezeală.
+• Șoferul se prezintă la încărcare cu echipament individual de protecție și respectă regulile de acces ale depozitului.
+• Încărcarea se efectuează de către expeditor, iar asigurarea și verificarea fixării mărfii revin părților conform
+responsabilităților legale.
+• Orice întârziere estimată de peste 60 de minute se comunică imediat dispeceratului beneficiarului.
+• Modificarea traseului, a punctelor de încărcare/descărcare sau a tarifului necesită acordul scris al ambelor părți.
+4. DOCUMENTE ȘI COMUNICARE
+Transportatorul va transmite CMR-ul completat și semnat, confirmarea de livrare și factura în format PDF.
+Documentele se trimit la adresa de e-mail a beneficiarului.
+BENEFICIAR / COMANDANTTRANSPORTATOR
+Societate: CARPATHIA CARGO TEST SRL
+Nume / semnătură: ___________________
+Data: ___________________
+VALLOR TEAM SRL
+Reprezentant: ___________________
+Data: ___________________
+NOTĂ: Acesta este un model de test, fără valoare contractuală. Denumirile societăților, persoanele, adresele, referințele și datele
+operaționale sunt fictive.

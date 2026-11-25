@@ -1,0 +1,49 @@
+COMANDĂ DE TRANSPORT
+Document demonstrativ – VT-TEST-001/25.11.2026 · Toate datele comerciale sunt fictive
+COMANDANT / BENEFICIAR
+DANUBIA LOGISTICS TEST SRL
+Str. Fabricii nr. 18, Oradea, România
+CUI fictiv: RO00000001
+TRANSPORTATOR
+VALLOR TEAM SRL
+Arcuș, jud. Covasna, România
+vallorsoft@gmail.com
+1. DATE PRIVIND TRANSPORTUL
+Loc de încărcareDebrecen, Ungaria
+Depozit industrial – Poarta 3
+Data / interval26.11.2026
+08:00–10:00
+Loc de
+descărcare
+Brașov, România
+Parc Logistic – Rampă 12
+Data / interval27.11.2026
+08:00–12:00
+MarfăPaleți cu componente metaliceCantitate24 europaleți
+VehiculCap tractor + semiremorcă prelatăGreutate18.500 kg
+ReferințăDLT-261126-084Tip transportFTL – marfă generală
+2. CONDIȚII FINANCIARE
+Tarif transport1.450 EUR + TVA, dacă este
+aplicabil
+Termen de plată30 zile de la primirea facturii și CMR-ului
+FacturareDupă livrare, pe baza CMR semnatMonedăEUR
+3. INSTRUCȚIUNI ȘI OBLIGAȚII
+• Transportatorul va asigura un ansamblu rutier corespunzător, cu prelată și chingi suficiente pentru fixarea mărfii.
+• Șoferul va verifica numărul coletelor și starea aparentă a ambalajelor; orice neconcordanță se menționează pe
+CMR înainte de plecare.
+• Beneficiarul asigură încărcarea și descărcarea în intervalele comunicate. Timpul de așteptare peste 24 de ore se
+negociază separat.
+• Este interzisă transbordarea mărfii fără acordul scris al beneficiarului.
+• Transportatorul va transmite confirmarea încărcării și dovada livrării la adresa de e-mail comunicată.
+4. DOCUMENTE ȘI COMUNICARE
+La finalul cursei, transportatorul transmite CMR-ul semnat și ștampilat, după caz, precum și factura. Comunicarea
+operațională se face prin e-mail.
+BENEFICIAR / COMANDANTTRANSPORTATOR
+Societate: DANUBIA LOGISTICS TEST SRL
+Nume / semnătură: ___________________
+Data: ___________________
+VALLOR TEAM SRL
+Reprezentant: ___________________
+Data: ___________________
+NOTĂ: Acesta este un model de test, fără valoare contractuală. Denumirile societăților, persoanele, adresele, referințele și datele
+operaționale sunt fictive.

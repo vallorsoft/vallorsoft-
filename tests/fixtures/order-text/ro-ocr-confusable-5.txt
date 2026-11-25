@@ -1,0 +1,87 @@
+VALLOR TEAM SRL · SET DE TEST OCR1 / 3
+ORDIN DE TRANSPORT
+CONDIȚII GENERALE
+MODEL OCR · DOSAR EXPERIMENTAL NR. RDX-0526 · EMIS 25.11.2026
+PĂRȚILE ȘI IDENTIFICAREA COMENZII
+Beneficiar / comanditar:
+R0UTE-L0G!STIC S.R.L.
+Denumire de test, intenționat redactată cu caractere asemănătoare: ROUTE-LOGISTIC S.R.L.
+Sediu fictiv: Str. Depoului nr. 16, Alba Iulia, România
+Cod fiscal fictiv: RO 00O 00I 05 · Registru fictiv: J01/00I/2026
+Contact: Daria Iliescu · comenzi@r0ute-logistic.example
+Transportator: VALLOR TEAM SRL
+Arcuș, jud. Covasna, România · vallorsoft@gmail.com
+TRASEU ȘI PROGRAMARE
+Ridicare: Nitra, Slovacia – Priemyselná 18, hala 7
+02.12.2026 · 07:00–09:00
+Livrare: Oradea, România – Calea Borșului 42, platforma logistică Nord
+03.12.2026 · 08:00–11:00
+Marfă: componente pentru mobilier, ambalate în cutii și grupate pe paleți.
+Cantitate: 26 paleți · Greutate brută: 14.680 kg · Volum: aprox. 46 m³.
+Vehicul: cap tractor și semiremorcă prelată de 13,6 m.
+Referință: RL-02/12-26-O5 (litera O și cifra zero apar intenționat).
+TARIF ȘI DOCUMENTE
+Tarif total: 1.590 EUR, fără TVA. TVA se aplică, dacă este datorată, conform legislației fiscale. Termen de
+plată: 35 de zile calendaristice de la primirea facturii și a documentelor complete.
+Documente obligatorii: CMR completat și semnat, confirmare de livrare și factură. Orice rezervă privind
+ambalajul, cantitatea sau starea vizibilă a mărfii se înscrie pe CMR înainte de plecarea vehiculului.
+NOTĂ OCR: denumirea beneficiarului include deliberat caractere similare (O/0, I/1, !/l), spațieri neobișnuite și o variantă de
+normalizare. Numele legal de referință: ROUTE-LOGISTIC S.R.L. – entitate complet fictivă.
+
+VALLOR TEAM SRL · SET DE TEST OCR2 / 3
+CONDIȚII DE EXECUȚIE
+ANEXA 1 · OBLIGAȚII OPERAȚIONALE ȘI REGULI DE TRANSPORT
+1. VEHICUL ȘI ȘOFER
+Transportatorul pune la dispoziție un vehicul corespunzător tipului de marfă, curat, fără mirosuri persistente
+și în stare tehnică adecvată. Șoferul deține documentele legale și echipamentul individual de protecție
+solicitat de depozit.
+2. ÎNCĂRCARE, NUMĂRARE ȘI FIXARE
+La încărcare se verifică numărul de paleți și integritatea vizibilă a ambalajelor. Șoferul verifică fixarea
+încărcăturii înainte de plecare. Dacă încărcarea este realizată de expeditor, responsabilitățile fiecărei părți
+rămân cele stabilite de lege și de documentele semnate.
+3. INTERDICȚIA TRANSBORDĂRII
+Transbordarea, schimbarea vehiculului sau subcontractarea cursei nu sunt permise fără aprobarea
+prealabilă, scrisă, a beneficiarului. Aprobarea trebuie să identifice noul transportator și vehiculul utilizat.
+4. TIMPI DE AȘTEPTARE
+Primele 24 de ore de așteptare la încărcare sau descărcare sunt incluse. Staționarea suplimentară, dacă nu
+este cauzată de transportator, se notifică în scris și se negociază înainte de facturare. Nicio taxă
+suplimentară nu se consideră acceptată fără confirmare scrisă.
+5. COMUNICAREA PE PARCURSUL CURSEI
+Transportatorul comunică finalizarea încărcării, plecarea, eventualele întârzieri importante și sosirea la
+destinație. Orice incident care poate afecta marfa sau termenul de livrare se raportează imediat, cu
+informații verificabile.
+6. RĂSPUNDERE ȘI ASIGURARE
+Răspunderea părților se stabilește potrivit convenției CMR și legislației aplicabile. Transportatorul menține
+documentele de asigurare obligatorii valabile pe durata operațiunii și le prezintă la solicitarea beneficiarului.
+
+VALLOR TEAM SRL · SET DE TEST OCR3 / 3
+CLAUZE FINALE ȘI CONFIRMARE
+ANEXA 2 · REGULI ADMINISTRATIVE, FINANCIARE ȘI ACCEPTARE
+7. FACTURARE ȘI SCADENȚĂ
+Factura se emite după livrarea integrală a mărfii. Beneficiarul poate solicita corectarea documentelor
+incomplete sau ilizibile. Termenul de plată de 35 de zile începe la primirea facturii corecte împreună cu
+CMR-ul și confirmarea de livrare.
+8. MODIFICAREA COMENZII
+Orice schimbare privind traseul, adresele, cantitatea, programarea sau tariful trebuie confirmată în scris de
+ambele părți. Instrucțiunile telefonice se confirmă ulterior prin e-mail.
+9. FORȚĂ MAJORĂ ȘI EVENIMENTE NEPREVĂZUTE
+Partea afectată notifică cealaltă parte într-un termen rezonabil și transmite documentele justificative
+disponibile. Părțile cooperează pentru limitarea întârzierilor și a eventualelor prejudicii.
+10. CONFIDENȚIALITATE
+Datele comerciale, tarifele, informațiile despre clienți și detaliile operațiunii nu pot fi divulgate terților, cu
+excepția situațiilor impuse de lege sau necesare executării transportului.
+11. LEGE APLICABILĂ ȘI LITIGII
+În măsura permisă de normele imperative aplicabile, părțile încearcă soluționarea amiabilă a diferendelor. În
+lipsa unei înțelegeri, legea și competența se determină potrivit normelor relevante și convenției CMR, după
+caz.
+12. ACCEPTAREA
+Comanda și anexele sale formează un singur set de documente. Confirmarea scrisă a transportatorului
+reprezintă acceptarea condițiilor prezentate.
+BENEFICIAR: R0UTE-L0G!STIC S.R.L. / ROUTE-LOGISTIC S.R.L.
+Reprezentant fictiv: Daria Iliescu
+Semnătură: ________________________   Data: ______________
+TRANSPORTATOR: VALLOR TEAM SRL
+Reprezentant: ______________________
+Semnătură: ________________________   Data: ______________
+DOCUMENT FICTIV PENTRU TESTAREA OCR. Societățile terțe, persoanele, codurile, adresele și datele sunt inventate. Denumirea
+beneficiarului este intenționat ambiguă tipografic; nu reprezintă o companie reală.
