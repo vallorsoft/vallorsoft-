@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-11-25 — 🛰️ Menetlevél-idő GPS-javítás: a régi menetlevelek csak egyszer (PR #679)
+- A már meglévő (régi) menetlevelek csak EGYSZER, most kapják meg a 3 fordulós ellenőrzést; a kétszeri szabály (beküldéskor + 24 óra múlva) csak az új menetlevelekre él. Migráció `db/zzz-waybill-gps-time-fix-3.sql`: a háttérben már ellenőrzött régi menetlevél (az ellenőrzés > 1 órával a kitöltés után) → kész; a még nem ellenőrzött régi → egyetlen ellenőrzés azonnal, utána kész. A beküldéskor ellenőrzött új menetlevél 24 óra múlva megkapja a második ellenőrzést. Valódi Postgres 16-on ellenőrizve.
+
 ## 2026-11-25 — 🛰️ Menetlevél-idő GPS-javítás: 3 fordulós ellenőrzés, menetlevelenként pontosan kétszer (PR #678)
 - **3 forduló (3-ból 2, az 1. kötelező)**, mint az állomás-felismerésnél: (1) a felismerés erőssége ≥ 85% (pontszám 60% + előny a 2. jelölthöz 40% — a szavazatok már NEM számítanak bele, hogy a fordulók függetlenek legyenek); (2) független keresések — a felismerő 3 független keresésből ≥ 2 ugyanazt az állást adta (`match_detail.votes`), egy korábbi kör ugyanoda tette (`vote_hist`, a mostani kör nélkül), vagy ember jóváhagyta; (3) GPS-útvonal — a vontató nyers pontsora szerint a kamion a felismert helyen állt és ±15 percen belül ugyanakkor indult. Hiányzó szavazat-adatot nem feltételezünk.
 - **Pontosan 2 ellenőrzés menetlevelenként:** beküldéskor (háttérben), és 24 órával később (addigra a GPS-nap letöltődik és a felismerés lefut); utána soha többé. Egyetlen atomi `UPDATE … time_check_count + 1` foglalja le az ellenőrzést → a beküldés utáni és az ütemező futása sem ellenőrizhet kétszer. A régi „újra, ha az állomás újra felismert" szabály kivéve. A már egyszer (régi szabállyal) nézett menetlevelek is megkapják a két új ellenőrzést.
