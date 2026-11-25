@@ -1246,6 +1246,15 @@ function orderScanFill(f){
       n++;
     }
   }
+  // A fuvar-kiíró (wizard) 2. lépésének állomás-listája: a kiolvasott pontokból
+  // MINDIG újraépül (a régi `_syncStopsFromLegacyIfEmpty` csak üres listánál vette át).
+  if(typeof window.ocLoadScannedStops==='function'){
+    var _pu = pickups.length ? pickups : [firstPickup];
+    var _de = deliveries.length ? deliveries : [firstDelivery];
+    var _st = _pu.map(function(s){ return { kind:'pickup', loc:s.loc||'', firma:s.firma||'', data:s.data||'' }; })
+      .concat(_de.map(function(s){ return { kind:'delivery', loc:s.loc||'', firma:s.firma||'', data:s.data||'' }; }));
+    try{ window.ocLoadScannedStops(_st); }catch(e){}
+  }
   // FTL/LTL — a két pipa egymást kizárja (mint kézi kattintásnál)
   if(f.load_type==='FTL'||f.load_type==='LTL'){
     var ftl=document.getElementById('oFtl'), ltl=document.getElementById('oLtl');
