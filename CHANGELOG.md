@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-11-25 — 📄 Megbízás-kiolvasás: a kiolvasott fel-/lerakók a fuvar-kiíró állomás-listájába kerülnek (PR #__PR__)
+## 2026-11-25 — 📄 Megbízás-kiolvasás: a kiolvasott fel-/lerakók a fuvar-kiíró állomás-listájába kerülnek (PR #682)
 - **Gond:** a kiolvasás a régi (rejtett) űrlapmezőkbe írt; a fuvar-kiíró 2. lépésének állomás-listája csak akkor vette át, ha még teljesen üres volt → ha már volt (üres) állomás, vagy előtte léptek a lépések között, egyetlen állomás sem jelent meg.
 - **Javítás:** új `ocLoadScannedStops` (`public/order-wizard.js`) — a kiolvasás után az állomás-lista MINDIG a kiolvasott pontokból épül újra (több felrakó/lerakó is, dátummal + órával), a rejtett mezőket is szinkronizálva; az `orderScanFill` hívja. Cache-bust `?v=20261125scanstops`.
 
