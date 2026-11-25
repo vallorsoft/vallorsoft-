@@ -29,6 +29,7 @@ const orderAi = require('../services/order-ai');
 const pdfx = require('../services/pdf-extract');
 const { featureEnabled } = require('../lib/featureEnabled');
 const audit = require('../lib/audit');
+const orderLearn = require('../lib/orderLearn');
 
 const handlers = {};
 
@@ -137,14 +138,15 @@ async function loadCompanySamples(cid) {
   if (!cid) return [];
   try {
     const r = await pool.query(
-      `SELECT DISTINCT ON (template_key) template_label, fields, updated_at
+      `SELECT DISTINCT ON (template_key) template_key, template_label, fields, updated_at,
+              (to_jsonb(order_scan_samples) ->> 'cui') AS cui
          FROM order_scan_samples
         WHERE company_id = $1
         ORDER BY template_key, updated_at DESC`,
       [cid]);
     return r.rows
       .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-      .slice(0, FEWSHOT_MAX);
+      .slice(0, 500);
   } catch (_) { return []; /* tábla hiányzik → csendes fallback */ }
 }
 
@@ -206,7 +208,36 @@ handlers.scanOrderDocument = async function (req, res, args) {
       companyId: cid,
     });
 
+    // ── Tanult címkék (lib/orderLearn): a megbízó felismerése (CUI / név), majd a
+    //    javításokból tanult „ennél a megbízónál ez a felirat után áll" szabályok.
+    //    ÉRTÉKET nem tanulunk — minden érték a friss dokumentumból jön.
+    const fullText = String(r.text || text || '');
+    let templateKey = orderLearn.identifyClient(fullText, samples) || normalizeTemplateKey(r.fields && r.fields.client);
+    let applied = {};
+    if (templateKey && fullText) {
+      try {
+        const rr = await pool.query(
+          `SELECT id, field, anchor, mode, hits, misses FROM order_scan_rules
+            WHERE company_id=$1 AND template_key=$2`, [cid, templateKey]);
+        if (rr.rows.length) {
+          const smp = samples.find((x) => x.template_key === templateKey);
+          if (smp && !(r.fields && r.fields.client)) r.fields.client = smp.template_label;
+          applied = orderLearn.applyRules(fullText, r.fields, rr.rows).applied;
+        }
+      } catch (_) { /* tábla hiányzik → tanulás nélkül */ }
+    }
     const fields = sanitize(r.fields);
+    // A kiolvasás eltárolása a mentésig (a javításokból így tanulhatunk) — max. 3 napig.
+    let scanId = null;
+    try {
+      await pool.query(`DELETE FROM order_scan_jobs WHERE company_id=$1 AND created_at < NOW() - INTERVAL '3 days'`, [cid]);
+      const ins = await pool.query(
+        `INSERT INTO order_scan_jobs (company_id, text, extracted, template_key, applied)
+         VALUES ($1, $2, $3::jsonb, $4, $5::jsonb) RETURNING id`,
+        [cid, fullText.slice(0, 200000), JSON.stringify(Object.assign({}, fields, { greutate: fields.suly_kg })),
+          templateKey || null, JSON.stringify(applied)]);
+      scanId = ins.rows[0].id;
+    } catch (_) { /* migráció hiányzik → tanulás nélkül */ }
     try {
       // Audit: CSAK metaadat (méret/típus/AI-használat/bizonyosság/minta-szám).
       // A fájl tartalma SOHA nem kerül audit-logba vagy DB-be ezen az úton — a
@@ -225,7 +256,8 @@ handlers.scanOrderDocument = async function (req, res, args) {
         confidence: typeof r.confidence === 'number' ? r.confidence : null,
         ai_used: !!r.ai_used,
         ocr_used: !!r.ocr_used,
-        learned_from: samples.length,
+        learned_from: Object.keys(applied).length,
+        scan_id: scanId,
       },
     });
   } catch (e) {
@@ -256,56 +288,69 @@ handlers.confirmOrderScanTemplate = async function (req, res, args) {
     }
 
     const a = (args && args[0]) ? args[0] : {};
-    // Ugyanaz a fehérlista, mint a scanOrderDocument-nél — nem propagál semmi
-    // extra kulcsot, és a kliens által beírt „kreatív" mezőket kiszűri.
+    // Ugyanaz a fehérlista, mint a scanOrderDocument-nél.
     const fields = sanitize(a.fields || {});
-    if (!fields.client) {
-      // Nincs mit tárolni — a template-azonosítás értelmetlen ügyfél-név nélkül.
-      return res.json({ result: { ok: true, noop: true } });
-    }
+    const final = Object.assign({}, fields, { greutate: fields.suly_kg });
     const templateKey = normalizeTemplateKey(fields.client);
     if (!templateKey) return res.json({ result: { ok: true, noop: true } });
 
-    // A TANULT mezők: csak a STABIL-ak (a per-fuvar értékeket — dátum/ár/km/
-    // rendszám — szándékosan kihagyjuk). A typical_pickups/deliveries a
-    // multi-stop szerkezetet írja le: hányat vár egy tipikus megrendelő.
-    const learned = {
-      valuta: fields.valuta,
-      load_type: fields.load_type,
-      hossz_cm: fields.hossz_cm,
-      szel_cm: fields.szel_cm,
-      mag_cm: fields.mag_cm,
-      firma_incarcare: fields.firma_incarcare,
-      firma_descarcare: fields.firma_descarcare,
-      typical_pickups: Array.isArray(fields.pickups) ? fields.pickups.length : (fields.loc_incarcare ? 1 : null),
-      typical_deliveries: Array.isArray(fields.deliveries) ? fields.deliveries.length : (fields.loc_descarcare ? 1 : null),
-    };
-
+    // A megbízó azonosítója (név + CUI) — a felismeréshez. ÉRTÉKET nem tárolunk
+    // (a felrakó / lerakó / ár / méret fuvaronként más).
     try {
       await pool.query(
         `INSERT INTO order_scan_samples
-           (company_id, template_key, template_label, fields, sample_count, created_at, updated_at)
-         VALUES ($1, $2, $3, $4::jsonb, 1, NOW(), NOW())
+           (company_id, template_key, template_label, fields, sample_count, created_at, updated_at, cui)
+         VALUES ($1, $2, $3, '{}'::jsonb, 1, NOW(), NOW(), $4)
          ON CONFLICT (company_id, template_key) DO UPDATE
-           SET fields = EXCLUDED.fields,
-               template_label = EXCLUDED.template_label,
-               sample_count = order_scan_samples.sample_count + 1,
-               updated_at = NOW()`,
-        [cid, templateKey, fields.client, JSON.stringify(learned)]);
+           SET template_label = EXCLUDED.template_label, fields = '{}'::jsonb,
+               cui = COALESCE(EXCLUDED.cui, order_scan_samples.cui),
+               sample_count = order_scan_samples.sample_count + 1, updated_at = NOW()`,
+        [cid, templateKey, fields.client, fields.client_cui || null]);
     } catch (dbErr) {
-      // Migráció még nem futott → csendes; a scanOrderDocument továbbra is
-      // működik hint nélkül (defenzív, hogy a UI ne törjön el).
       console.warn('confirmOrderScanTemplate DB skip:', dbErr.message);
       return res.json({ result: { ok: true, noop: true } });
     }
 
+    // Tanulás a javításokból: a kiolvasás (order_scan_jobs) vs. a mentett fuvar.
+    let learned = 0;
+    const scanId = parseInt(a.scan_id, 10);
+    if (scanId > 0) {
+      try {
+        const j = await pool.query(
+          'SELECT text, extracted, applied FROM order_scan_jobs WHERE id=$1 AND company_id=$2', [scanId, cid]);
+        const job = j.rows[0];
+        if (job && job.text) {
+          // A már alkalmazott szabályok visszajelzése: ha a diszpécser megtartotta
+          // az értéket → +1 találat, ha javította → +1 tévedés.
+          for (const [field, ruleId] of Object.entries(job.applied || {})) {
+            const ok = orderLearn.sameValue(field, (job.extracted || {})[field], final[field]);
+            await pool.query(
+              `UPDATE order_scan_rules SET ${ok ? 'hits = hits + 1' : 'misses = misses + 1'}, updated_at = NOW()
+                WHERE id=$1 AND company_id=$2`, [ruleId, cid]);
+          }
+          await pool.query('DELETE FROM order_scan_rules WHERE company_id=$1 AND template_key=$2 AND misses > hits', [cid, templateKey]);
+          const rules = orderLearn.learnRules(job.text, job.extracted || {}, final);
+          for (const r of rules) {
+            await pool.query(
+              `INSERT INTO order_scan_rules (company_id, template_key, field, anchor, mode)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (company_id, template_key, field, anchor, mode)
+               DO UPDATE SET hits = order_scan_rules.hits + 1, updated_at = NOW()`,
+              [cid, templateKey, r.field, r.anchor.slice(0, 80), r.mode]);
+            learned++;
+          }
+        }
+        await pool.query('DELETE FROM order_scan_jobs WHERE id=$1 AND company_id=$2', [scanId, cid]);
+      } catch (e) { console.warn('order-scan tanulás kihagyva:', e.message); }
+    }
+
     try {
       await audit.fromReq(req, 'order.scan.confirm', 'order_template', null, {
-        template_key: templateKey,
+        template_key: templateKey, learned_rules: learned,
       });
     } catch (_) { /* audit best-effort */ }
 
-    return res.json({ result: { ok: true, template_key: templateKey } });
+    return res.json({ result: { ok: true, template_key: templateKey, learned } });
   } catch (e) {
     console.error('confirmOrderScanTemplate hiba:', e);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });

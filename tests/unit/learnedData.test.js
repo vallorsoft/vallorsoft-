@@ -32,6 +32,7 @@ test('Sofer / bejelentkezés nélkül tiltva, DB-hívás nélkül', async () => 
 test('lista: cégre szűrt, sofőr-becenévnél a NÉV látszik, nem az e-mail', async () => {
   pool.query
     .mockResolvedValueOnce(rows([{ id: 5, template_key: 'dhl', template_label: 'DHL SRL', fields: { valuta: 'EUR', load_type: 'FTL' }, sample_count: 3, updated_at: null }]))
+    .mockResolvedValueOnce(rows([{ template_key: 'dhl', field: 'loc_incarcare', n: 1 }]))
     .mockResolvedValueOnce(rows([
       { id: 9, kind: 'driver_alias', key_norm: 'imi', value: { email: 'GI@x.ro' }, hits: 2, updated_at: null },
       { id: 10, kind: 'mail_style', key_norm: 'user:1', value: { style: { accent: '#f00' } }, hits: 1, updated_at: null },
@@ -41,6 +42,7 @@ test('lista: cégre szűrt, sofőr-becenévnél a NÉV látszik, nem az e-mail',
   expect(r.ok).toBe(true);
   expect(r.orderScan[0]).toMatchObject({ id: 5, label: 'DHL SRL', count: 3 });
   expect(r.orderScan[0].summary).toContain('EUR');
+  expect(r.orderScan[0].summary).toContain('🏷 loc_incarcare');
   const alias = r.memory.find(m => m.kind === 'driver_alias');
   expect(alias.summary).toBe('Gondos Imre');
   expect(JSON.stringify(r.memory)).not.toContain('gi@x.ro');

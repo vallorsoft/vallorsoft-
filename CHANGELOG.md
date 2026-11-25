@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-25 — 🧠 Megbízás-kiolvasás: tanulás a javításokból (címke, nem érték) + gomb-átnevezés (PR #683)
+- **Tanulás:** ha a kiolvasás után a diszpécser kijavítja a mezőket és elmenti a fuvart, a rendszer megkeresi a helyes értéket a dokumentum szövegében, és az előtte álló FELIRATOT jegyzi meg a megbízóhoz (`order_scan_rules`, pl. „ALFA: felrakás = »Punct A >>« után"). ÉRTÉKET nem tanul (felrakó / lerakó / ár / dátum fuvaronként más) — a régi értékalapú alapértelmezés (pénznem / FTL / méret) kivezetve, a tárolt minták kiürítve. Legközelebb a megbízót CUI-ból / névből felismeri, és a tanult címke után (vagy alatta) olvas a friss dokumentumból. A szabály a további mentésekből erősödik (megtartott érték) vagy gyengül (javított érték); a gyenge szabály törlődik.
+- `lib/orderLearn.js` (`learnRules` / `applyRules` / `identifyClient`), `order_scan_jobs` (a kiolvasás a mentésig, max. 3 nap), `order_scan_samples.cui`. Migráció `db/order-scan-rules.sql`. A 🧠 Tanult adatok fülön látszik, mely mezőkhöz van tanult címke, és törölhető.
+- **Gomb:** „📄 Megrendelő feltöltése + automatikus kiolvasás" (RO „citire automată") — már nem AI olvas. Állapot-sor: „N 🧠 tanult címkéből kiolvasva".
+- Ellenőrizve böngészőben, valódi DB-vel: ismeretlen formátumú megbízás → 2 mező; javítás + mentés → 4 címke tanulva; a második (más értékű) megbízásból a 4 mező helyesen jön. Teszt: `tests/unit/orderLearn.test.js`, `orderScan.test.js`.
+
 ## 2026-11-25 — 📄 Megbízás-kiolvasás: a kiolvasott fel-/lerakók a fuvar-kiíró állomás-listájába kerülnek (PR #682)
 - **Gond:** a kiolvasás a régi (rejtett) űrlapmezőkbe írt; a fuvar-kiíró 2. lépésének állomás-listája csak akkor vette át, ha még teljesen üres volt → ha már volt (üres) állomás, vagy előtte léptek a lépések között, egyetlen állomás sem jelent meg.
 - **Javítás:** új `ocLoadScannedStops` (`public/order-wizard.js`) — a kiolvasás után az állomás-lista MINDIG a kiolvasott pontokból épül újra (több felrakó/lerakó is, dátummal + órával), a rejtett mezőket is szinkronizálva; az `orderScanFill` hívja. Cache-bust `?v=20261125scanstops`.

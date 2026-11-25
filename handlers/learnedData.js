@@ -65,9 +65,17 @@ async function learnedDataList(req, res) {
       const r = await pool.query(
         `SELECT id, template_key, template_label, fields, sample_count, updated_at
            FROM order_scan_samples WHERE company_id=$1 ORDER BY updated_at DESC LIMIT $2`, [cid, MAX_ROWS]);
+      let rc = {};
+      try {
+        const q = await pool.query(
+          `SELECT template_key, field, COUNT(*)::int AS n FROM order_scan_rules
+            WHERE company_id=$1 AND hits > misses GROUP BY template_key, field`, [cid]);
+        q.rows.forEach((x) => { (rc[x.template_key] = rc[x.template_key] || []).push(x.field); });
+      } catch (_) { rc = {}; }
       orderScan = r.rows.map(x => {
         const f = x.fields || {};
         const p = [];
+        if (rc[x.template_key]) p.push('🏷 ' + rc[x.template_key].join(', '));
         if (f.valuta) p.push(f.valuta);
         if (f.load_type) p.push(f.load_type);
         if (f.hossz_cm || f.szel_cm || f.mag_cm) p.push([f.hossz_cm, f.szel_cm, f.mag_cm].map(v => v || '?').join('×') + ' cm');
@@ -153,8 +161,11 @@ async function learnedDataDelete(req, res, args) {
     let n = 0;
     if (source === 'order_scan') {
       if (!(id > 0)) return res.json({ result: { ok: false, err: 'ID invalid' } });
-      const r = await pool.query('DELETE FROM order_scan_samples WHERE id=$1 AND company_id=$2', [id, cid]);
+      const r = await pool.query('DELETE FROM order_scan_samples WHERE id=$1 AND company_id=$2 RETURNING template_key', [id, cid]);
       n = r.rowCount;
+      if (r.rows[0]) {
+        try { await pool.query('DELETE FROM order_scan_rules WHERE company_id=$1 AND template_key=$2', [cid, r.rows[0].template_key]); } catch (_) {}
+      }
     } else if (source === 'memory') {
       if (id > 0) {
         const r = await pool.query('DELETE FROM order_chat_memory WHERE id=$1 AND company_id=$2', [id, cid]);

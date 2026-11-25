@@ -14,8 +14,8 @@ function _key(client) {
   return (w[0] || '').slice(0, 60);
 }
 
-// Tanulás: ha a kiolvasott megbízóhoz van megerősített minta, a STABIL mezőit
-// (pénznem, FTL/LTL, méretek) alapértékként adjuk — csak az üres mezőkbe.
+// (Régi) értékalapú alapértelmezés — NEM használjuk: egy megbízónál is minden
+// fuvarnál más lehet az érték. A tanulás címke-alapú: lib/orderLearn.js.
 function applySamples(fields, samples) {
   if (!Array.isArray(samples) || !samples.length || !fields.client) return 0;
   const k = _key(fields.client);
@@ -30,8 +30,8 @@ function applySamples(fields, samples) {
 
 function extract({ text, samples, own }) {
   const r = parseOrderText(text || '', own || {});
-  const learned = applySamples(r.fields, samples);
-  return { fields: r.fields, confidence: r.confidence, learned };
+  void samples;
+  return { fields: r.fields, confidence: r.confidence, learned: 0 };
 }
 
 module.exports = { extract, applySamples, provider: 'heuristic' };

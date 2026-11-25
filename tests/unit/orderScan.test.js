@@ -226,19 +226,22 @@ describe('handlers/orderScan — scanOrderDocument', () => {
   });
 
   // ── Tanulás — few-shot minta betöltés ──
-  it('few-shot: a cég korábbi mintáit lekéri és a kiolvasónak adja', async () => {
-    // Első SELECT (loadCompanySamples) → 2 minta
-    mockDbQuery.mockResolvedValueOnce({ rows: [
-      { template_label: 'Vallor Logistics SRL', fields: { valuta: 'EUR', load_type: 'FTL', typical_deliveries: 3 }, updated_at: new Date('2026-08-01') },
-      { template_label: 'DHL Freight', fields: { valuta: 'EUR', load_type: 'LTL' }, updated_at: new Date('2026-07-01') },
-    ]});
-    mockGeminiJson({ client: 'Vallor', confidence: 0.9 });
-    const r = await call(ADMIN, IMG);
+  it('tanult címke: a felismert megbízónál a címke után olvas (a friss értéket)', async () => {
+    const TEXT = 'ALFA SPEDITION SRL\nPunct A >> Cluj-Napoca, Bd. Muncii 18\n';
+    mockDbQuery.mockImplementation(async (sql) => {
+      if (/FROM order_scan_samples/.test(sql)) return { rows: [{ template_key: 'alfa', template_label: 'ALFA SPEDITION SRL', cui: null, updated_at: new Date() }] };
+      if (/FROM order_scan_rules/.test(sql)) return { rows: [{ id: 7, field: 'loc_incarcare', anchor: 'punct a >>', mode: 'same', hits: 2, misses: 0 }] };
+      if (/INSERT INTO order_scan_jobs/.test(sql)) return { rows: [{ id: 99 }] };
+      return { rows: [] };
+    });
+    mockExtract.mockResolvedValue({ fields: { client: null, loc_incarcare: null }, confidence: 0.2, ai_used: false, text: TEXT });
+    const r = await call(ADMIN, PDF);
     expect(r.result.ok).toBe(true);
-    expect(r.result.learned_from).toBe(2);
-    // A minták a (helyi) kiolvasónak adódnak át
-    const opts = mockExtract.mock.calls[mockExtract.mock.calls.length - 1][0];
-    expect(opts.samples.map((x) => x.template_label)).toEqual(['Vallor Logistics SRL', 'DHL Freight']);
+    expect(r.result.fields.client).toBe('ALFA SPEDITION SRL');
+    expect(r.result.fields.loc_incarcare).toBe('Cluj-Napoca, Bd. Muncii 18');
+    expect(r.result.learned_from).toBe(1);
+    expect(r.result.scan_id).toBe(99);
+    mockDbQuery.mockReset(); mockDbQuery.mockResolvedValue({ rows: [] });
   });
 
   it('few-shot: DB-hiba (tábla hiányzik) → hint nélkül fut', async () => {
@@ -288,27 +291,26 @@ describe('handlers/orderScan — confirmOrderScanTemplate', () => {
     expect(mockDbQuery).not.toHaveBeenCalled();
   });
 
-  it('template_key az első jelentős szóból (Vallor Logistics SRL → vallor)', async () => {
-    mockDbQuery.mockResolvedValueOnce({ rows: [] }); // INSERT sikeres
-    const r = await callConfirm(ADMIN, [{ fields: {
-      client: 'Vallor Logistics SRL',
-      valuta: 'EUR', load_type: 'FTL',
-      pickups: [{ loc: 'A' }, { loc: 'B' }],
-      deliveries: [{ loc: 'X' }, { loc: 'Y' }, { loc: 'Z' }],
-    }}]);
+  it('mentéskor csak a megbízó azonosítója tárolódik — érték (pénznem/méret) NEM', async () => {
+    const r = await callConfirm(ADMIN, [{ fields: { client: 'Vallor Logistics SRL', client_cui: 'RO123456', valuta: 'EUR', load_type: 'FTL' } }]);
     expect(r.result.ok).toBe(true);
     expect(r.result.template_key).toBe('vallor');
-    expect(mockDbQuery).toHaveBeenCalledTimes(1);
-    // Ellenőrizzük a payload-ot: cid + kulcs + label + stabil mezők
-    const args = mockDbQuery.mock.calls[0][1];
-    expect(args[0]).toBe(1);              // company_id
-    expect(args[1]).toBe('vallor');       // template_key
-    expect(args[2]).toBe('Vallor Logistics SRL'); // template_label
-    const learned = JSON.parse(args[3]);
-    expect(learned.valuta).toBe('EUR');
-    expect(learned.load_type).toBe('FTL');
-    expect(learned.typical_pickups).toBe(2);
-    expect(learned.typical_deliveries).toBe(3);
+    const [sql, args] = mockDbQuery.mock.calls[0];
+    expect(sql).toMatch(/'\{\}'::jsonb/);
+    expect(args).toEqual([1, 'vallor', 'Vallor Logistics SRL', 'RO123456']);
+  });
+
+  it('javításból címkét tanul (order_scan_rules), a kiolvasást törli', async () => {
+    const TEXT = 'ALFA SPEDITION SRL\nPunct A >> Oradea, Str. Lunga 4\n';
+    mockDbQuery.mockImplementation(async (sql) => {
+      if (/FROM order_scan_jobs/.test(sql)) return { rows: [{ text: TEXT, extracted: { client: 'ALFA SPEDITION SRL', loc_incarcare: null }, applied: {} }] };
+      return { rows: [] };
+    });
+    const r = await callConfirm(ADMIN, [{ scan_id: 5, fields: { client: 'ALFA SPEDITION SRL', loc_incarcare: 'Oradea, Str. Lunga 4' } }]);
+    expect(r.result.learned).toBe(1);
+    const ins = mockDbQuery.mock.calls.find(([q]) => /INSERT INTO order_scan_rules/.test(q));
+    expect(ins[1]).toEqual([1, 'alfa', 'loc_incarcare', 'punct a >>', 'same']);
+    expect(mockDbQuery.mock.calls.some(([q, p]) => /DELETE FROM order_scan_jobs/.test(q) && p[0] === 5 && p[1] === 1)).toBe(true);
   });
 
   it('rövidítést (SC/SRL) átugrik, a második szót veszi', async () => {
