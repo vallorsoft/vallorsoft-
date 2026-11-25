@@ -1859,6 +1859,14 @@ function startOrderRouteKmScheduler() {
           catch (e) { wr.markFailed(w.id, !(e && e.retryable)); console.warn('[WaybillKm] menetlevél hiba', w.id, e.message); }
         }
       } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillKm] sor hiba', e.message); }
+      // a beküldött menetlevelek fel-/lerakási idejének GPS-ellenőrzése (≥ 85% → felülírás)
+      try {
+        const wt = require('../lib/waybillTimeFix');
+        for (const w of await wt.pickQueue(pool, 30)) {
+          try { await wt.checkWaybill(pool, w.company_id, w.id); }
+          catch (e) { await wt.markDone(pool, w.id); console.warn('[WaybillTime] menetlevél hiba', w.id, e.message); }
+        }
+      } catch (e) { if (!(e && (e.code === '42P01' || e.code === '42703'))) console.warn('[WaybillTime] sor hiba', e.message); }
       // a menetlevél útvonal-pontjainak GPS km-óra állása (a régi menetlevelekre is, visszamenőleg)
       try {
         const wo = require('../lib/waybillRouteData');

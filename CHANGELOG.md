@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-11-25 — 🛰️ Beküldött menetlevél: a rosszul beírt fel-/lerakási idő GPS-ből javítva (≥ 85%)
+- **Mit:** minden beküldött menetlevél fel-/lerakási pontját (Încărcare / Descărcare) a rendszer összeveti a GPS-ből felismert állomás-idővel; ha a felismerés legalább **85%-os** megbízhatóságú és a sofőr ideje 15 percnél többel eltér (vagy hiányzik), a **tárolt** menetlevél-pont dátuma + órája a GPS-időre íródik (a nyomtatvány eddig is mutatta, most a menetlevél adata is javul).
+- **Megbízhatóság (%)** a meglévő állomás-felismerésből (`lib/waybillTimeFix.js` `confidencePct`): jóváhagyott állomás / a sofőr által jóváhagyott pótolt gomb = 100; biztos (`auto`) találat = pontszám (50%) + a 3 független ellenőrzés egyezése (30%) + előny a második jelölthöz (20%); javaslat, kézi ellenőrzésre váró vagy bukott újraellenőrzés legfeljebb 80% → sosem ír felül.
+- **Megőrizve:** a sofőr eredeti értéke a pontban (`time_driver` / `data_driver`), jelölés `time_source='gps'` + `time_conf`; a Plecare / Sosire (km-óra, diurna-ablak) nem változik; az iroda kézi átírását (`time_source='manual'`) többé nem írja felül. Változás után a pontok GPS km-óra állása újraszámolódik (`route_odo_at = NULL`). Audit `waybill.gps_time_fix`.
+- **Mikor fut:** beküldéskor azonnal (háttérben), majd a fuvar-km ütemező körében minden még nem ellenőrzött menetlevélre (visszamenőleg is), és 60 napig újra, ha a menetlevél valamelyik állomását a rendszer azóta újra felismerte. Migráció `db/zzz-waybill-gps-time-fix.sql` (`fuvarlevelek.time_check_at` / `time_check`).
+- **Felület:** a menetlevél-szerkesztőben a javított ponton „🛰️ Oră corectată din GPS (92%) · șofer: …" jelvény (RO/HU). Teszt: `tests/unit/waybillTimeFix.test.js` (17) + valódi Postgres 16-on végig ellenőrizve.
+
 ## 2026-11-22 — 🗄️ Teljes rendszer-mentés a Cloudflare R2-re: havi teljes + éjszakai változások, újraélesztés
 - **Mit:** a teljes adatbázis (minden cég, adat, dokumentum, fotó — ezek a DB-ben vannak). Az első futáskor és 30 naponta teljes mentés (`pg_dump -Fc`, AES-256-GCM, `system/ÉÉÉÉ/HH/full-*.vsdb`), minden éjjel (alap 03:00 Bukarest, `SYSTEM_BACKUP_HOUR`) csak a változások (`delta-*.vsbk`: a megváltozott sorok aktuális állapota + a törölt sorok kulcsa); minden fájl mellett `.json` leíró, így a DB teljes elvesztése után is összerakható a lánc. Megőrzés: változás 35 nap, teljes 1 év. Hiba → developer e-mail.
 - **Változás-követés:** induláskor minden elsődleges kulcsos táblára trigger (`sys_tc_row` + `sys_tc_trunc`), ami CSAK a kulcsot írja a `sys_change_log`-ba (az adatot nem másolja); a napló kiolvasása és törlése REPEATABLE READ pillanatképben (a mentés közben véglegesedő változás nem vész el). Migráció `db/system-backup.sql`.

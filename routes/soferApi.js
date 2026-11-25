@@ -384,6 +384,8 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
       console.error('driver puncte → auto-Finalizat hiba (a mentés sikeres):', cErr.message);
     }
     require('../lib/waybillDocCheck').touch(cid, { waybillId: id });
+    // a beírt fel-/lerakási idők GPS-ellenőrzése a háttérben (nem várjuk meg)
+    require('../lib/waybillTimeFix').checkWaybill(pool, cid, id).catch((e) => console.warn('[WaybillTime] beküldés utáni ellenőrzés', id, e.message));
     res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
