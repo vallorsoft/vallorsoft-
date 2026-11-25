@@ -14,7 +14,13 @@
 
 ---
 
-## 2026-11-25 — 🛰️ Beküldött menetlevél: a rosszul beírt fel-/lerakási idő GPS-ből javítva (≥ 85%)
+## 2026-11-25 — 🛰️ Menetlevél-idő GPS-javítás: 3 fordulós ellenőrzés, menetlevelenként pontosan kétszer (PR #678)
+- **3 forduló (3-ból 2, az 1. kötelező)**, mint az állomás-felismerésnél: (1) a felismerés erőssége ≥ 85% (pontszám 60% + előny a 2. jelölthöz 40% — a szavazatok már NEM számítanak bele, hogy a fordulók függetlenek legyenek); (2) független keresések — a felismerő 3 független keresésből ≥ 2 ugyanazt az állást adta (`match_detail.votes`), egy korábbi kör ugyanoda tette (`vote_hist`, a mostani kör nélkül), vagy ember jóváhagyta; (3) GPS-útvonal — a vontató nyers pontsora szerint a kamion a felismert helyen állt és ±15 percen belül ugyanakkor indult. Hiányzó szavazat-adatot nem feltételezünk.
+- **Pontosan 2 ellenőrzés menetlevelenként:** beküldéskor (háttérben), és 24 órával később (addigra a GPS-nap letöltődik és a felismerés lefut); utána soha többé. Egyetlen atomi `UPDATE … time_check_count + 1` foglalja le az ellenőrzést → a beküldés utáni és az ütemező futása sem ellenőrizhet kétszer. A régi „újra, ha az állomás újra felismert" szabály kivéve. A már egyszer (régi szabállyal) nézett menetlevelek is megkapják a két új ellenőrzést.
+- `lib/waybillRouteData.js` új közös `loadTrack` (a nyomtatvány és az ellenőrzés ugyanazt a pontsor-betöltést használja). `time_check` napló: ellenőrzésenként a javított és a kihagyott pontok + fordulók eredménye. Migráció `db/zzz-waybill-gps-time-fix-2.sql` (`fuvarlevelek.time_check_count`).
+- Teszt: `tests/unit/waybillTimeFix.test.js` 25 eset; valódi Postgres 16-on: 1. ellenőrzés átírja (3/3), azonnali újra → semmi, 24 óra után 2., utána soha.
+
+## 2026-11-25 — 🛰️ Beküldött menetlevél: a rosszul beírt fel-/lerakási idő GPS-ből javítva (≥ 85%) (PR #677)
 - **Mit:** minden beküldött menetlevél fel-/lerakási pontját (Încărcare / Descărcare) a rendszer összeveti a GPS-ből felismert állomás-idővel; ha a felismerés legalább **85%-os** megbízhatóságú és a sofőr ideje 15 percnél többel eltér (vagy hiányzik), a **tárolt** menetlevél-pont dátuma + órája a GPS-időre íródik (a nyomtatvány eddig is mutatta, most a menetlevél adata is javul).
 - **Megbízhatóság (%)** a meglévő állomás-felismerésből (`lib/waybillTimeFix.js` `confidencePct`): jóváhagyott állomás / a sofőr által jóváhagyott pótolt gomb = 100; biztos (`auto`) találat = pontszám (50%) + a 3 független ellenőrzés egyezése (30%) + előny a második jelölthöz (20%); javaslat, kézi ellenőrzésre váró vagy bukott újraellenőrzés legfeljebb 80% → sosem ír felül.
 - **Megőrizve:** a sofőr eredeti értéke a pontban (`time_driver` / `data_driver`), jelölés `time_source='gps'` + `time_conf`; a Plecare / Sosire (km-óra, diurna-ablak) nem változik; az iroda kézi átírását (`time_source='manual'`) többé nem írja felül. Változás után a pontok GPS km-óra állása újraszámolódik (`route_odo_at = NULL`). Audit `waybill.gps_time_fix`.
