@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-25 — 📄 Megbízás-kiolvasás: valódi (EUROLEXIM-típusú) megbízás is (PR #__PR__)
+- Szóközzel írt dátum („24 11 2026"), „LOCUL INCARCARII / DATA  DESCARCARII" (rag + dupla szóköz), „PRETUL TRANSPORTULUI", „CANTITATEA MARFURILOR 23.5" (tonna → kg), „TIPUL CAMIONULUI … COMPLET" → FTL, fejléc-szám címke nélkül („NR8228/23 11 2026" → 8228), címke nélküli „RO 15650427" CUI a fejlécben.
+- Több soros felrakó-cím: a cég a jogi formánál válik le („KLINKIER PRZYSUCHA S.A."), irányítószám-sor megmarad, a folytatás az időpontnál véget ér és az óra a ponté lesz (16:30). Az egyszavas nagybetűs cím-folytatás („NOVOTEL") nem szakasz-fejléc.
+- A valódi megbízáson 13 mező helyes (előtte 2). Kitakart minta: `tests/fixtures/order-text/ro-real-eurolexim.txt`.
+
 ## 2026-11-25 — 📄 Megbízás-kiolvasás AI nélkül: helyi felirat-értelmező + helyi OCR (PR #680)
 - **Gond:** az AI kivétele (PR #665, `lib/docPrivacy`) után a megrendelő-kiolvasás egy minimális regex-tartalékra esett vissza (csak CUI / egy dátum / ár / rendszám), helyszínt, megbízót, céget nem olvasott, fotóból / szkennelt PDF-ből semmit.
 - **Új `lib/orderText.js`** — címke-szegmentáló RO / HU / EN (+ DE) feliratokkal, ékezet-függetlenül: a sor bármely pontján felismeri a címkéket, az egybeolvadt táblázat-cellákat is szétválasztja („Loc de încărcareDebrecen", „ReferințăDLT-…Tip transportFTL"), a két sorra tört címkét összefűzi, blokkos (több felrakó / lerakó) elrendezést is ért, és folyó szöveges tartalékai vannak („emisă de X SRL", „tariful … este de 1.760 EUR", „Traseu: Linz → Timișoara"). Kiolvas: megbízó + CUI, referencia, fel-/lerakás helye, cége, dátuma + órája (multi-drop `pickups[]`/`deliveries[]`), ár + pénznem, súly (t → kg), FTL/LTL, méretek, rendszámok, megjegyzés. A saját cég nem lesz megbízó.
