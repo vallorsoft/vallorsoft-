@@ -1181,7 +1181,8 @@ function orderScanFile(input){
         _ordScanPending={ fileName:f.name, dataUrl:p.dataUrl };
         var filled=orderScanFill(r.fields||{});
         _ordScanInfo=r.fields||{};
-        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used, ocr_used:r.ocr_used });
+        window._ordScanId=r.scan_id||null;
+        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used, ocr_used:r.ocr_used, learned:r.learned_from||0 });
         toast(t('cs.os.done')+filled,'ok');
       }else{
         _ordScanPending=null;
@@ -1299,6 +1300,7 @@ function renderOrdScanStatus(o){
     +'<span class="text-muted">'+esc(o.fileName)+'</span></div>'
     +'<div class="text-muted" style="margin-top:4px;">'
     +esc(t('cs.os.filled'))+': <b>'+o.filled+'</b> · '+esc(t('cs.os.conf'))+': '+conf
+    +(o.learned?' · <b>'+o.learned+'</b> '+esc(t('cs.os.learned')):'')
     +' · <span style="color:var(--status-warn);">'+esc(t(o.ocr_used?'cs.os.localOcr':'cs.os.noAi'))+'</span></div>'
     +(extra.length?'<div class="text-muted" style="margin-top:4px;">'+extra.join(' · ')+'</div>':'')
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;">'
@@ -1419,6 +1421,7 @@ function createOrder(){
       // A tanulás-jelzőt a csatolás ELŐTT rögzítjük: az `_ordScanAttachTo`
       // szinkron `orderScanClear()`-t hív, ami az `_ordScanInfo`-t null-ra állítja.
       const _learnFromScan = !!_ordScanInfo;
+      const _scanMeta = _ordScanInfo ? { scan_id: window._ordScanId || null, client_cui: _ordScanInfo.client_cui || null } : null;
       // A feltöltött (AI-val kiolvasott) megrendelő csatolása a friss fuvarhoz
       if(typeof _ordScanAttachTo==='function') _ordScanAttachTo(r.id);
       // Tanulás: ha az AI-kiolvasás után mentette a fuvart, a mostani (a
@@ -1429,7 +1432,7 @@ function createOrder(){
       // marad ki erre az iterációra (a következő scanre újra próbálkozunk).
       if(_learnFromScan){
         try {
-          gas('confirmOrderScanTemplate',[{ fields: p }]).catch(function(){ /* csendes */ });
+          gas('confirmOrderScanTemplate',[{ fields: Object.assign({}, p, { client_cui: _scanMeta.client_cui }), scan_id: _scanMeta.scan_id }]).catch(function(){ /* csendes */ });
         } catch(_) { /* csendes */ }
       }
       loadOrders();
