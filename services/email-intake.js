@@ -127,9 +127,11 @@ async function pollOnce(pool, creds, companyId, opts) {
       }
 
       let text = (parsed.text || '').trim();
-      if (pdfBuffer) { try { const ex = await pdfx.extractText(pdfBuffer); if (ex.text) text = ex.text; } catch (_) {} }
+      let docText = pdfBuffer ? '' : undefined;
+      if (pdfBuffer) { try { const ex = await pdfx.extractText(pdfBuffer); if (ex.text) { text = ex.text; docText = ex.text; } } catch (_) {} }
 
-      const r = await orderAi.extractFields({ text, pdfBuffer, pdfName, aiEnabled });
+      const r = await orderAi.extractFields({ text, docText, pdfBuffer, pdfName, aiEnabled, companyId });
+      if (r.ocr_used && r.text) text = r.text; // a szkennelt PDF OCR-szövege is tárolódik (újrafeldolgozáshoz)
 
       insertData = [companyId, (parsed.from && parsed.from.text) || null, parsed.subject || null,
         parsed.date || new Date(), m.uid, text.slice(0, 20000), pdfName, pdfBuffer,
@@ -186,8 +188,10 @@ async function processSource(pool, companyId, source, uid) {
   const pdfName = pdfAtt ? pdfAtt.filename : null;
   if (pdfBuffer && pdfBuffer.length > 15 * 1024 * 1024) pdfBuffer = null;
   let text = (parsed.text || '').trim();
-  if (pdfBuffer) { try { const ex = await pdfx.extractText(pdfBuffer); if (ex.text) text = ex.text; } catch (_) {} }
-  const r = await orderAi.extractFields({ text, pdfBuffer, pdfName, aiEnabled });
+  let docText = pdfBuffer ? '' : undefined;
+  if (pdfBuffer) { try { const ex = await pdfx.extractText(pdfBuffer); if (ex.text) { text = ex.text; docText = ex.text; } } catch (_) {} }
+  const r = await orderAi.extractFields({ text, docText, pdfBuffer, pdfName, aiEnabled, companyId });
+  if (r.ocr_used && r.text) text = r.text;
   const ins = await pool.query(
     `INSERT INTO inbound_orders (company_id, source_email, subject, received_at, message_uid,
        raw_text, pdf_name, pdf_data, extracted, confidence, ai_used, status)

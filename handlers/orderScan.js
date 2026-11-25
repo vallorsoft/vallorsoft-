@@ -180,8 +180,10 @@ handlers.scanOrderDocument = async function (req, res, args) {
     // PDF-nél a szöveges kinyerés is megtörténik: ez az AI-hiba /
     // kulcs-hiány esetén futó heurisztikus tartalék bemenete.
     let text = '';
+    let docText;
     if (mimeType === 'application/pdf') {
-      try { const ex = await pdfx.extractText(buf); text = ex.text || ''; }
+      docText = '';
+      try { const ex = await pdfx.extractText(buf); text = ex.text || ''; docText = text; }
       catch (_) { /* a szöveg-kinyerés hibája ne buktassa a kiolvasást */ }
     }
 
@@ -195,11 +197,13 @@ handlers.scanOrderDocument = async function (req, res, args) {
     // szűr: az a levelek automatikus feldolgozását szabályozza.
     const r = await orderAi.extractFields({
       text,
+      docText,
       fileBuffer: buf,
       mimeType,
       pdfName: _str(a.fileName, 200) || undefined,
       aiEnabled: true,
       samples,
+      companyId: cid,
     });
 
     const fields = sanitize(r.fields);
@@ -209,7 +213,7 @@ handlers.scanOrderDocument = async function (req, res, args) {
       // csatolás a kliens `orderDocUpload` hívásán megy, fuvar-id-hez kötve.
       await audit.fromReq(req, 'order.scan', 'order', null, {
         mime: mimeType, bytes: approxBytes, ai_used: r.ai_used,
-        confidence: r.confidence, file_name: _str(a.fileName, 200),
+        confidence: r.confidence, ocr_used: !!r.ocr_used, file_name: _str(a.fileName, 200),
         samples_used: samples.length,
       });
     } catch (_) { /* audit best-effort */ }
@@ -220,6 +224,7 @@ handlers.scanOrderDocument = async function (req, res, args) {
         fields,
         confidence: typeof r.confidence === 'number' ? r.confidence : null,
         ai_used: !!r.ai_used,
+        ocr_used: !!r.ocr_used,
         learned_from: samples.length,
       },
     });

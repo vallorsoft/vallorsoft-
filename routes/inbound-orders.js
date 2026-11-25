@@ -130,8 +130,9 @@ router.post('/api/inbound-orders/:id/reparse', requireLogin, requireRole('Admin'
     const aiEnabled = !!(set.rows[0] && set.rows[0].meta && set.rows[0].meta.ai_enabled);
     const row = r0.rows[0];
     let text = row.raw_text || '';
-    if (row.pdf_data) { const ex = await pdfx.extractText(row.pdf_data); if (ex.text) text = ex.text; }
-    const r = await orderAi.extractFields({ text, pdfBuffer: row.pdf_data, pdfName: row.pdf_name, aiEnabled });
+    let docText;
+    if (row.pdf_data) { docText = ''; const ex = await pdfx.extractText(row.pdf_data); if (ex.text) { text = ex.text; docText = ex.text; } }
+    const r = await orderAi.extractFields({ text, docText, pdfBuffer: row.pdf_data, pdfName: row.pdf_name, aiEnabled, companyId: own(req) });
     const { rows } = await pool.query(
       `UPDATE inbound_orders SET extracted=$1, confidence=$2, ai_used=$3, status='parsed', updated_at=now()
          WHERE id=$4 AND company_id=$5 RETURNING ${LIST_COLS}`,

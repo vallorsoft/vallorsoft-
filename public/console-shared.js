@@ -1181,7 +1181,7 @@ function orderScanFile(input){
         _ordScanPending={ fileName:f.name, dataUrl:p.dataUrl };
         var filled=orderScanFill(r.fields||{});
         _ordScanInfo=r.fields||{};
-        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used });
+        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used, ocr_used:r.ocr_used });
         toast(t('cs.os.done')+filled,'ok');
       }else{
         _ordScanPending=null;
@@ -1290,7 +1290,7 @@ function renderOrdScanStatus(o){
     +'<span class="text-muted">'+esc(o.fileName)+'</span></div>'
     +'<div class="text-muted" style="margin-top:4px;">'
     +esc(t('cs.os.filled'))+': <b>'+o.filled+'</b> · '+esc(t('cs.os.conf'))+': '+conf
-    +(o.ai_used?'':' · <span style="color:var(--status-warn);">'+esc(t('cs.os.noAi'))+'</span>')+'</div>'
+    +' · <span style="color:var(--status-warn);">'+esc(t(o.ocr_used?'cs.os.localOcr':'cs.os.noAi'))+'</span></div>'
     +(extra.length?'<div class="text-muted" style="margin-top:4px;">'+extra.join(' · ')+'</div>':'')
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;">'
     +'<input type="checkbox" id="ordScanAttach" checked style="width:15px;height:15px;cursor:pointer;"> '
