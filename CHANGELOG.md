@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-11-25 — 📄 Megbízás-kiolvasás: a kiolvasott fel-/lerakók a fuvar-kiíró állomás-listájába kerülnek (PR #__PR__)
+- **Gond:** a kiolvasás a régi (rejtett) űrlapmezőkbe írt; a fuvar-kiíró 2. lépésének állomás-listája csak akkor vette át, ha még teljesen üres volt → ha már volt (üres) állomás, vagy előtte léptek a lépések között, egyetlen állomás sem jelent meg.
+- **Javítás:** új `ocLoadScannedStops` (`public/order-wizard.js`) — a kiolvasás után az állomás-lista MINDIG a kiolvasott pontokból épül újra (több felrakó/lerakó is, dátummal + órával), a rejtett mezőket is szinkronizálva; az `orderScanFill` hívja. Cache-bust `?v=20261125scanstops`.
+
 ## 2026-11-25 — 📄 Megbízás-kiolvasás: valódi (EUROLEXIM-típusú) megbízás is (PR #681)
 - Szóközzel írt dátum („24 11 2026"), „LOCUL INCARCARII / DATA  DESCARCARII" (rag + dupla szóköz), „PRETUL TRANSPORTULUI", „CANTITATEA MARFURILOR 23.5" (tonna → kg), „TIPUL CAMIONULUI … COMPLET" → FTL, fejléc-szám címke nélkül („NR8228/23 11 2026" → 8228), címke nélküli „RO 15650427" CUI a fejlécben.
 - Több soros felrakó-cím: a cég a jogi formánál válik le („KLINKIER PRZYSUCHA S.A."), irányítószám-sor megmarad, a folytatás az időpontnál véget ér és az óra a ponté lesz (16:30). Az egyszavas nagybetűs cím-folytatás („NOVOTEL") nem szakasz-fejléc.

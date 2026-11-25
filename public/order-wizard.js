@@ -966,6 +966,25 @@
     _refreshView();
   }
 
+  // ── Megrendelő-kiolvasás (📄) eredménye → állomás-lista ──
+  // A kiolvasás MINDIG felülírja a 2. lépés állomásait (dátummal + órával), akkor is,
+  // ha a listában már volt (üres) állomás — korábban csak üres listánál vette át.
+  // A lépést nem váltja; a legacy mezőket is szinkronizálja.
+  function ocLoadScannedStops(stops) {
+    var list = (Array.isArray(stops) ? stops : []).filter(function (s) { return s && (s.loc || s.firma || s.data); });
+    if (!list.length) return 0;
+    OC.stops = list.slice(0, 20).map(function (s) {
+      var d = String(s.data || '');
+      return { kind: s.kind === 'delivery' ? 'delivery' : 'pickup', loc: s.loc || '', firma: s.firma || '',
+               data: d.slice(0, 10), time: _dtTime(d) };
+    });
+    OC.openStopIdx = 0;
+    _commitStopsToLegacy();
+    _renderStopsList();
+    _refreshView();
+    return OC.stops.length;
+  }
+  window.ocLoadScannedStops = ocLoadScannedStops;
   window.ocLoadStops = ocLoadStops;
   window.ocInit = ocInit;
   window.ocGoStep = ocGoStep;
