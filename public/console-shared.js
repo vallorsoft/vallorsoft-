@@ -3162,6 +3162,8 @@ function feEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g
 // a fuvar-állomás kötését és a Plecare/Sosire óráját).
 function feRowPunct(p){p=p||{};var meta={};Object.keys(p).forEach(function(k){if(k!=='tip'&&k!=='loc'&&k!=='data'&&k!=='time')meta[k]=p[k];});
   var gpsTag=(p.loc_source==='gps')?'<span class="badge info" title="'+feEsc((typeof t==='function'?t('sa.wbPlanned'):'Planificat')+': '+(p.loc_planned||''))+'" style="grid-column:1/-1;justify-self:start;">📍 '+feEsc(typeof t==='function'?t('sa.wbGpsTag'):'Adresă GPS')+'</span>':'';
+  if(p.time_source==='gps'){var _drv=((p.data_driver||'')+' '+(p.time_driver||'')).trim()||'—';
+    gpsTag+='<span class="badge warn" title="'+feEsc((typeof t==='function'?t('fed.gpsTimeTip'):'Ora scrisă de șofer')+': '+_drv)+'" style="grid-column:1/-1;justify-self:start;">🛰️ '+feEsc((typeof t==='function'?t('fed.gpsTimeTag'):'Oră corectată din GPS')+' ('+(p.time_conf||'')+'%) · '+(typeof t==='function'?t('fed.gpsTimeDrv'):'șofer')+': '+_drv)+'</span>';}
   return '<div class="fe-row" data-meta="'+feEsc(JSON.stringify(meta))+'" style="display:grid;grid-template-columns:1fr 2fr 1.1fr 0.9fr auto;gap:6px;align-items:center;">'+gpsTag
   +'<input class="input fe-p-tip" data-sg="punct_tip" placeholder="Tip" value="'+feEsc(p.tip)+'">'
   +'<input class="input fe-p-loc" data-sg="punct_loc" placeholder="Localitate" value="'+feEsc(p.loc)+'">'
@@ -3523,6 +3525,8 @@ function saveFuvEdit(){
     var o=Object.assign({},m,{tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value,time:((r.querySelector('.fe-p-time')||{}).value||'')});
     // kézi átírás után a GPS-jelölés már nem igaz
     if(o.loc_source==='gps'&&o.loc_gps&&o.loc!==o.loc_gps){delete o.loc_source;delete o.loc_gps;}
+    // kézi időátírás után a GPS-javítás többé nem írja felül (iroda döntött)
+    if(o.time_source==='gps'&&o.time_gps&&((o.time||'')+' '+(o.data||'').slice(0,10))!==o.time_gps){o.time_source='manual';}
     return o;});
   var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return _feCurPick(r,'.fe-a-val',{loc:r.querySelector('.fe-a-loc').value,data:((r.querySelector('.fe-a-data')||{}).value||''),tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0},'suma');});
   var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return _feCurPick(r,'.fe-c-val',{loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value,categorie:((r.querySelector('.fe-c-cat')||{}).value||'altele')},'pret');});
