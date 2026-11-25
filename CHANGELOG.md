@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-11-25 — 🏢 Megrendelő automatikusan az ügyfelek közé (ANAF, CUI alapján) + ANAF gomb a fuvar-kiíráson (PR #684)
+- **Kiolvasáskor:** ha a megrendelőn van CUI, a rendszer megnézi a cég ügyfelei közt; ha nincs, lekéri az ANAF-ból (hivatalos név, cím, Reg. Com.) és felveszi az Ügyfelek közé. A fuvar-kiíró ügyfél-választója kiválasztja, a megrendelő neve a hivatalos ANAF-név lesz. Állapot-sor: „Megrendelő felvéve az ANAF-ból" / „Megrendelő az ügyfelek közül" / „A CUI nem található". ANAF-hiba nem akasztja meg a kiolvasást.
+- **Fuvar-kiírás:** az ügyfél-választó mellett új **ANAF** gomb → CUI beírása → ha már ügyfél, azt választja ki; ha nem, felveszi az ANAF-adatokkal (`POST /api/clients/from-cui`, Admin/Manager). Az ügyfél-választó feliratai RO+HU.
+- **Javítás:** a fuvar-kiíró eddig a kiválasztott ügyfelet nem kötötte a fuvarhoz (csak a nevet írta be) — a `comCreate` most elmenti az `orders.client_id`-t (csak a saját cég ügyfele köthető). Ha a megrendelő nevét kézzel átírják, a kötés megszűnik.
+- Közös út: `lib/clientByCui.js` (`ensureClientByCui` / `findByCui` / `saveAnafClient`) — a szöveges fuvarkiírás (chat) ANAF-mentése is erre állt át (nincs duplikált beszúrás). Érvénytelen ellenőrző számjegyű CUI-val nem hívjuk az ANAF-ot. Teszt: `tests/unit/clientByCui.test.js`, `orderScan.test.js` (+4). Cache-bust `?v=20261125anafcl`.
+
 ## 2026-11-25 — 🧠 Megbízás-kiolvasás: tanulás a javításokból (címke, nem érték) + gomb-átnevezés (PR #683)
 - **Tanulás:** ha a kiolvasás után a diszpécser kijavítja a mezőket és elmenti a fuvart, a rendszer megkeresi a helyes értéket a dokumentum szövegében, és az előtte álló FELIRATOT jegyzi meg a megbízóhoz (`order_scan_rules`, pl. „ALFA: felrakás = »Punct A >>« után"). ÉRTÉKET nem tanul (felrakó / lerakó / ár / dátum fuvaronként más) — a régi értékalapú alapértelmezés (pénznem / FTL / méret) kivezetve, a tárolt minták kiürítve. Legközelebb a megbízót CUI-ból / névből felismeri, és a tanult címke után (vagy alatta) olvas a friss dokumentumból. A szabály a további mentésekből erősödik (megtartott érték) vagy gyengül (javított érték); a gyenge szabály törlődik.
 - `lib/orderLearn.js` (`learnRules` / `applyRules` / `identifyClient`), `order_scan_jobs` (a kiolvasás a mentésig, max. 3 nap), `order_scan_samples.cui`. Migráció `db/order-scan-rules.sql`. A 🧠 Tanult adatok fülön látszik, mely mezőkhöz van tanult címke, és törölhető.

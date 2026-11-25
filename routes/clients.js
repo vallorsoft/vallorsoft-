@@ -34,6 +34,21 @@ router.get('/api/clients/anaf', requireLogin, async (req, res) => {
   }
 });
 
+// Ügyfél felvétele CUI alapján az ANAF-ból (a fuvar-kiíró „ANAF" gombja).
+// Ha a cég ügyfelei közt már megvan, azt adja vissza (nincs duplikátum).
+router.post('/api/clients/from-cui', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
+  const cui = String((req.body || {}).cui || '').trim();
+  if (!cui) return res.status(400).json({ error: 'CUI este obligatoriu.' });
+  try {
+    const r = await require('../lib/clientByCui').ensureClientByCui(req.session.user.company_id, cui,
+      { req, source: 'order_form_anaf' });
+    if (r.client) return res.json({ client: r.client, created: !!r.created });
+    if (r.invalid) return res.status(400).json({ error: 'CUI invalid.' });
+    if (r.notFound) return res.status(404).json({ error: 'CUI-ul nu a fost găsit la ANAF.' });
+    return res.status(502).json({ error: 'ANAF indisponibil: ' + (r.err || '') });
+  } catch (e) { console.error('POST /api/clients/from-cui hiba:', e.message); res.status(500).json({ error: 'Eroare de server' }); }
+});
+
 router.get('/api/clients/:id', requireLogin, async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT * FROM clients WHERE id=$1 AND company_id=$2`,
