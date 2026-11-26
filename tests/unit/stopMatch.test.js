@@ -104,6 +104,9 @@ describe('stopMatch motor', () => {
     expect(sm.cityQuery('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL, NOVOTEL')).toBe('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL');
     expect(sm.cityQuery('Novotel, Sos. Bucuresti-Ploiesti 93A, București')).toBe('București');
     expect(sm.cityQuery('NOVOTEL')).toBe('NOVOTEL');
+    // betűs végű országút (DN14B, DJ107A) sem település
+    expect(sm.cityQuery('DN14B, Sibiu')).toBe('Sibiu');
+    expect(sm.cityQuery('DJ107A, Baciu')).toBe('Baciu');
     expect(sm.norm('Brașov')).toBe('brasov');
   });
 });

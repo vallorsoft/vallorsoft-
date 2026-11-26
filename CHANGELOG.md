@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-11-26 — 📍 Cím-felismerés: a cím végi szálloda-/építkezés-név (NOVOTEL) nem település (PR #686)
+- **Hiba:** a „SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL, NOVOTEL" lerakónál a `cityQuery` a „NOVOTEL"-t vette településnek, ezért a lerakás GPS-állását nem találta meg, és a sofőrnek nem ajánlotta fel (a „Megérkeztem" gomb ~5 órával a lerakás után is látszott). AI nem kell hozzá — a GPS-alapú felismerés (`stopMatch` / `stopAutoEvents`) dolgozik.
+- **Fix:** `lib/stopMatch.js` `VENUE_RE` (hotel / novotel / ibis / mercure / hilton / marriott / santier) — ilyen darab, ha van más darab is, nem lehet település; marad az út-szöveg. Egyetlen darabos cím változatlan. Teszt: `tests/unit/stopMatch.test.js` (+3).
+- **Fix 2:** `lib/placeName.js` `STREET_RE` — a betűs végű országút (`DN14B`, `DJ107A`, `DC…`) is útnak számít (eddig a `dn\d*\b` nem fogta meg → „DN14B" lett a település, a visszamenőleg kiírt fuvar lerakói sosem párosodtak). Teszt: `stopMatch.test.js` cityQuery (+2).
+
 ## 2026-11-25 — 📄 Megbízás-kiolvasás: dátum nem kerül a címbe + ismételt cím nem új felrakó (PR #685)
 - **Dátum:** a címből kikerül minden dátum (napnévvel — „Joi, 27 noiembrie 2026" —, szöveges hónappal, év nélkül „28.11.", tartománnyal „28-29.11.2026"), és beolvasódik a ponthoz. Új formák: „Nov 27, 2026", év nélküli „28.11." (a megbízás évével), tartománynál a kezdő nap. Az „1 Decembrie" / „1 Mai" utcanév nem dátum.
 - **Ismétlődő cím:** ugyanaz a cím (pl. a megbízás végi összesítőben újra leírva) nem lesz második felrakó / lerakó — összevonódik. Külön pont marad, ha más a dátum / óra, más a cég, vagy a cím más rakodóhelyet jelöl (rampa / hala / kapu / raktár / dock …).
