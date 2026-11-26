@@ -100,6 +100,10 @@ describe('stopMatch motor', () => {
     expect(sm.cityQuery('DN1 km 12, Bod, Brașov')).toBe('Bod');
     expect(sm.cityQuery('Copșa Mică')).toBe('Copșa Mică');
     expect(sm.cityQuery('Arad, Strada X 2')).toBe('Arad');
+    // szálloda-építkezés a cím végén: a „NOVOTEL" nem település → a cím (út) marad geokódolható szöveg
+    expect(sm.cityQuery('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL, NOVOTEL')).toBe('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL');
+    expect(sm.cityQuery('Novotel, Sos. Bucuresti-Ploiesti 93A, București')).toBe('București');
+    expect(sm.cityQuery('NOVOTEL')).toBe('NOVOTEL');
     expect(sm.norm('Brașov')).toBe('brasov');
   });
 });
