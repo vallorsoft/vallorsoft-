@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-11-27 — 🤖 Elfelejtett állomás-gomb: a sofőrnek felajánlott GPS-találat végre megjelenik (PR #686, 2. kör)
+Teljes átvizsgálás (sor / felismerő motor / GPS-adat / pótlás) után a hibák, amelyek miatt a lerakás után sem jött felajánlás:
+- **A rendszer lezárta a fuvart a sofőr jóváhagyása előtt** — ha az utolsó lerakót is a GPS-ből írtuk be, a fuvar `Finalizat` lett, és a lezárt fuvar beírásai a sofőrnek már nem jelentek meg. Most a fuvar `In Curs` marad, és a sofőr jóváhagyása / javítása után zárul (`finalizeIfDone`: minden állomás kész ÉS minden beírás jóváhagyva).
+- **Időablak:** a GPS-ablak a legutolsó tervezett nap +2 napjáig tartott → a későn lerakott / dátum nélküli állomás GPS-e be se töltődött. Folyamatban lévő fuvarnál a mai napig tart; a 14 napos vágás a fuvar ELEJÉT tartja meg (utólag kiírt fuvar).
+- **Sor:** a még soha nem ellenőrzött fuvar (pl. utólag kiírt) a sor VÉGÉRE került (`requeued` NULL) — most legelőre. A korán (a tervezett nap előtt) lerakott állomásnál is keres (+2 nap); a 12 próbálkozás után is újrapróbál, ha új GPS-pont jött; a lezárt fuvar egyszeri ellenőrzése nem vész el, ha a GPS-nap még nincs letöltve.
+- **Végellenőrzés:** a sofőr KÉSŐN nyomott gombjához mérte a következő állomást (nem a GPS-távozáshoz) → a jó beírást visszavonta, és örökre tiltotta. Javítva (`verifyChain`, és a felismerő motor `prevDone`-ja is: a GPS-távozás a horgony, az utólagos gombnyomás nem tolja ki a valódi állásokat).
+- **Ismétlődő hely („DN14B" ×3):** egy fel nem ismert korábbi azonos helyű állomás minden későbbit megakasztott. Most csak az akasztja meg, akinek ugyanaz az állása (átfedés), vagy dátum nélkül / ugyanarra a napra tervezett.
+- **Cím-felismerés:** csak útból álló cím („DN14B") nem geokódolódik településként (a kiíráskor választott pont / a cég neve az út mentén); a kiíráskor választott koordináta mindig érvényes; „km 12", „Zona Industriala", „A1", házszámos „Gyár utca 5" / „Hauptstrasse 1", végén álló irányítószám; a csak utcás cím a szálloda-név és a „nr" nélkül geokódolódik.
+- **Geokód:** átmeneti szolgáltató-hiba (429 / időtúllépés) nem kerül 3 napra „nem található"-ként a cache-be; enyhe Románia-központú előny.
+- **Sofőr:** a bemutatóra ugrás nem szakítja meg a GPS-ből pótolt állomások átnézését. Cache-bust `sofer.js?v=20261127autostop`.
+- **Migráció** `db/zzz-stop-autofill-chain-requeue.sql`: a hibás okkal visszavont beírások tiltása feloldva, a folyamatban lévő fuvarok újra sorba állítva.
+- Tesztek: `stopAutoEvents` / `stopVerify` / `stopMatch` / `stopPressHourly` (+13).
+
+## 2026-11-26 — 📍 Cím-felismerés: a cím végi szálloda-/építkezés-név (NOVOTEL) nem település (PR #686)
+- **Hiba:** a „SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL, NOVOTEL" lerakónál a `cityQuery` a „NOVOTEL"-t vette településnek, ezért a lerakás GPS-állását nem találta meg, és a sofőrnek nem ajánlotta fel (a „Megérkeztem" gomb ~5 órával a lerakás után is látszott). AI nem kell hozzá — a GPS-alapú felismerés (`stopMatch` / `stopAutoEvents`) dolgozik.
+- **Fix:** `lib/stopMatch.js` `VENUE_RE` (hotel / novotel / ibis / mercure / hilton / marriott / santier) — ilyen darab, ha van más darab is, nem lehet település; marad az út-szöveg. Egyetlen darabos cím változatlan. Teszt: `tests/unit/stopMatch.test.js` (+3).
+- **Fix 2:** `lib/placeName.js` `STREET_RE` — a betűs végű országút (`DN14B`, `DJ107A`, `DC…`) is útnak számít (eddig a `dn\d*\b` nem fogta meg → „DN14B" lett a település, a visszamenőleg kiírt fuvar lerakói sosem párosodtak). Teszt: `stopMatch.test.js` cityQuery (+2).
+
 ## 2026-11-25 — 📄 Megbízás-kiolvasás: dátum nem kerül a címbe + ismételt cím nem új felrakó (PR #685)
 - **Dátum:** a címből kikerül minden dátum (napnévvel — „Joi, 27 noiembrie 2026" —, szöveges hónappal, év nélkül „28.11.", tartománnyal „28-29.11.2026"), és beolvasódik a ponthoz. Új formák: „Nov 27, 2026", év nélküli „28.11." (a megbízás évével), tartománynál a kezdő nap. Az „1 Decembrie" / „1 Mai" utcanév nem dátum.
 - **Ismétlődő cím:** ugyanaz a cím (pl. a megbízás végi összesítőben újra leírva) nem lesz második felrakó / lerakó — összevonódik. Külön pont marad, ha más a dátum / óra, más a cég, vagy a cím más rakodóhelyet jelöl (rampa / hala / kapu / raktár / dock …).

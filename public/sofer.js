@@ -5341,6 +5341,9 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
           var st = stateGet && stateGet();
           if (st && st.draft) return;
         } catch(_){}
+        // a GPS-ből pótolt állomások átnézése (🤖) ne vesszen el a bemutatóra ugrással
+        var am = document.getElementById('autoStopModal');
+        if (am && am.style.display === 'flex') return;
         window.location.href = '/sofer-demo';
       }, 1200);
     } catch (_) {}

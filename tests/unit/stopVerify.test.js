@@ -57,6 +57,20 @@ describe('végellenőrzés — verifyChain', () => {
     ];
     expect(ae.verifyChain(st).map((b) => b.reason)).toEqual(['order_time']);
   });
+  test('a sofőr KÉSŐN nyomta meg az előző állomást: a GPS szerinti távozás a mérce, a későbbi beírás jó', () => {
+    const st = [
+      { id: 1, loc: 'A', done_at: T('2026-11-11', '20:00'), gps_arrived_at: T('2026-11-11', '08:00'), gps_left_at: T('2026-11-11', '09:00') },
+      auto({ id: 2, loc: 'B', done_at: T('2026-11-11', '14:00'), arrived_at: T('2026-11-11', '13:00'), gps_arrived_at: T('2026-11-11', '13:00'), gps_left_at: T('2026-11-11', '14:00') }),
+    ];
+    expect(ae.verifyChain(st)).toEqual([]);
+  });
+  test('ismétlődő hely: a korábbi, fel nem ismert (előző napra tervezett) állomás nem teszi hibássá a későbbit', () => {
+    const st = [
+      { id: 2, loc: 'DN14B', done_at: null, data: '2026-11-10' },
+      auto({ id: 4, loc: 'DN14B', done_at: T('2026-11-11', '14:00'), arrived_at: T('2026-11-11', '13:00'), gps_arrived_at: T('2026-11-11', '13:00'), gps_left_at: T('2026-11-11', '14:00'), data: '2026-11-11' }),
+    ];
+    expect(ae.verifyChain(st)).toEqual([]);
+  });
   test('a beírt idő eltér a GPS-állástól → hibás', () => {
     const st = [auto({ id: 1, loc: 'A', done_at: T('2026-11-11', '15:00'), arrived_at: T('2026-11-11', '08:00'), gps_arrived_at: T('2026-11-11', '08:00'), gps_left_at: T('2026-11-11', '09:00') })];
     expect(ae.verifyChain(st).map((b) => b.reason)).toEqual(['gps_mismatch']);

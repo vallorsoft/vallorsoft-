@@ -124,6 +124,17 @@ describe('handlers/stopAutoEvents — csak a sofőr, csak a saját', () => {
     expect(params).toEqual([[5], 7, 'a@b.ro']);
     expect(res.json.mock.calls[0][0].result.acked).toBe(1);
   });
+  test('jóváhagyás után: a fuvar csak akkor zárul, ha minden állomás kész és minden beírás jóváhagyott', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    pool.query.mockResolvedValueOnce({ rows: [{ id: 5 }], rowCount: 1 });
+    pool.query.mockResolvedValue({ rows: [{ order_id: 'O1' }], rowCount: 1 });
+    const res = resMock();
+    await h.ackAutoStopEvents(req(drv), res, [{ ids: [5] }]);
+    const fin = pool.query.mock.calls.find((c) => /SET status='Finalizat'/.test(c[0]));
+    expect(fin).toBeTruthy();
+    expect(fin[0]).toMatch(/done_at IS NULL OR \(auto_filled IS NOT NULL AND auto_ack_at IS NULL\)/);
+    expect(fin[1]).toEqual(['O1', 7]);
+  });
   test('jóváhagyás előtti ellenőrzés: a nem stimmelő beírás visszanyílik, nem lesz jóváhagyva', async () => {
     pool.query.mockResolvedValueOnce(rows([{ order_id: 'O1' }]));
     pool.query.mockResolvedValueOnce(rows([
@@ -172,6 +183,22 @@ describe('ismétlődő hely a fuvarban (4. = 6. állomás, egy nappal később)'
     expect(p).toEqual([]);
     expect(p.skips.map((x) => x.reason)).toEqual(['not_sure', 'same_site_open']);
   });
+  test('a korábbi, fel nem ismert azonos helyű állomás (korábbi napra tervezve) nem akasztja meg a későbbit', () => {
+    const day = new Date(Date.parse(T('09:00'))).toISOString().slice(0, 10);
+    const prev = new Date(Date.parse(day + 'T12:00:00Z') - 86400000).toISOString().slice(0, 10);
+    const p = ae.planAutoFill([
+      stop({ id: 2, loc: 'DN14B', kind: 'delivery', data: prev, match_status: 'unmatched' }),
+      stop({ id: 4, loc: 'DN14B', kind: 'delivery', data: day, match_status: 'auto', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
+    ], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([4]);
+  });
+  test('a korábbi azonos helyű állomás MÁSIK GPS-állása nem akasztja meg a későbbit', () => {
+    const p = ae.planAutoFill([
+      stop({ id: 2, loc: 'Arad', match_status: 'suggested', match_score: 50, match_detail: { votes: 1 }, gps_arrived_at: T('05:00'), gps_left_at: T('06:00') }),
+      stop({ id: 4, loc: 'Arad', match_status: 'auto', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
+    ], last, NOW);
+    expect(p.map((x) => x.id)).toEqual([4]);
+  });
   test('más helyű állomás nem akasztja meg', () => {
     const p = ae.planAutoFill([
       stop({ id: 4, loc: 'Cluj', match_status: 'unmatched' }),
@@ -197,5 +224,28 @@ describe('ismétlődő hely a fuvarban (4. = 6. állomás, egy nappal később)'
       stop({ id: 7, loc: 'Arad', kind: 'delivery', data: day, match_status: 'auto', gps_arrived_at: T('08:00'), gps_left_at: T('09:00') }),
     ], last, NOW);
     expect(p.map((x) => x.id)).toEqual([7]);
+  });
+});
+
+describe('applyAutoEvents — a rendszer nem zárja le a fuvart a sofőr jóváhagyása előtt', () => {
+  beforeEach(() => reset());
+  test('az utolsó lerakót is a GPS-ből írtuk be → a fuvar In Curs marad (a sofőr még látja)', async () => {
+    const stopsRow = [
+      { id: 1, kind: 'pickup', loc: 'A', done_at: T('05:00'), arrived_at: T('04:00'), match_status: 'auto', gps_arrived_at: T('04:00'), gps_left_at: T('05:00') },
+      { id: 2, kind: 'delivery', loc: 'B', done_at: null, arrived_at: null, match_status: 'auto', match_detail: { votes: 3 }, gps_arrived_at: T('08:00'), gps_left_at: T('09:00') },
+    ];
+    let filled = false;
+    pool.query.mockImplementation(async (sql) => {
+      if (/FROM orders WHERE id=\$1/.test(sql)) return rows([{ id: 'O1', status: 'In Curs', email_sofer: 'a@b.ro' }]);
+      if (/stop_match_settings/.test(sql)) return rows([]);
+      if (/FROM order_stops WHERE order_id=\$1/.test(sql)) {
+        return rows(filled ? stopsRow.map((s) => s.id === 2 ? { ...s, done_at: T('09:00'), arrived_at: T('08:00'), auto_filled: 'both' } : s) : stopsRow);
+      }
+      if (/SET arrived_at = COALESCE/.test(sql)) { filled = true; return { rows: [], rowCount: 1 }; }
+      return { rows: [], rowCount: 0 };
+    });
+    const out = await ae.applyAutoEvents(7, 'O1', { lastPtSec: sec('11:00'), now: NOW });
+    expect(out.filled).toBe(1);
+    expect(pool.query.mock.calls.some((c) => /status=\$3/.test(c[0]) && c[1] && c[1][2] === 'Finalizat')).toBe(false);
   });
 });
