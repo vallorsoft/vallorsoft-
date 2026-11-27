@@ -89,6 +89,15 @@ function _notifyOffice(u, stop, what) {
   } catch (_) {}
 }
 
+// a sofőr döntése után: ha a fuvar minden állomása kész és mindent jóváhagyott, lezárjuk
+async function _finalizeOrdersOf(cid, stopIds) {
+  try {
+    const ord = (await pool.query(
+      `SELECT DISTINCT order_id FROM order_stops WHERE id = ANY($1::bigint[]) AND company_id=$2`, [stopIds, cid])).rows;
+    for (const o of ord) await autoEv.finalizeIfDone(cid, o.order_id);
+  } catch (e) { console.warn('[StopAuto] lezárás hiba', e.message); }
+}
+
 handlers.getMyAutoStopEvents = async function (req, res) {
   try {
     const u = req.session && req.session.user;
@@ -156,6 +165,7 @@ handlers.ackAutoStopEvents = async function (req, res, args) {
     await _learn(u.company_id, (r.rows || []).map((x) => ({ signals: x.match_detail && x.match_detail.signals, ok: true })));
     // a sofőr jóváhagyása a hely megerősítése is — az irodának külön nem kell
     for (const x of r.rows || []) await _confirmByDriver(u, x.id);
+    await _finalizeOrdersOf(u.company_id, okIds);
     return res.json({ result: { ok: true, acked: r.rowCount, reverted } });
   } catch (err) {
     console.error('ackAutoStopEvents hiba:', err.message);
@@ -183,6 +193,7 @@ handlers.correctAutoStopTime = async function (req, res, args) {
       [s.id, u.company_id, arr, done, JSON.stringify(orig)]);
     audit.fromReq(req, 'order.stop_auto.correct_time', 'order_stop', String(s.id), { order: s.order_id, orig, arrived_at: arr, done_at: done });
     await _confirmByDriver(u, s.id);   // a hely ugyanaz, csak az idő változott
+    await _finalizeOrdersOf(u.company_id, [s.id]);
     _notifyOffice(u, s, 'oră');
     return res.json({ result: { ok: true } });
   } catch (err) {
@@ -255,6 +266,7 @@ handlers.correctAutoStopMap = async function (req, res, args) {
       await _learn(u.company_id, [{ signals: s.match_detail && s.match_detail.signals, ok: false,
         bad: { lat: s.actual_lat, lng: s.actual_lng, firma: s.firma } }]);
     }
+    await _finalizeOrdersOf(u.company_id, [s.id]);
     _notifyOffice(u, s, 'hartă');
     // háttérben: cím a kijelölt pontra (cache-elt, fojtott) + menetlevél frissítése, ha kérték — nem várjuk meg
     const cid = u.company_id;

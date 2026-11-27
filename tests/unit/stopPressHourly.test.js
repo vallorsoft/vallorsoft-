@@ -46,7 +46,22 @@ describe('pickQueue — igazságos sorrend', () => {
     pool.query.mockResolvedValueOnce(rows([]));
     await runner.pickQueue(10, new Date());
     const [sql] = pool.query.mock.calls[0];
-    expect(sql).toMatch(/ORDER BY st\.requeued DESC NULLS LAST, st\.attempted_at ASC NULLS FIRST/);
+    expect(sql).toMatch(/ORDER BY \(st\.order_id IS NULL\) DESC, st\.requeued DESC NULLS LAST, st\.attempted_at ASC NULLS FIRST/);
+  });
+  test('a még soha nem ellenőrzött fuvar kerül legelőre (nincs állapot-sora)', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    await runner.pickQueue(10, new Date());
+    const [sql] = pool.query.mock.calls[0];
+    expect(sql.indexOf('(st.order_id IS NULL) DESC')).toBeLessThan(sql.indexOf('st.requeued DESC'));
+  });
+  test('korai lerakás: a holnapi / holnaputáni nyitott állomásnál is keres', () => {
+    expect(runner.PRESS_DUE_SQL).toMatch(/::date \+ 2\b/);
+  });
+  test('a 12 próbálkozás után is újrapróbál, ha új GPS-pont jött', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    await runner.pickQueue(10, new Date());
+    const [sql] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/st\.attempts < 12 OR EXISTS \(SELECT 1 FROM gps_track_days/);
   });
 });
 

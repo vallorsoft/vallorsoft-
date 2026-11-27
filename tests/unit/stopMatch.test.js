@@ -101,12 +101,25 @@ describe('stopMatch motor', () => {
     expect(sm.cityQuery('Copșa Mică')).toBe('Copșa Mică');
     expect(sm.cityQuery('Arad, Strada X 2')).toBe('Arad');
     // szálloda-építkezés a cím végén: a „NOVOTEL" nem település → a cím (út) marad geokódolható szöveg
-    expect(sm.cityQuery('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL, NOVOTEL')).toBe('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL');
+    expect(sm.cityQuery('SOS BUCURESTI-PLOIESTI NR 93A SANTIER HOTEL, NOVOTEL')).toBe('SOS BUCURESTI-PLOIESTI 93A');
     expect(sm.cityQuery('Novotel, Sos. Bucuresti-Ploiesti 93A, București')).toBe('București');
     expect(sm.cityQuery('NOVOTEL')).toBe('NOVOTEL');
     // betűs végű országút (DN14B, DJ107A) sem település
     expect(sm.cityQuery('DN14B, Sibiu')).toBe('Sibiu');
     expect(sm.cityQuery('DJ107A, Baciu')).toBe('Baciu');
+    // km-szelvény, ipari zóna, autópálya, házszámos utca, végén álló irányítószám
+    expect(sm.cityQuery('DN 1, km 12, Bod')).toBe('Bod');
+    expect(sm.cityQuery('Zona Industriala Vest, Arad')).toBe('Arad');
+    expect(sm.cityQuery('A1, Sibiu')).toBe('Sibiu');
+    expect(sm.cityQuery('Autostrada A1 km 10, Sibiu')).toBe('Sibiu');
+    expect(sm.cityQuery('Gyár utca 5, Budapest')).toBe('Budapest');
+    expect(sm.cityQuery('Hauptstrasse 1, 80331 München')).toBe('München');
+    expect(sm.cityQuery('Strada Gării 2, Baciu 407055, Cluj')).toBe('Baciu');
+    // csak út a címben: a motor nem geokódolja a puszta utat településként
+    expect(sm.isRoadOnly('DN14B')).toBe(true);
+    expect(sm.isRoadOnly('DN 14B, RO')).toBe(true);
+    expect(sm.isRoadOnly('DN14B, Sibiu')).toBe(false);
+    expect(sm.isRoadOnly('Arad')).toBe(false);
     expect(sm.norm('Brașov')).toBe('brasov');
   });
 });

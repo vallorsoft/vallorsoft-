@@ -1737,8 +1737,11 @@ function startStopMatchScheduler() {
         if (!(await allowed(q.company_id))) continue;
         n++;
         try {
-          await runner.matchOrder(q.company_id, q.id, { recheck: q.recheck === true });
-          if (q.status === 'Finalizat') await runner.markClosedReviewed(q.id);
+          const r = await runner.matchOrder(q.company_id, q.id, { recheck: q.recheck === true });
+          // lezárt fuvar egyszeri ellenőrzése: ha a GPS-nap még nincs letöltve (no_gps), később újra
+          // próbáljuk (6 óránként, legfeljebb 8×) — nem zárjuk le az egyetlen esélyt adat nélkül
+          const noGpsYet = r && r.status === 'no_gps' && Number(q.attempts || 0) < 8;
+          if (q.status === 'Finalizat' && !noGpsYet) await runner.markClosedReviewed(q.id);
         }
         catch (e) {
           console.warn('[StopMatch] fuvar hiba', q.id, e.message);
